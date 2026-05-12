@@ -580,7 +580,7 @@ function renderNodes() {
     return rightEdge - (NODE_PORT_LEFT_X - NODE_PORT_R);
   });
   merged.select(".node-hover-dot-left").style("display", (d) => (canReceiveInput(d) ? null : "none"));
-  merged.select(".node-hover-dot-right").attr("cx", (d) => nodeRightPortX(d)).style("display", (d) => (nodeOutputs(d).length ? null : "none"));
+  merged.select(".node-hover-dot-right").attr("cx", (d) => nodeRightPortX(d)).style("display", (d) => (hasFreeOutputs(d) && !isPlaceholderNode(d) ? null : "none"));
   merged.select(".node-add-button").style("display", (d) => (hasFreeOutputs(d) && !isPlaceholderNode(d) ? null : "none"));
   merged.select(".node-more-icon").style("display", (d) => (isStartNode(d) ? "none" : null));
   merged.each(function (d) {
