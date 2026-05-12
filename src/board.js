@@ -152,6 +152,8 @@ let hoveredId = null;
 let pendingSourceId = null;
 let operationSourceId = null;
 let operationReplaceId = null;
+let operationOutputKey = null;
+let outcomeMenuSourceId = null;
 let settingsNodeId = null;
 let settingsDrafts = {};
 let settingsErrors = {};
@@ -177,6 +179,7 @@ const zoom = d3
     return false;
   })
   .on("start", (event) => {
+    closeOutcomeMenu();
     if (event.sourceEvent?.button === 2 || event.sourceEvent?.touches?.length === 2) {
       document.body.classList.add("is-board-panning");
     }
@@ -260,6 +263,7 @@ function wireControls() {
   document.addEventListener(
     "click",
     (event) => {
+      if (outcomeMenuSourceId && !event.target.closest("#outcomeMenu") && !event.target.closest(".node-add-button")) closeOutcomeMenu();
       if (!document.body.classList.contains("is-node-settings-open") || isSettingsCloseConfirmOpen) return;
       if (event.target.closest("#nodeSettingsSidebar") || event.target.closest("#nodeSettingsCloseConfirm")) return;
       requestNodeSettingsClose();
@@ -286,6 +290,14 @@ function wireControls() {
     if (event.target.id === "operationModal") closeOperationModal();
   });
   document.querySelector("#operationModalClose").addEventListener("click", closeOperationModal);
+  document.querySelector("#outcomeMenu").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-outcome-key]");
+    if (!button) return;
+    const sourceId = outcomeMenuSourceId;
+    const outputKey = button.dataset.outcomeKey;
+    closeOutcomeMenu();
+    openOperationModal(sourceId, null, outputKey);
+  });
   document.querySelector("#nodeSettingsBackdrop").addEventListener("click", handleNodeSettingsBackdropClick);
   document.querySelector("#nodeSettingsCloseConfirmMask").addEventListener("click", (event) => {
     if (event.target.id === "nodeSettingsCloseConfirmMask") closeSettingsCloseConfirm();
@@ -300,9 +312,10 @@ function wireControls() {
     card.addEventListener("click", () => {
       const sourceId = operationSourceId;
       const replaceId = operationReplaceId;
+      const outputKey = operationOutputKey;
       const operationType = card.dataset.operation || null;
       closeOperationModal();
-      const nodeId = replaceId ? replacePlaceholderNode(replaceId, card.dataset.kind || "empty", operationType) : addNode(card.dataset.kind || "empty", sourceId, operationType);
+      const nodeId = replaceId ? replacePlaceholderNode(replaceId, card.dataset.kind || "empty", operationType) : addNode(card.dataset.kind || "empty", sourceId, operationType, outputKey);
       const nodeItem = getNode(nodeId);
       if (nodeItem && isConfigurableTransferNode(nodeItem)) {
         pendingSettingsNodeIds.add(nodeId);
@@ -528,7 +541,7 @@ function renderNodes() {
   merged.select(".node-add-button").on("click", (event, d) => {
     event.stopPropagation();
     if (!hasFreeOutputs(d)) return;
-    openOperationModal(d.id);
+    openOutcomeMenu(d.id);
   });
   merged.select(".node-more-icon").on("click", (event, d) => {
     event.stopPropagation();
@@ -720,16 +733,16 @@ function renderProperties() {
   });
 }
 
-function addNode(kind, sourceId = null, operationType = null) {
+function addNode(kind, sourceId = null, operationType = null, outputKey = null) {
   pushHistory();
   const sourceNode = sourceId ? getNode(sourceId) : null;
-  const position = sourceNode ? nextNodePosition(sourceNode) : centerNodePosition();
+  const position = sourceNode ? nextNodePosition(sourceNode, outputKey) : centerNodePosition();
   const id = `${kind}-${Date.now().toString(36)}`;
   const nextNode = node(id, kind, position.x, position.y);
   configureNodeForOperation(nextNode, operationType);
   state.nodes.push(nextNode);
   if (sourceNode) {
-    state.edges.push(createOutputEdge(sourceNode, id));
+    state.edges.push(createOutputEdge(sourceNode, id, outputKey));
   }
   if (isTransferWithFallbackNode(nextNode)) createFallbackPlaceholderFor(nextNode);
   selectedId = id;
@@ -778,8 +791,8 @@ function createFallbackPlaceholderFor(sourceNode) {
   return placeholder;
 }
 
-function createOutputEdge(sourceNode, targetId) {
-  const output = firstFreeOutput(sourceNode);
+function createOutputEdge(sourceNode, targetId, outputKey = null) {
+  const output = outputKey ? nodeOutputs(sourceNode).find((item) => item.key === outputKey) : firstFreeOutput(sourceNode);
   if (!output) return edge(sourceNode.id, targetId);
   return edge(sourceNode.id, targetId, output.label || "", output.tone || "plain", output.key);
 }
@@ -791,8 +804,8 @@ function centerNodePosition() {
   return { x: x - NODE_W / 2, y: y - NODE_H / 2 };
 }
 
-function nextNodePosition(sourceNode) {
-  const output = firstFreeOutput(sourceNode);
+function nextNodePosition(sourceNode, outputKey = null) {
+  const output = outputKey ? nodeOutputs(sourceNode).find((item) => item.key === outputKey) : firstFreeOutput(sourceNode);
   const gap = output?.key === "failed" ? FALLBACK_CREATE_GAP_X : NODE_CREATE_GAP_X;
   return { x: sourceNode.x + NODE_W + gap, y: sourceNode.y };
 }
@@ -809,6 +822,10 @@ function firstFreeOutput(nodeItem) {
   return nodeOutputs(nodeItem).find((output) => !state.edges.some((edgeItem) => edgeItem.source === nodeItem.id && (edgeItem.outputKey || "main") === output.key));
 }
 
+function freeOutputs(nodeItem) {
+  return nodeOutputs(nodeItem).filter((output) => !state.edges.some((edgeItem) => edgeItem.source === nodeItem.id && (edgeItem.outputKey || "main") === output.key));
+}
+
 function hasFreeOutputs(nodeItem) {
   return Boolean(firstFreeOutput(nodeItem));
 }
@@ -817,9 +834,48 @@ function isPlaceholderNode(nodeItem) {
   return nodeItem?.kind === "empty";
 }
 
-function openOperationModal(sourceId = null, replaceId = null) {
+function openOutcomeMenu(sourceId) {
+  const sourceNode = getNode(sourceId);
+  const outputs = freeOutputs(sourceNode);
+  if (!sourceNode || !outputs.length) return;
+  if (outputs.length === 1 && !outputs[0].label) {
+    openOperationModal(sourceId, null, outputs[0].key);
+    return;
+  }
+  outcomeMenuSourceId = sourceId;
+  const menu = document.querySelector("#outcomeMenu");
+  menu.innerHTML = outputs.map(renderOutcomeMenuItem).join("");
+  const transform = d3.zoomTransform(svg.node());
+  const screen = transform.apply([sourceNode.x + NODE_W + 48, sourceNode.y + 14]);
+  menu.style.left = `${Math.round(screen[0] + 56)}px`;
+  menu.style.top = `${Math.round(screen[1])}px`;
+  menu.classList.add("is-open");
+  menu.setAttribute("aria-hidden", "false");
+}
+
+function closeOutcomeMenu() {
+  outcomeMenuSourceId = null;
+  const menu = document.querySelector("#outcomeMenu");
+  if (!menu) return;
+  menu.classList.remove("is-open");
+  menu.setAttribute("aria-hidden", "true");
+  menu.innerHTML = "";
+}
+
+function renderOutcomeMenuItem(output) {
+  const iconName = output.tone === "success" ? "success" : output.tone === "danger" || output.key === "failed" ? "fail" : "success";
+  const label = output.label || "Основной выход";
+  return `<button class="outcome-menu-card" type="button" data-outcome-key="${escapeAttr(output.key)}">
+    <span class="outcome-menu-icon">${iconSvg(iconName, 20)}</span>
+    <span>${escapeHtml(label)}</span>
+  </button>`;
+}
+
+function openOperationModal(sourceId = null, replaceId = null, outputKey = null) {
+  closeOutcomeMenu();
   operationSourceId = sourceId;
   operationReplaceId = replaceId;
+  operationOutputKey = outputKey;
   document.body.classList.add("is-operation-modal-open");
   document.querySelector("#operationModal").setAttribute("aria-hidden", "false");
 }
@@ -829,6 +885,7 @@ function closeOperationModal() {
   document.querySelector("#operationModal").setAttribute("aria-hidden", "true");
   operationSourceId = null;
   operationReplaceId = null;
+  operationOutputKey = null;
   selectedId = null;
   hoveredId = null;
   render();
@@ -859,11 +916,13 @@ function closeNodeSettings(clearSelection = true) {
   }
   renderNodeSettingsSidebar();
   renderEdges();
+  closeOutcomeMenu();
   nodeLayer.selectAll(".scenario-node-svg").classed("is-selected", (nodeItem) => nodeItem.id === selectedId);
 }
 
 function cancelNodeSettings(clearSelection = true) {
   closeSettingsCloseConfirm();
+  closeOutcomeMenu();
   const nodeId = settingsNodeId;
   if (!nodeId || !pendingSettingsNodeIds.has(nodeId)) {
     closeNodeSettings(clearSelection);
@@ -1613,6 +1672,8 @@ function createScenarioFromForm(event) {
   pendingSourceId = null;
   operationSourceId = null;
   operationReplaceId = null;
+  operationOutputKey = null;
+  closeOutcomeMenu();
   settingsNodeId = null;
   history = [];
   future = [];
@@ -1634,6 +1695,8 @@ function openScenario(scenarioId) {
   pendingSourceId = null;
   operationSourceId = null;
   operationReplaceId = null;
+  operationOutputKey = null;
+  closeOutcomeMenu();
   settingsNodeId = null;
   history = [];
   future = [];
@@ -1651,6 +1714,8 @@ function showScenarioList() {
   pendingSourceId = null;
   operationSourceId = null;
   operationReplaceId = null;
+  operationOutputKey = null;
+  closeOutcomeMenu();
   settingsNodeId = null;
   persistAppState();
   renderAppShell();
@@ -1679,8 +1744,15 @@ function removeNodeById(nodeId) {
   nodeIdsToRemove.forEach((removedId) => delete settingsErrors[removedId]);
   nodeIdsToRemove.forEach((removedId) => pendingSettingsNodeIds.delete(removedId));
   if (settingsNodeId && nodeIdsToRemove.has(settingsNodeId)) closeNodeSettings(false);
-  if (operationSourceId && nodeIdsToRemove.has(operationSourceId)) operationSourceId = null;
-  if (operationReplaceId && nodeIdsToRemove.has(operationReplaceId)) operationReplaceId = null;
+  if (operationSourceId && nodeIdsToRemove.has(operationSourceId)) {
+    operationSourceId = null;
+    operationOutputKey = null;
+  }
+  if (operationReplaceId && nodeIdsToRemove.has(operationReplaceId)) {
+    operationReplaceId = null;
+    operationOutputKey = null;
+  }
+  if (outcomeMenuSourceId && nodeIdsToRemove.has(outcomeMenuSourceId)) closeOutcomeMenu();
   selectedId = null;
   hoveredId = null;
   render();

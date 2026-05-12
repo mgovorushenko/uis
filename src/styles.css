@@ -840,6 +840,66 @@ body.is-board-panning #scenarioSvg {
   color: var(--cmgui-color-icon-secondary);
 }
 
+.outcome-menu {
+  position: absolute;
+  z-index: 42;
+  display: none;
+  flex-direction: column;
+  gap: var(--cmgui-spacing-2);
+  padding: var(--cmgui-spacing-3);
+  border-radius: var(--cmgui-border-radius-large);
+  background: var(--cmgui-color-bg-main-white);
+  box-shadow: var(--cmgui-shadow-large);
+}
+
+.outcome-menu.is-open {
+  display: flex;
+}
+
+.outcome-menu-card {
+  width: 216px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: var(--cmgui-spacing-2);
+  padding: var(--cmgui-spacing-2) var(--cmgui-spacing-3) var(--cmgui-spacing-2) var(--cmgui-spacing-2);
+  border: 1px solid var(--cmgui-color-border-primary);
+  border-radius: var(--cmgui-border-radius-large);
+  background: var(--cmgui-color-bg-main-white);
+  color: var(--cmgui-color-text-primary);
+  font: var(--cmgui-font-caption);
+  text-align: left;
+  cursor: pointer;
+}
+
+.outcome-menu-card:hover {
+  border-color: var(--cmgui-color-border-hover);
+}
+
+.outcome-menu-icon {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--cmgui-border-radius-medium);
+  background: var(--cmgui-color-bg-main-gray);
+  color: var(--cmgui-color-icon-primary);
+}
+
+.outcome-menu-icon .ds-icon,
+.outcome-menu-icon .ds-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.outcome-menu-card > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .bottom-bar .cmgui-icon,
 .bottom-bar .cmgui-icon svg {
   width: 16px;
