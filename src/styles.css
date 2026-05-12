@@ -757,16 +757,16 @@ body.is-board-panning #scenarioSvg {
 }
 
 .save-button {
+  width: 88px;
   height: 32px;
   padding: var(--cmgui-spacing-2) var(--cmgui-spacing-3);
   border: 1px solid transparent;
-  background: var(--cmgui-color-bg-button-primary-disabled);
-  color: var(--cmgui-color-text-button-primary);
   font: var(--cmgui-font-body-button-extrasmall);
   cursor: pointer;
 }
 
 .save-button.is-ready {
+  border-color: transparent;
   background: var(--cmgui-color-bg-accent-opacity);
   color: var(--cmgui-color-text-accent);
 }

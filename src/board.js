@@ -230,6 +230,7 @@ let isSettingsCloseConfirmOpen = false;
 let history = [];
 let future = [];
 let persistTimer = null;
+let hasUnsavedScenarioChanges = false;
 
 const svg = d3.select("#scenarioSvg");
 const viewport = d3.select("#viewport");
@@ -256,7 +257,7 @@ const zoom = d3
     viewport.attr("transform", event.transform);
     document.querySelector("#zoomLabel").textContent = `${Math.round(event.transform.k * 100)}%`;
     state.viewport = { x: event.transform.x, y: event.transform.y, k: event.transform.k };
-    schedulePersistState();
+    schedulePersistState({ markDirty: false });
   })
   .on("end", () => {
     document.body.classList.remove("is-board-panning");
@@ -492,6 +493,7 @@ function renderAppShell() {
   if (currentScenario) {
     document.querySelector(".top-bar strong").textContent = currentScenario.name;
   }
+  updateSaveButton();
 }
 
 function renderScenarioList() {
@@ -3081,6 +3083,7 @@ function createScenarioFromForm(event) {
   settingsNodeId = null;
   history = [];
   future = [];
+  hasUnsavedScenarioChanges = false;
   persistAppState();
   closeScenarioCreateModal();
   renderAppShell();
@@ -3104,6 +3107,7 @@ function openScenario(scenarioId) {
   settingsNodeId = null;
   history = [];
   future = [];
+  hasUnsavedScenarioChanges = false;
   persistAppState();
   renderAppShell();
   render();
@@ -3182,12 +3186,16 @@ function collectNodeIdsForRemoval(rootNodeId) {
 }
 
 function saveState() {
-  const savedAt = new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-  state.savedAt = savedAt;
   persistState();
+  hasUnsavedScenarioChanges = false;
+  updateSaveButton();
+}
+
+function updateSaveButton() {
   const button = document.querySelector("#saveButton");
-  button.classList.add("is-ready");
-  button.textContent = `Сохранено ${savedAt}`;
+  if (!button) return;
+  button.classList.toggle("is-ready", !hasUnsavedScenarioChanges);
+  button.textContent = hasUnsavedScenarioChanges ? "Сохранить" : "Сохранено";
 }
 
 function persistState() {
@@ -3195,7 +3203,11 @@ function persistState() {
   persistAppState();
 }
 
-function schedulePersistState() {
+function schedulePersistState({ markDirty = true } = {}) {
+  if (markDirty) {
+    hasUnsavedScenarioChanges = true;
+    updateSaveButton();
+  }
   window.clearTimeout(persistTimer);
   persistTimer = window.setTimeout(persistState, 120);
 }
