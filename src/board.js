@@ -958,11 +958,12 @@ function edgeLabelPoint(d, labelWidth = EDGE_LABEL_MAX_WIDTH) {
 }
 
 function edgeRoute(sourceNode, targetNode, edgeItem = null) {
+  const targetPortVisible = isNodePortVisible(targetNode.id) && canReceiveInput(targetNode);
   const x1 = sourceNode.x + (isNodePortVisible(sourceNode.id) ? nodeRightPortX(sourceNode) + NODE_PORT_R : NODE_W + NODE_PORT_EDGE_GAP);
   const layoutX1 = sourceNode.x + NODE_W + NODE_PORT_EDGE_GAP;
   const y1 = sourceNode.y + NODE_H / 2;
-  const x2 = targetNode.x + (isNodePortVisible(targetNode.id) && canReceiveInput(targetNode) ? NODE_PORT_LEFT_X - NODE_PORT_R - NODE_PORT_EDGE_GAP : -NODE_PORT_EDGE_GAP);
-  const layoutX2 = targetNode.x - NODE_PORT_EDGE_GAP;
+  const x2 = targetNode.x + (targetPortVisible ? NODE_PORT_LEFT_X - NODE_PORT_R : -NODE_PORT_EDGE_GAP);
+  const layoutX2 = targetPortVisible ? x2 : targetNode.x - NODE_PORT_EDGE_GAP;
   const y2 = targetNode.y + NODE_H / 2;
   if (layoutX2 <= layoutX1 + 48 && Math.abs(y2 - y1) > 1) {
     const labelWidth = edgeItem?.label ? estimateEdgeLabelWidth(edgeItem.label) : 0;
