@@ -687,7 +687,7 @@ function edgeLabelPoint(d, labelWidth = EDGE_LABEL_MAX_WIDTH) {
   if (!a || !b) return { x: 0, y: 0 };
   const route = edgeRoute(a, b);
   if (!route) return { x: 0, y: 0 };
-  return { x: route.x2 - EDGE_LABEL_SIDE_GAP - labelWidth / 2, y: route.y2 };
+  return { x: b.x - EDGE_LABEL_SIDE_GAP - labelWidth / 2, y: route.y2 };
 }
 
 function edgeRoute(sourceNode, targetNode) {
