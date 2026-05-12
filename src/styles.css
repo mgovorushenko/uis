@@ -470,12 +470,12 @@ body.is-board-panning #scenarioSvg {
   transition: opacity 120ms ease;
 }
 
-.scenario-node-svg:hover:not(.is-hover-suppressed) .node-card,
+.scenario-node-svg:hover .node-card,
 .scenario-node-svg.is-selected .node-card {
   opacity: 0;
 }
 
-.scenario-node-svg:hover:not(.is-hover-suppressed) .node-hover-card,
+.scenario-node-svg:hover .node-hover-card,
 .scenario-node-svg.is-selected .node-hover-card {
   opacity: 1;
 }
@@ -527,9 +527,9 @@ body.is-board-panning #scenarioSvg {
   transition: opacity 120ms ease;
 }
 
-.scenario-node-svg:hover:not(.is-hover-suppressed) .node-hover-dot,
-.scenario-node-svg:hover:not(.is-hover-suppressed) .node-add-button,
-.scenario-node-svg:hover:not(.is-hover-suppressed) .node-more-icon,
+.scenario-node-svg:hover .node-hover-dot,
+.scenario-node-svg:hover .node-add-button,
+.scenario-node-svg:hover .node-more-icon,
 .scenario-node-svg.is-selected .node-hover-dot,
 .scenario-node-svg.is-selected .node-add-button,
 .scenario-node-svg.is-selected .node-more-icon {

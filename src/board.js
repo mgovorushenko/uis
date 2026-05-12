@@ -480,10 +480,11 @@ function renderNodes() {
           delete d.dragOffsetY;
           delete d.dragMoved;
           draggedNodeId = null;
-          if (hoveredId === d.id) hoveredId = null;
+          const isStillHovered = isPointerOverNode(event, d);
+          hoveredId = isStillHovered ? d.id : null;
           if (wasMoved && selectedId === d.id) selectedId = null;
-          d3.select(this).classed("is-selected", d.id === selectedId).classed("is-hover-suppressed", wasMoved);
-          updateNodeText(this, d, d.id === selectedId);
+          d3.select(this).classed("is-selected", d.id === selectedId);
+          updateNodeText(this, d, d.id === selectedId || d.id === hoveredId);
           renderEdges();
           schedulePersistState();
         }),
@@ -513,14 +514,12 @@ function renderNodes() {
     .classed("is-muted", (d) => d.muted)
     .classed("is-placeholder", (d) => isPlaceholderNode(d))
     .on("mouseenter", function (event, d) {
-      if (d3.select(this).classed("is-hover-suppressed")) return;
       if (draggedNodeId === d.id) return;
       hoveredId = d.id;
       updateNodeText(this, d, true);
       renderEdges();
     })
     .on("mouseleave", function (event, d) {
-      d3.select(this).classed("is-hover-suppressed", false);
       if (hoveredId === d.id) hoveredId = null;
       updateNodeText(this, d, d.id === selectedId);
       renderEdges();
@@ -603,6 +602,17 @@ function renderNodes() {
     operationSourceId = null;
     render();
   });
+}
+
+function isPointerOverNode(event, nodeItem) {
+  const transform = d3.zoomTransform(svg.node());
+  const [pointerX, pointerY] = transform.invert(d3.pointer(event, svg.node()));
+  const left = nodeItem.x + NODE_PORT_LEFT_X - NODE_PORT_R;
+  const rightEdge = isPlaceholderNode(nodeItem) ? NODE_W : nodeRightPortX(nodeItem) + NODE_PORT_R;
+  const right = nodeItem.x + rightEdge;
+  const top = nodeItem.y - 1;
+  const bottom = nodeItem.y + NODE_HOVER_H - 1;
+  return pointerX >= left && pointerX <= right && pointerY >= top && pointerY <= bottom;
 }
 
 function renderEdges() {
