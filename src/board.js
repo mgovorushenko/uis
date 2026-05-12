@@ -465,7 +465,10 @@ function renderNodes() {
           d3.select(this).attr("transform", `translate(${d.x},${d.y})`);
           renderEdges();
         })
-        .on("end", () => {
+        .on("end", function (event, d) {
+          if (hoveredId === d.id) hoveredId = null;
+          updateNodeText(this, d, d.id === selectedId);
+          renderEdges();
           schedulePersistState();
         }),
     );
