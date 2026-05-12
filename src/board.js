@@ -557,7 +557,7 @@ function renderEdges() {
   labels.exit().remove();
   const enter = labels.enter().append("g").attr("class", "edge-label-svg");
   enter.append("rect").attr("rx", 4);
-  enter.append("text").attr("x", edgeLabelPaddingX).attr("y", 14);
+  enter.append("text").attr("x", edgeLabelPaddingX).attr("y", 12);
   enter.merge(labels).each(function (d) {
     const group = d3.select(this);
     const p = edgeLabelPoint(d);
@@ -565,7 +565,7 @@ function renderEdges() {
     const width = Math.ceil(text.node().getComputedTextLength()) + edgeLabelPaddingX * 2;
     group.attr("transform", `translate(${p.x - width / 2},${p.y - 12})`).attr("class", "edge-label-svg");
     group.select("rect").attr("width", width).attr("height", 24).attr("fill", colorForTone);
-    text.attr("x", edgeLabelPaddingX).attr("fill", "white").attr("font", "var(--cmgui-font-caption)");
+    text.attr("x", edgeLabelPaddingX).attr("y", 12).attr("fill", "white").attr("font", "var(--cmgui-font-caption)");
   });
 }
 
