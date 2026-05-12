@@ -581,7 +581,6 @@ function renderNodes() {
   const moreButton = enter.append("g").attr("class", "node-more-icon").attr("transform", `translate(${NODE_W - 48},8)`);
   moreButton.append("rect").attr("class", "node-more-hitarea").attr("width", 44).attr("height", 44).attr("rx", 22);
   moreButton.append("g").attr("class", "node-more-graphic").attr("transform", "translate(12,12)");
-  enter.append("g").attr("class", "node-status-badge").attr("transform", `translate(${NODE_W - 9},-7)`);
 
   const merged = enter.merge(nodes);
   merged
@@ -628,7 +627,6 @@ function renderNodes() {
   merged.select(".node-icon-svg").attr("transform", (d) => (isPlaceholderNode(d) ? "translate(22,20)" : "translate(22,20)"));
   merged.select(".node-add-icon").html(() => iconSvg("add", 16));
   merged.select(".node-more-graphic").html((d) => iconSvg(isPlaceholderNode(d) ? "delete" : isFullscreenActionNode(d) ? "fullscreen-20" : "more", 20));
-  merged.select(".node-status-badge").html((d) => (isFullscreenActionNode(d) ? iconSvg("warning-message-filled-20", 20) : ""));
   merged.select(".node-more-icon").attr("transform", (d) => (isPlaceholderNode(d) ? `translate(${NODE_W - 36},20)` : `translate(${NODE_W - 48},8)`));
   merged.select(".node-more-hitarea").attr("width", (d) => (isPlaceholderNode(d) ? 20 : 44)).attr("height", (d) => (isPlaceholderNode(d) ? 20 : 44)).attr("rx", (d) => (isPlaceholderNode(d) ? 10 : 22));
   merged.select(".node-more-graphic").attr("transform", (d) => (isPlaceholderNode(d) ? "translate(0,0)" : "translate(12,12)"));

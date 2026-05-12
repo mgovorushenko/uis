@@ -487,8 +487,7 @@ body.is-board-panning #scenarioSvg {
 
 .node-icon-svg .ds-icon,
 .node-add-icon .ds-icon,
-.node-more-icon .ds-icon,
-.node-status-badge .ds-icon {
+.node-more-icon .ds-icon {
   display: block;
   color: currentColor;
 }
@@ -579,12 +578,6 @@ body.is-board-panning #scenarioSvg {
 }
 
 .node-more-graphic {
-  pointer-events: none;
-}
-
-.node-status-badge {
-  color: var(--cmgui-color-icon-accent);
-  opacity: 1;
   pointer-events: none;
 }
 
