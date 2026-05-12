@@ -11,7 +11,7 @@ const NODE_PORT_RIGHT_X = NODE_W + 51;
 const NODE_PORT_RIGHT_COMPACT_X = NODE_W + 20;
 const NODE_PORT_R = 3;
 const NODE_PORT_EDGE_GAP = 8;
-const NODE_CREATE_GAP_X = 120;
+const NODE_CREATE_GAP_X = 80;
 const EDGE_LABEL_SIDE_GAP = 40;
 const GROUP_TRANSFER_EMPLOYEES_BY_GROUP = {
   "Отдел продаж": ["Лемаева Юлия", "Васнецов Николай", "Смирнова Алина", "Орлов Денис"],
@@ -864,7 +864,7 @@ function nextNodePosition(sourceNode, outputKey = null) {
 }
 
 function placeholderCreateGap(output) {
-  return estimateEdgeLabelWidth(output?.label || "") + EDGE_LABEL_SIDE_GAP * 2 + 33;
+  return estimateEdgeLabelWidth(output?.label || "") + EDGE_LABEL_SIDE_GAP * 2;
 }
 
 function estimateEdgeLabelWidth(label) {
