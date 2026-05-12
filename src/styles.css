@@ -566,7 +566,11 @@ body.is-board-panning #scenarioSvg {
 }
 
 .node-more-icon:hover {
-  color: var(--cmgui-color-icon-secondary);
+  color: var(--cmgui-color-icon-accent-hover);
+}
+
+.scenario-node-svg.is-placeholder .node-more-icon:hover {
+  color: var(--cmgui-color-icon-error);
 }
 
 .node-more-hitarea {
