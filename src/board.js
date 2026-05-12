@@ -44,6 +44,7 @@ const SIMPLE_TRANSFER_CONFIG = {
   },
 };
 const INFO_MESSAGE_OPERATION = "info-message";
+const CONTACT_FORM_OPERATION = "contact-form";
 const icons = {
   search: '<circle cx="9" cy="9" r="5"></circle><path d="m13 13 4 4"></path>',
   star: '<path d="m10 2 2.5 5.1 5.6.8-4 3.9.9 5.5-5-2.6-5 2.6.9-5.5-4-3.9 5.6-.8L10 2Z"></path>',
@@ -746,7 +747,7 @@ function addNode(kind, sourceId = null, operationType = null, outputKey = null) 
   if (sourceNode) {
     state.edges.push(createOutputEdge(sourceNode, id, outputKey));
   }
-  if (isTransferWithFallbackNode(nextNode)) createFallbackPlaceholderFor(nextNode);
+  createOutputPlaceholdersFor(nextNode);
   selectedId = id;
   render();
   schedulePersistState();
@@ -759,7 +760,7 @@ function replacePlaceholderNode(replaceId, kind, operationType = null) {
   if (!target || !isPlaceholderNode(target)) return addNode(kind, null, operationType);
   Object.assign(target, node(replaceId, kind, target.x, target.y));
   configureNodeForOperation(target, operationType);
-  if (isTransferWithFallbackNode(target)) createFallbackPlaceholderFor(target);
+  createOutputPlaceholdersFor(target);
   selectedId = replaceId;
   render();
   schedulePersistState();
@@ -787,16 +788,36 @@ function configureNodeForOperation(nodeItem, operationType) {
     nodeItem.icon = "info-message";
     nodeItem.settings = { infoMessage: createInfoMessageSettings() };
   }
+  if (operationType === CONTACT_FORM_OPERATION) {
+    nodeItem.title = "Форма сбора контактов";
+    nodeItem.subtitle = "Ожидание контактов: 1 мин.";
+    nodeItem.color = "var(--cmgui-color-special-15)";
+    nodeItem.icon = "form";
+    nodeItem.settings = { contactForm: createContactFormSettings() };
+  }
+}
+
+function createOutputPlaceholdersFor(sourceNode) {
+  nodeOutputs(sourceNode).forEach((output) => {
+    if (!output.placeholder) return;
+    createPlaceholderForOutput(sourceNode, output);
+  });
 }
 
 function createFallbackPlaceholderFor(sourceNode) {
-  if (state.edges.some((edgeItem) => edgeItem.source === sourceNode.id && edgeItem.outputKey === "failed")) return null;
+  const output = nodeOutputs(sourceNode).find((item) => item.key === "failed");
+  if (!output) return null;
+  return createPlaceholderForOutput(sourceNode, output);
+}
+
+function createPlaceholderForOutput(sourceNode, output) {
+  if (state.edges.some((edgeItem) => edgeItem.source === sourceNode.id && edgeItem.outputKey === output.key)) return null;
   const id = `empty-${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 6)}`;
-  const position = nextNodePosition(sourceNode);
+  const position = nextNodePosition(sourceNode, output.key);
   const placeholder = node(id, "empty", position.x, position.y);
   placeholder.operationType = "fallback-placeholder";
   state.nodes.push(placeholder);
-  state.edges.push(edge(sourceNode.id, id, "Никто не ответил", "plain", "failed"));
+  state.edges.push(edge(sourceNode.id, id, output.label || "", output.tone || "plain", output.key));
   return placeholder;
 }
 
@@ -815,8 +836,9 @@ function centerNodePosition() {
 
 function nextNodePosition(sourceNode, outputKey = null) {
   const output = outputKey ? nodeOutputs(sourceNode).find((item) => item.key === outputKey) : firstFreeOutput(sourceNode);
-  const gap = output?.key === "failed" ? FALLBACK_CREATE_GAP_X : NODE_CREATE_GAP_X;
-  return { x: sourceNode.x + NODE_W + gap, y: sourceNode.y };
+  const gap = output?.placeholder ? FALLBACK_CREATE_GAP_X : NODE_CREATE_GAP_X;
+  const offsetY = output?.offsetY || 0;
+  return { x: sourceNode.x + NODE_W + gap, y: sourceNode.y + offsetY };
 }
 
 function nodeOutputs(nodeItem) {
@@ -824,7 +846,13 @@ function nodeOutputs(nodeItem) {
   if (isPlaceholderNode(nodeItem)) return [];
   if (nodeItem.kind === "start") return [{ key: "main", label: "" }];
   if (isInfoMessageNode(nodeItem)) return [{ key: "delivered", label: "Сообщение доставлено", tone: "success" }];
-  if (isTransferWithFallbackNode(nodeItem)) return [{ key: "failed", label: "Никто не ответил", tone: "plain" }];
+  if (isContactFormNode(nodeItem)) {
+    return [
+      { key: "completed", label: "Форма заполнена", tone: "plain", placeholder: true, offsetY: -92 },
+      { key: "expired", label: "Форма не заполнена", tone: "plain", placeholder: true, offsetY: 92 },
+    ];
+  }
+  if (isTransferWithFallbackNode(nodeItem)) return [{ key: "failed", label: "Никто не ответил", tone: "plain", placeholder: true }];
   return [{ key: "main", label: "" }];
 }
 
@@ -992,6 +1020,7 @@ function hasUnsavedNodeSettings(nodeId) {
 function stableStringifySettings(nodeItem, settings) {
   if (isGroupTransferNode(nodeItem)) return JSON.stringify(normalizeComparableGroupTransferSettings(settings));
   if (isInfoMessageNode(nodeItem)) return JSON.stringify(normalizeComparableInfoMessageSettings(settings));
+  if (isContactFormNode(nodeItem)) return JSON.stringify(normalizeComparableContactFormSettings(settings));
   return JSON.stringify(normalizeComparableSimpleTransferSettings(nodeItem.operationType, settings));
 }
 
@@ -1080,6 +1109,7 @@ function renderCounter(id, value, { min = 0, max = 9999999 } = {}) {
 function renderPrimarySettingsCard(nodeItem, settings, errors) {
   if (isGroupTransferNode(nodeItem)) return settings.groupName ? renderGroupTransferCard(settings) : renderEmptyGroupTransferCard(errors);
   if (isInfoMessageNode(nodeItem)) return renderInfoMessageCard(settings, errors);
+  if (isContactFormNode(nodeItem)) return renderContactFormCard(settings);
   return renderSimpleTransferCard(nodeItem, settings, errors);
 }
 
@@ -1155,6 +1185,35 @@ function renderInfoMessageCard(settings, errors = {}) {
   </section>`;
 }
 
+function renderContactFormCard(settings) {
+  return `<section class="node-settings-card contact-form-card">
+    <div class="node-settings-card-head is-static">
+      <span>Основные параметры</span>
+    </div>
+    ${renderSettingsAlert("Клиенту будет предложено оставить свои контактные данные. Эта операция работает только для онлайн-чатов и не работает для мессенджеров или Email.")}
+    <div class="contact-form-preview">
+      <div class="contact-form-preview-row">
+        <span>Текст сообщения:</span>
+        <strong>${escapeHtml(settings.messageText)}</strong>
+      </div>
+      <div class="contact-form-preview-row">
+        <span>ФИО контакта*</span>
+        <strong>${escapeHtml(settings.namePlaceholder)}</strong>
+      </div>
+      <div class="contact-form-preview-row">
+        <span>Телефон*</span>
+        <strong>${escapeHtml(settings.phonePlaceholder)}</strong>
+      </div>
+      <div class="contact-form-preview-row">
+        <span>Email*</span>
+        <strong>${escapeHtml(settings.emailPlaceholder)}</strong>
+      </div>
+    </div>
+    <button class="contact-form-settings-link" type="button" id="contactFormSettingsButton">Перейти к настройкам формы</button>
+    ${renderContactWait(settings)}
+  </section>`;
+}
+
 function renderSimpleSelect(id, placeholder, value, options, isOpen) {
   const selected = options.find(([optionValue]) => optionValue === value);
   return `<div class="cmgui-select-container simple-select">
@@ -1223,6 +1282,17 @@ function renderTransitionDelay(settings) {
     <span class="response-label">Переход к следующему шагу через</span>
     <input class="response-input" id="transitionDelayInput" value="${settings.transitionDelay}" inputmode="numeric" />
     <div class="segment-control" role="group" aria-label="Единица времени перехода">
+      <button class="${settings.timeoutUnit === "seconds" ? "is-active" : ""}" type="button" data-time-unit="seconds">Секунд</button>
+      <button class="${settings.timeoutUnit === "minutes" ? "is-active" : ""}" type="button" data-time-unit="minutes">Минут</button>
+    </div>
+  </div>`;
+}
+
+function renderContactWait(settings) {
+  return `<div class="response-row contact-wait-row">
+    <span class="response-label">Ожидание контактов</span>
+    <input class="response-input" id="contactWaitInput" value="${settings.contactWait}" inputmode="numeric" />
+    <div class="segment-control" role="group" aria-label="Единица времени ожидания контактов">
       <button class="${settings.timeoutUnit === "seconds" ? "is-active" : ""}" type="button" data-time-unit="seconds">Секунд</button>
       <button class="${settings.timeoutUnit === "minutes" ? "is-active" : ""}" type="button" data-time-unit="minutes">Минут</button>
     </div>
@@ -1390,6 +1460,10 @@ function wireNodeSettingsSidebar(sidebar, nodeItem, settings) {
     const transitionDelay = sanitizePositiveInteger(event.target.value, settings.transitionDelay);
     updateNodeSettingsDraft(nodeItem, { transitionDelay });
   });
+  sidebar.querySelector("#contactWaitInput")?.addEventListener("input", (event) => {
+    const contactWait = sanitizePositiveInteger(event.target.value, settings.contactWait);
+    updateNodeSettingsDraft(nodeItem, { contactWait });
+  });
   sidebar.querySelector("#messageTextInput")?.addEventListener("input", (event) => {
     const errors = { ...(settingsErrors[nodeItem.id] || {}) };
     if (event.target.value.trim()) {
@@ -1503,6 +1577,7 @@ function collectGroupTransferSettings(sidebar, settings) {
 function collectNodeSettings(sidebar, nodeItem, settings) {
   if (isGroupTransferNode(nodeItem)) return collectGroupTransferSettings(sidebar, settings);
   if (isInfoMessageNode(nodeItem)) return collectInfoMessageSettings(sidebar, settings);
+  if (isContactFormNode(nodeItem)) return collectContactFormSettings(sidebar, settings);
   return collectSimpleTransferSettings(sidebar, nodeItem, settings);
 }
 
@@ -1523,9 +1598,18 @@ function collectInfoMessageSettings(sidebar, settings) {
   });
 }
 
+function collectContactFormSettings(sidebar, settings) {
+  return createContactFormSettings({
+    ...settings,
+    contactWait: sanitizePositiveInteger(sidebar.querySelector("#contactWaitInput")?.value, settings.contactWait),
+    cycleLimit: sanitizePositiveInteger(sidebar.querySelector("#cycleLimitInput")?.value, settings.cycleLimit),
+  });
+}
+
 function validateNodeSettings(nodeItem, settings) {
   if (isGroupTransferNode(nodeItem)) return settings.groupName ? {} : { groupName: "Выберите отдел" };
   if (isInfoMessageNode(nodeItem)) return settings.messageText.trim() ? {} : { messageText: true };
+  if (isContactFormNode(nodeItem)) return {};
   const config = SIMPLE_TRANSFER_CONFIG[nodeItem.operationType];
   if (config?.requiredField === "employeeName" && !settings.employeeName) return { employeeName: config.requiredError };
   return {};
@@ -1534,6 +1618,7 @@ function validateNodeSettings(nodeItem, settings) {
 function closeDropdownPatchForNode(nodeItem) {
   if (isGroupTransferNode(nodeItem)) return { groupDropdownOpen: false, distributionDropdownOpen: false };
   if (isInfoMessageNode(nodeItem)) return {};
+  if (isContactFormNode(nodeItem)) return {};
   return { employeeDropdownOpen: false };
 }
 
@@ -1574,6 +1659,20 @@ function createInfoMessageSettings(overrides = {}) {
   const defaults = {
     messageText: "",
     transitionDelay: 1,
+    timeoutUnit: "seconds",
+    cycleLimit: 1,
+    technicalOpen: false,
+  };
+  return { ...defaults, ...overrides };
+}
+
+function createContactFormSettings(overrides = {}) {
+  const defaults = {
+    messageText: "Заполните ваши контактные данные и мы свяжемся с вами в течение 15 минут",
+    namePlaceholder: "Ваше имя",
+    phonePlaceholder: "Ваш телефон",
+    emailPlaceholder: "Ваш Email",
+    contactWait: 60,
     timeoutUnit: "seconds",
     cycleLimit: 1,
     technicalOpen: false,
@@ -1623,9 +1722,18 @@ function getInfoMessageSettings(nodeItem) {
   });
 }
 
+function getContactFormSettings(nodeItem) {
+  const existing = nodeItem.settings?.contactForm || {};
+  return createContactFormSettings({
+    ...existing,
+    technicalOpen: existing.technicalOpen ?? false,
+  });
+}
+
 function getNodeSettings(nodeItem) {
   if (isGroupTransferNode(nodeItem)) return getGroupTransferSettings(nodeItem);
   if (isInfoMessageNode(nodeItem)) return getInfoMessageSettings(nodeItem);
+  if (isContactFormNode(nodeItem)) return getContactFormSettings(nodeItem);
   return getSimpleTransferSettings(nodeItem);
 }
 
@@ -1644,10 +1752,18 @@ function updateNodeSettingsDraft(nodeItem, patch) {
     settingsDrafts[nodeItem.id] = createInfoMessageSettings(next);
     return;
   }
+  if (isContactFormNode(nodeItem)) {
+    settingsDrafts[nodeItem.id] = createContactFormSettings(next);
+    return;
+  }
   settingsDrafts[nodeItem.id] = createSimpleTransferSettings(nodeItem.operationType, next);
 }
 
 function saveNodeSettings(nodeItem, settings) {
+  if (isContactFormNode(nodeItem)) {
+    saveContactFormSettings(nodeItem, settings);
+    return;
+  }
   if (isInfoMessageNode(nodeItem)) {
     saveInfoMessageSettings(nodeItem, settings);
     return;
@@ -1670,6 +1786,11 @@ function saveInfoMessageSettings(nodeItem, settings) {
   applyInfoMessageTitle(nodeItem, nodeItem.settings.infoMessage);
 }
 
+function saveContactFormSettings(nodeItem, settings) {
+  nodeItem.settings = { ...(nodeItem.settings || {}), contactForm: createContactFormSettings(settings) };
+  applyContactFormTitle(nodeItem, nodeItem.settings.contactForm);
+}
+
 function applyGroupTransferTitle(nodeItem, settings) {
   nodeItem.title = settings.groupName ? `На группу: ${settings.groupName}` : "На группу";
   nodeItem.subtitle = settings.groupName ? `Ожидание ответа: ${formatTimeout(settings.responseTimeout, settings.timeoutUnit)}` : "Группа не выбрана";
@@ -1687,12 +1808,16 @@ function isInfoMessageNode(nodeItem) {
   return nodeItem?.kind === "message" && nodeItem.operationType === INFO_MESSAGE_OPERATION;
 }
 
+function isContactFormNode(nodeItem) {
+  return nodeItem?.kind === "form" && nodeItem.operationType === CONTACT_FORM_OPERATION;
+}
+
 function isConfigurableTransferNode(nodeItem) {
   return isGroupTransferNode(nodeItem) || isSimpleTransferNode(nodeItem);
 }
 
 function isConfigurableNode(nodeItem) {
-  return isConfigurableTransferNode(nodeItem) || isInfoMessageNode(nodeItem);
+  return isConfigurableTransferNode(nodeItem) || isInfoMessageNode(nodeItem) || isContactFormNode(nodeItem);
 }
 
 function isTransferWithFallbackNode(nodeItem) {
@@ -1700,6 +1825,7 @@ function isTransferWithFallbackNode(nodeItem) {
 }
 
 function settingsTitleForNode(nodeItem) {
+  if (isContactFormNode(nodeItem)) return "Форма сбора контактов";
   if (isInfoMessageNode(nodeItem)) return "Информационное сообщение";
   if (isGroupTransferNode(nodeItem)) return "На группу";
   return SIMPLE_TRANSFER_CONFIG[nodeItem.operationType]?.title || nodeItem.title;
@@ -1721,6 +1847,11 @@ function applyInfoMessageTitle(nodeItem, settings) {
   nodeItem.subtitle = `Следующая операция через: ${formatTimeout(settings.transitionDelay, settings.timeoutUnit)}`;
 }
 
+function applyContactFormTitle(nodeItem, settings) {
+  nodeItem.title = "Форма сбора контактов";
+  nodeItem.subtitle = `Ожидание контактов: ${formatTimeout(settings.contactWait, settings.timeoutUnit)}`;
+}
+
 function normalizeComparableSimpleTransferSettings(operationType, settings) {
   const normalized = createSimpleTransferSettings(operationType, settings);
   return {
@@ -1737,6 +1868,19 @@ function normalizeComparableInfoMessageSettings(settings) {
   return {
     messageText: normalized.messageText || "",
     transitionDelay: sanitizePositiveInteger(normalized.transitionDelay, 1),
+    timeoutUnit: normalized.timeoutUnit,
+    cycleLimit: sanitizePositiveInteger(normalized.cycleLimit, 1),
+  };
+}
+
+function normalizeComparableContactFormSettings(settings) {
+  const normalized = createContactFormSettings(settings);
+  return {
+    messageText: normalized.messageText || "",
+    namePlaceholder: normalized.namePlaceholder || "",
+    phonePlaceholder: normalized.phonePlaceholder || "",
+    emailPlaceholder: normalized.emailPlaceholder || "",
+    contactWait: sanitizePositiveInteger(normalized.contactWait, 60),
     timeoutUnit: normalized.timeoutUnit,
     cycleLimit: sanitizePositiveInteger(normalized.cycleLimit, 1),
   };
@@ -2008,7 +2152,19 @@ function normalizeLoadedState(loadedState) {
   loadedState.nodes = loadedState.nodes.map((nodeItem) => {
     const catalogItem = catalog[nodeItem.kind];
     if (!catalogItem) return nodeItem;
-    return { ...nodeItem, color: catalogItem.color, icon: catalogItem.icon };
+    const normalizedNode = { ...nodeItem, color: catalogItem.color, icon: catalogItem.icon };
+    if (normalizedNode.kind === "form" && !normalizedNode.operationType) {
+      normalizedNode.operationType = CONTACT_FORM_OPERATION;
+      normalizedNode.settings = { ...(normalizedNode.settings || {}), contactForm: createContactFormSettings(normalizedNode.settings?.contactForm) };
+    }
+    return normalizedNode;
+  });
+  loadedState.edges = loadedState.edges.map((edgeItem) => {
+    const sourceNode = loadedState.nodes.find((nodeItem) => nodeItem.id === edgeItem.source);
+    if (!isContactFormNode(sourceNode)) return edgeItem;
+    if (edgeItem.label === "Форма заполнена") return { ...edgeItem, outputKey: "completed" };
+    if (edgeItem.label === "Форма не заполнена") return { ...edgeItem, outputKey: "expired" };
+    return edgeItem;
   });
   return loadedState;
 }

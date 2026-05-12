@@ -1366,6 +1366,54 @@ body.is-node-settings-open .node-settings-sidebar {
   flex-wrap: wrap;
 }
 
+.contact-form-preview {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--cmgui-color-border-secondary);
+  border-radius: var(--cmgui-border-radius-large);
+  color: var(--cmgui-color-text-primary);
+  font: var(--cmgui-font-body);
+}
+
+.contact-form-preview-row {
+  display: grid;
+  grid-template-columns: 138px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.contact-form-preview-row span {
+  color: var(--cmgui-color-text-secondary);
+  font-weight: 400;
+}
+
+.contact-form-preview-row strong {
+  min-width: 0;
+  color: var(--cmgui-color-text-primary);
+  font-weight: 400;
+}
+
+.contact-form-settings-link {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--cmgui-color-text-accent);
+  font: var(--cmgui-font-body-button);
+  cursor: pointer;
+}
+
+.contact-form-settings-link:hover {
+  color: var(--cmgui-color-text-accent-hover);
+}
+
+.contact-wait-row {
+  flex-wrap: wrap;
+}
+
 .cmgui-select-container {
   position: relative;
 }
