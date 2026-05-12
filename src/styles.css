@@ -1271,6 +1271,17 @@ body.is-node-settings-open .node-settings-sidebar {
   flex: 0 0 260px;
 }
 
+.simple-select,
+.employee-picker {
+  position: relative;
+  width: 100%;
+}
+
+.employee-picker {
+  display: grid;
+  gap: var(--cmgui-spacing-2);
+}
+
 .cmgui-select-container {
   position: relative;
 }
@@ -1306,6 +1317,10 @@ body.is-node-settings-open .node-settings-sidebar {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.cmgui-select-field-output.is-placeholder {
+  color: var(--cmgui-color-text-secondary);
 }
 
 .cmgui-select-field-suffix {

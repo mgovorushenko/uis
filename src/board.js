@@ -22,6 +22,27 @@ const GROUP_TRANSFER_EMPLOYEES_BY_GROUP = {
   "Новая группа": ["Новый сотрудник 1", "Новый сотрудник 2"],
 };
 const GROUP_TRANSFER_GROUPS = Object.keys(GROUP_TRANSFER_EMPLOYEES_BY_GROUP).filter((groupName) => groupName !== "Новая группа");
+const TRANSFER_EMPLOYEES = ["Мирошников Роман", "Лемаева Юлия", "Васнецов Николай", "Смирнова Алина", "Кузнецова Мария", "Фомин Артем"];
+const SIMPLE_TRANSFER_CONFIG = {
+  "employee-transfer": {
+    title: "На сотрудника",
+    requiredField: "employeeName",
+    requiredError: "Выберите сотрудника",
+    emptySubtitle: "Сотрудник не выбран",
+    alert: "Чат будет направлен сразу на выбранного сотрудника",
+    icon: "user-20",
+  },
+  "personal-manager-transfer": {
+    title: "На персонального менеджера",
+    alert: "Чат будет направлен на персонального менеджера клиента",
+    icon: "last-manager",
+  },
+  "last-manager-transfer": {
+    title: "На последнего менеджера",
+    alert: "Чат будет направлен на менеджера, с которым клиент общался последним",
+    icon: "last-manager",
+  },
+};
 const icons = {
   search: '<circle cx="9" cy="9" r="5"></circle><path d="m13 13 4 4"></path>',
   star: '<path d="m10 2 2.5 5.1 5.6.8-4 3.9.9 5.5-5-2.6-5 2.6.9-5.5-4-3.9 5.6-.8L10 2Z"></path>',
@@ -283,7 +304,7 @@ function wireControls() {
       closeOperationModal();
       const nodeId = replaceId ? replacePlaceholderNode(replaceId, card.dataset.kind || "empty", operationType) : addNode(card.dataset.kind || "empty", sourceId, operationType);
       const nodeItem = getNode(nodeId);
-      if (nodeItem && isGroupTransferNode(nodeItem)) {
+      if (nodeItem && isConfigurableTransferNode(nodeItem)) {
         pendingSettingsNodeIds.add(nodeId);
         openNodeSettings(nodeId);
       }
@@ -477,7 +498,7 @@ function renderNodes() {
       }
       selectedId = d.id;
       render();
-      if (isGroupTransferNode(d)) {
+      if (isConfigurableTransferNode(d)) {
         openNodeSettings(d.id);
       }
     });
@@ -710,7 +731,7 @@ function addNode(kind, sourceId = null, operationType = null) {
   if (sourceNode) {
     state.edges.push(createOutputEdge(sourceNode, id));
   }
-  if (isGroupTransferNode(nextNode)) createFallbackPlaceholderFor(nextNode);
+  if (isTransferWithFallbackNode(nextNode)) createFallbackPlaceholderFor(nextNode);
   selectedId = id;
   render();
   schedulePersistState();
@@ -723,7 +744,7 @@ function replacePlaceholderNode(replaceId, kind, operationType = null) {
   if (!target || !isPlaceholderNode(target)) return addNode(kind, null, operationType);
   Object.assign(target, node(replaceId, kind, target.x, target.y));
   configureNodeForOperation(target, operationType);
-  if (isGroupTransferNode(target)) createFallbackPlaceholderFor(target);
+  if (isTransferWithFallbackNode(target)) createFallbackPlaceholderFor(target);
   selectedId = replaceId;
   render();
   schedulePersistState();
@@ -736,6 +757,13 @@ function configureNodeForOperation(nodeItem, operationType) {
     nodeItem.title = "На группу";
     nodeItem.subtitle = "Группа не выбрана";
     nodeItem.settings = { groupTransfer: createGroupTransferSettings() };
+  }
+  if (SIMPLE_TRANSFER_CONFIG[operationType]) {
+    const config = SIMPLE_TRANSFER_CONFIG[operationType];
+    nodeItem.title = config.title;
+    nodeItem.subtitle = config.emptySubtitle || "Ожидание ответа: 1 мин.";
+    nodeItem.icon = config.icon;
+    nodeItem.settings = { simpleTransfer: createSimpleTransferSettings(operationType) };
   }
 }
 
@@ -773,7 +801,7 @@ function nodeOutputs(nodeItem) {
   if (!nodeItem) return [];
   if (isPlaceholderNode(nodeItem)) return [];
   if (nodeItem.kind === "start") return [{ key: "main", label: "" }];
-  if (isGroupTransferNode(nodeItem)) return [{ key: "failed", label: "Никто не ответил", tone: "plain" }];
+  if (isTransferWithFallbackNode(nodeItem)) return [{ key: "failed", label: "Никто не ответил", tone: "plain" }];
   return [{ key: "main", label: "" }];
 }
 
@@ -811,7 +839,7 @@ function openNodeSettings(nodeId) {
   settingsNodeId = nodeId;
   selectedId = nodeId;
   const nodeItem = getNode(nodeId);
-  if (nodeItem && !settingsDrafts[nodeId]) settingsDrafts[nodeId] = clone(getGroupTransferSettings(nodeItem));
+  if (nodeItem && !settingsDrafts[nodeId]) settingsDrafts[nodeId] = clone(getNodeSettings(nodeItem));
   document.body.classList.add("is-node-settings-open");
   document.querySelector("#nodeSettingsSidebar").setAttribute("aria-hidden", "false");
   renderNodeSettingsSidebar();
@@ -882,15 +910,16 @@ function closeSettingsCloseConfirm() {
 
 function hasUnsavedNodeSettings(nodeId) {
   const nodeItem = getNode(nodeId);
-  if (!nodeItem || !isGroupTransferNode(nodeItem)) return false;
+  if (!nodeItem || !isConfigurableTransferNode(nodeItem)) return false;
   if (pendingSettingsNodeIds.has(nodeId)) return true;
   const draft = settingsDrafts[nodeId];
   if (!draft) return false;
-  return stableStringifySettings(draft) !== stableStringifySettings(getGroupTransferSettings(nodeItem));
+  return stableStringifySettings(nodeItem, draft) !== stableStringifySettings(nodeItem, getNodeSettings(nodeItem));
 }
 
-function stableStringifySettings(settings) {
-  return JSON.stringify(normalizeComparableGroupTransferSettings(settings));
+function stableStringifySettings(nodeItem, settings) {
+  if (isGroupTransferNode(nodeItem)) return JSON.stringify(normalizeComparableGroupTransferSettings(settings));
+  return JSON.stringify(normalizeComparableSimpleTransferSettings(nodeItem.operationType, settings));
 }
 
 function normalizeComparableGroupTransferSettings(settings) {
@@ -913,24 +942,24 @@ function renderNodeSettingsSidebar() {
   const sidebar = document.querySelector("#nodeSettingsSidebar");
   if (!sidebar) return;
   const nodeItem = getNode(settingsNodeId);
-  if (!nodeItem || !isGroupTransferNode(nodeItem)) {
+  if (!nodeItem || !isConfigurableTransferNode(nodeItem)) {
     sidebar.innerHTML = "";
     return;
   }
 
-  const settings = getGroupTransferDraft(nodeItem);
+  const settings = getNodeSettingsDraft(nodeItem);
   const errors = settingsErrors[nodeItem.id] || {};
-  const hasGroup = Boolean(settings.groupName);
   const bodyScrollTop = sidebar.querySelector(".node-settings-body")?.scrollTop || 0;
-  sidebar.innerHTML = `<form class="node-settings-form" id="groupTransferForm">
+  const title = settingsTitleForNode(nodeItem);
+  sidebar.innerHTML = `<form class="node-settings-form" id="nodeSettingsForm">
     <header class="node-settings-header">
-      <h2>На группу</h2>
+      <h2>${escapeHtml(title)}</h2>
       <button class="node-settings-close" type="button" id="nodeSettingsClose" title="Закрыть" aria-label="Закрыть">
         <span class="cmgui-icon">${iconSvg("cancel", 20)}</span>
       </button>
     </header>
     <div class="node-settings-body">
-      ${hasGroup ? renderGroupTransferCard(settings) : renderEmptyGroupTransferCard(errors)}
+      ${isGroupTransferNode(nodeItem) ? (settings.groupName ? renderGroupTransferCard(settings) : renderEmptyGroupTransferCard(errors)) : renderSimpleTransferCard(nodeItem, settings, errors)}
       <section class="node-settings-card technical-settings-card ${settings.technicalOpen ? "is-open" : ""}">
         <button class="node-settings-card-head" type="button" id="technicalToggle">
           <span>Технические настройки</span>
@@ -1013,6 +1042,38 @@ function renderGroupTransferCard(settings) {
   </section>`;
 }
 
+function renderSimpleTransferCard(nodeItem, settings, errors = {}) {
+  const config = SIMPLE_TRANSFER_CONFIG[nodeItem.operationType];
+  return `<section class="node-settings-card simple-transfer-card">
+    <div class="node-settings-card-head is-static">
+      <span>Основные параметры</span>
+    </div>
+    ${renderSettingsAlert(config.alert)}
+    ${
+      config.requiredField === "employeeName"
+        ? `<div class="employee-picker">
+            ${renderSimpleSelect("employeeSelect", "Сотрудник*", settings.employeeName || "", TRANSFER_EMPLOYEES.map((name) => [name, name]), settings.employeeDropdownOpen)}
+            ${errors.employeeName ? `<span class="settings-field-error">${escapeHtml(errors.employeeName)}</span>` : ""}
+          </div>`
+        : ""
+    }
+    ${renderResponseTimeout(settings)}
+  </section>`;
+}
+
+function renderSimpleSelect(id, placeholder, value, options, isOpen) {
+  const selected = options.find(([optionValue]) => optionValue === value);
+  return `<div class="cmgui-select-container simple-select">
+    <div class="cmgui-select cmgui-select-size-medium">
+      <button class="cmgui-select-field ${isOpen ? "cmgui-select-field-active" : ""}" type="button" id="${id}" aria-expanded="${isOpen}">
+        <span class="cmgui-select-field-output ${selected ? "" : "is-placeholder"}">${escapeHtml(selected ? selected[1] : placeholder)}</span>
+        <span class="cmgui-select-field-suffix">${iconSvg("arrow-list-down", 20)}</span>
+      </button>
+    </div>
+    ${isOpen ? renderSelectPopup(id, options) : ""}
+  </div>`;
+}
+
 function renderEmployeesTable(settings) {
   const showOrder = settings.distribution === "queued";
   const showTimeout = settings.distribution !== "all";
@@ -1052,7 +1113,7 @@ function renderCellCounter(id, value, employeeIndex, { min = 0, max = 9999999 } 
 }
 
 function renderResponseTimeout(settings) {
-  if (settings.distribution !== "all") return "";
+  if (settings.distribution && settings.distribution !== "all") return "";
   return `<div class="response-row">
     <span class="response-label">Ожидание ответа</span>
     <input class="response-input" id="responseTimeoutInput" value="${settings.responseTimeout}" inputmode="numeric" />
@@ -1140,20 +1201,21 @@ function renderSettingsAlert(text) {
 function wireNodeSettingsSidebar(sidebar, nodeItem, settings) {
   sidebar.querySelector("#nodeSettingsClose")?.addEventListener("click", () => cancelNodeSettings(true));
   sidebar.querySelector("#nodeSettingsCancel")?.addEventListener("click", () => cancelNodeSettings(true));
-  sidebar.querySelector("#groupTransferForm")?.addEventListener("keydown", (event) => {
+  sidebar.querySelector("#nodeSettingsForm")?.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && isEditableEventTarget(event.target)) event.preventDefault();
   });
-  sidebar.querySelector("#groupTransferForm")?.addEventListener("submit", (event) => {
+  sidebar.querySelector("#nodeSettingsForm")?.addEventListener("submit", (event) => {
     event.preventDefault();
-    const nextSettings = collectGroupTransferSettings(sidebar, getGroupTransferDraft(nodeItem));
-    if (!nextSettings.groupName) {
-      settingsErrors[nodeItem.id] = { groupName: "Выберите отдел" };
-      updateGroupTransferDraft(nodeItem, { groupDropdownOpen: false });
+    const nextSettings = collectNodeSettings(sidebar, nodeItem, getNodeSettingsDraft(nodeItem));
+    const validationErrors = validateNodeSettings(nodeItem, nextSettings);
+    if (Object.keys(validationErrors).length) {
+      settingsErrors[nodeItem.id] = validationErrors;
+      updateNodeSettingsDraft(nodeItem, closeDropdownPatchForNode(nodeItem));
       renderNodeSettingsSidebar();
       return;
     }
     pushHistory();
-    saveGroupTransferSettings(nodeItem, nextSettings);
+    saveNodeSettings(nodeItem, nextSettings);
     delete settingsDrafts[nodeItem.id];
     delete settingsErrors[nodeItem.id];
     pendingSettingsNodeIds.delete(nodeItem.id);
@@ -1162,11 +1224,11 @@ function wireNodeSettingsSidebar(sidebar, nodeItem, settings) {
     schedulePersistState();
   });
   sidebar.querySelector("#addGroupButton")?.addEventListener("click", () => {
-    updateGroupTransferDraft(nodeItem, { groupDropdownOpen: !settings.groupDropdownOpen });
+    updateNodeSettingsDraft(nodeItem, { groupDropdownOpen: !settings.groupDropdownOpen });
     renderNodeSettingsSidebar();
   });
   sidebar.querySelector("#changeGroupButton")?.addEventListener("click", () => {
-    updateGroupTransferDraft(nodeItem, { groupDropdownOpen: !settings.groupDropdownOpen });
+    updateNodeSettingsDraft(nodeItem, { groupDropdownOpen: !settings.groupDropdownOpen });
     renderNodeSettingsSidebar();
   });
   sidebar.querySelector(".group-picker")?.insertAdjacentHTML("beforeend", renderGroupDropdown(settings));
@@ -1175,43 +1237,54 @@ function wireNodeSettingsSidebar(sidebar, nodeItem, settings) {
       const value = button.dataset.dropdownValue;
       const groupName = value === "__create_group__" ? "Новая группа" : value;
       delete settingsErrors[nodeItem.id];
-      updateGroupTransferDraft(nodeItem, { groupName, groupDropdownOpen: false, employees: createEmployeesForGroup(groupName) });
+      updateNodeSettingsDraft(nodeItem, { groupName, groupDropdownOpen: false, employees: createEmployeesForGroup(groupName) });
+      renderNodeSettingsSidebar();
+    });
+  });
+  sidebar.querySelector("#employeeSelect")?.addEventListener("click", () => {
+    updateNodeSettingsDraft(nodeItem, { employeeDropdownOpen: !settings.employeeDropdownOpen });
+    renderNodeSettingsSidebar();
+  });
+  sidebar.querySelectorAll("[data-dropdown-id='employeeSelect']").forEach((button) => {
+    button.addEventListener("click", () => {
+      delete settingsErrors[nodeItem.id];
+      updateNodeSettingsDraft(nodeItem, { employeeName: button.dataset.dropdownValue, employeeDropdownOpen: false });
       renderNodeSettingsSidebar();
     });
   });
   sidebar.querySelector("#technicalToggle")?.addEventListener("click", () => {
-    updateGroupTransferDraft(nodeItem, { technicalOpen: !settings.technicalOpen });
+    updateNodeSettingsDraft(nodeItem, { technicalOpen: !settings.technicalOpen });
     renderNodeSettingsSidebar();
   });
   sidebar.querySelector(".technical-settings-card:not(.is-open)")?.addEventListener("click", (event) => {
     if (event.target.closest("button")) return;
-    updateGroupTransferDraft(nodeItem, { technicalOpen: true });
+    updateNodeSettingsDraft(nodeItem, { technicalOpen: true });
     renderNodeSettingsSidebar();
   });
   sidebar.querySelector("#distributionSelect")?.addEventListener("click", () => {
-    updateGroupTransferDraft(nodeItem, { distributionDropdownOpen: !settings.distributionDropdownOpen });
+    updateNodeSettingsDraft(nodeItem, { distributionDropdownOpen: !settings.distributionDropdownOpen });
     renderNodeSettingsSidebar();
   });
   sidebar.querySelectorAll("[data-dropdown-id='distributionSelect']").forEach((button) => {
     button.addEventListener("click", () => {
-      updateGroupTransferDraft(nodeItem, { distribution: button.dataset.dropdownValue, distributionDropdownOpen: false });
+      updateNodeSettingsDraft(nodeItem, { distribution: button.dataset.dropdownValue, distributionDropdownOpen: false });
       renderNodeSettingsSidebar();
     });
   });
   sidebar.querySelectorAll("[data-time-unit]").forEach((button) => {
     button.addEventListener("click", () => {
-      updateGroupTransferDraft(nodeItem, { timeoutUnit: button.dataset.timeUnit });
+      updateNodeSettingsDraft(nodeItem, { timeoutUnit: button.dataset.timeUnit });
       renderNodeSettingsSidebar();
     });
   });
   sidebar.querySelector("#responseTimeoutInput")?.addEventListener("input", (event) => {
     const responseTimeout = sanitizePositiveInteger(event.target.value, settings.responseTimeout);
-    updateGroupTransferDraft(nodeItem, { responseTimeout });
+    updateNodeSettingsDraft(nodeItem, { responseTimeout });
   });
   sidebar.querySelector("#cycleLimitInput")?.addEventListener("input", (event) => {
     if (/^\d*(?:\.\d*)?$/.test(event.target.value)) {
       const cycleLimit = sanitizePositiveInteger(event.target.value, settings.cycleLimit);
-      updateGroupTransferDraft(nodeItem, { cycleLimit });
+      updateNodeSettingsDraft(nodeItem, { cycleLimit });
       return;
     }
     event.target.value = settings.cycleLimit;
@@ -1220,16 +1293,16 @@ function wireNodeSettingsSidebar(sidebar, nodeItem, settings) {
     button.addEventListener("mousedown", (event) => {
       if (button.disabled || event.button !== 0) return;
       event.preventDefault();
-      const draft = getGroupTransferDraft(nodeItem);
+      const draft = getNodeSettingsDraft(nodeItem);
       const next = Math.max(1, draft.cycleLimit + Number(button.dataset.cycleStep));
-      updateGroupTransferDraft(nodeItem, { cycleLimit: next });
+      updateNodeSettingsDraft(nodeItem, { cycleLimit: next });
       renderNodeSettingsSidebar();
     });
   });
   sidebar.querySelectorAll("[data-employee-timeout-index]").forEach((control) => {
     if (control.matches("input")) {
       control.addEventListener("input", (event) => {
-        const draft = getGroupTransferDraft(nodeItem);
+        const draft = getNodeSettingsDraft(nodeItem);
         const currentEmployee = draft.employees[Number(event.target.dataset.employeeTimeoutIndex)];
         if (!/^\d*(?:\.\d*)?$/.test(event.target.value)) {
           event.target.value = currentEmployee?.timeout || 1;
@@ -1239,20 +1312,20 @@ function wireNodeSettingsSidebar(sidebar, nodeItem, settings) {
         const employees = draft.employees.map((employee, employeeIndex) =>
           employeeIndex === index ? { ...employee, timeout: sanitizePositiveInteger(event.target.value, employee.timeout) } : employee,
         );
-        updateGroupTransferDraft(nodeItem, { employees });
+        updateNodeSettingsDraft(nodeItem, { employees });
       });
       return;
     }
     control.addEventListener("mousedown", (event) => {
       if (control.disabled || event.button !== 0) return;
       event.preventDefault();
-      const draft = getGroupTransferDraft(nodeItem);
+      const draft = getNodeSettingsDraft(nodeItem);
       const index = Number(control.dataset.employeeTimeoutIndex);
       const step = Number(control.dataset.employeeTimeoutStep);
       const employees = draft.employees.map((employee, employeeIndex) =>
         employeeIndex === index ? { ...employee, timeout: Math.max(1, employee.timeout + step) } : employee,
       );
-      updateGroupTransferDraft(nodeItem, { employees });
+      updateNodeSettingsDraft(nodeItem, { employees });
       renderNodeSettingsSidebar();
     });
   });
@@ -1279,17 +1352,17 @@ function wireNodeSettingsSidebar(sidebar, nodeItem, settings) {
       const fromIndex = Number(event.dataTransfer.getData("text/plain"));
       const toIndex = Number(row.dataset.dragIndex);
       if (!Number.isInteger(fromIndex) || !Number.isInteger(toIndex) || fromIndex === toIndex) return;
-      const draft = getGroupTransferDraft(nodeItem);
-      updateGroupTransferDraft(nodeItem, { employees: moveArrayItem(draft.employees, fromIndex, toIndex) });
+      const draft = getNodeSettingsDraft(nodeItem);
+      updateNodeSettingsDraft(nodeItem, { employees: moveArrayItem(draft.employees, fromIndex, toIndex) });
       renderNodeSettingsSidebar();
     });
   });
   sidebar.querySelectorAll("[data-employee-index]").forEach((button) => {
     button.addEventListener("click", () => {
-      const draft = getGroupTransferDraft(nodeItem);
+      const draft = getNodeSettingsDraft(nodeItem);
       const index = Number(button.dataset.employeeIndex);
       const employees = draft.employees.map((employee, employeeIndex) => (employeeIndex === index ? { ...employee, enabled: !employee.enabled } : employee));
-      updateGroupTransferDraft(nodeItem, { employees });
+      updateNodeSettingsDraft(nodeItem, { employees });
       renderNodeSettingsSidebar();
     });
   });
@@ -1302,6 +1375,31 @@ function collectGroupTransferSettings(sidebar, settings) {
     responseTimeout: sanitizePositiveInteger(sidebar.querySelector("#responseTimeoutInput")?.value, settings.responseTimeout),
     cycleLimit: sanitizePositiveInteger(sidebar.querySelector("#cycleLimitInput")?.value, settings.cycleLimit),
   };
+}
+
+function collectNodeSettings(sidebar, nodeItem, settings) {
+  if (isGroupTransferNode(nodeItem)) return collectGroupTransferSettings(sidebar, settings);
+  return collectSimpleTransferSettings(sidebar, nodeItem, settings);
+}
+
+function collectSimpleTransferSettings(sidebar, nodeItem, settings) {
+  return createSimpleTransferSettings(nodeItem.operationType, {
+    ...settings,
+    responseTimeout: sanitizePositiveInteger(sidebar.querySelector("#responseTimeoutInput")?.value, settings.responseTimeout),
+    cycleLimit: sanitizePositiveInteger(sidebar.querySelector("#cycleLimitInput")?.value, settings.cycleLimit),
+  });
+}
+
+function validateNodeSettings(nodeItem, settings) {
+  if (isGroupTransferNode(nodeItem)) return settings.groupName ? {} : { groupName: "Выберите отдел" };
+  const config = SIMPLE_TRANSFER_CONFIG[nodeItem.operationType];
+  if (config?.requiredField === "employeeName" && !settings.employeeName) return { employeeName: config.requiredError };
+  return {};
+}
+
+function closeDropdownPatchForNode(nodeItem) {
+  if (isGroupTransferNode(nodeItem)) return { groupDropdownOpen: false, distributionDropdownOpen: false };
+  return { employeeDropdownOpen: false };
 }
 
 function createGroupTransferSettings(overrides = {}) {
@@ -1322,6 +1420,19 @@ function createGroupTransferSettings(overrides = {}) {
   };
   if (!Array.isArray(settings.employees) || !settings.employees.length) settings.employees = defaults.employees;
   return settings;
+}
+
+function createSimpleTransferSettings(operationType, overrides = {}) {
+  const defaults = {
+    operationType,
+    employeeName: "",
+    responseTimeout: 60,
+    timeoutUnit: "seconds",
+    cycleLimit: 1,
+    technicalOpen: false,
+    employeeDropdownOpen: false,
+  };
+  return { ...defaults, ...overrides, operationType };
 }
 
 function createEmployeesForGroup(groupName) {
@@ -1348,18 +1459,43 @@ function getGroupTransferSettings(nodeItem) {
   });
 }
 
-function getGroupTransferDraft(nodeItem) {
-  if (!settingsDrafts[nodeItem.id]) settingsDrafts[nodeItem.id] = clone(getGroupTransferSettings(nodeItem));
+function getSimpleTransferSettings(nodeItem) {
+  const existing = nodeItem.settings?.simpleTransfer || {};
+  const inferredEmployeeName = existing.employeeName ?? inferEmployeeName(nodeItem.title);
+  return createSimpleTransferSettings(nodeItem.operationType, {
+    ...existing,
+    employeeName: inferredEmployeeName,
+    technicalOpen: existing.technicalOpen ?? false,
+  });
+}
+
+function getNodeSettings(nodeItem) {
+  if (isGroupTransferNode(nodeItem)) return getGroupTransferSettings(nodeItem);
+  return getSimpleTransferSettings(nodeItem);
+}
+
+function getNodeSettingsDraft(nodeItem) {
+  if (!settingsDrafts[nodeItem.id]) settingsDrafts[nodeItem.id] = clone(getNodeSettings(nodeItem));
   return settingsDrafts[nodeItem.id];
 }
 
-function updateGroupTransferDraft(nodeItem, patch) {
-  settingsDrafts[nodeItem.id] = createGroupTransferSettings({ ...getGroupTransferDraft(nodeItem), ...patch });
+function updateNodeSettingsDraft(nodeItem, patch) {
+  const next = { ...getNodeSettingsDraft(nodeItem), ...patch };
+  settingsDrafts[nodeItem.id] = isGroupTransferNode(nodeItem) ? createGroupTransferSettings(next) : createSimpleTransferSettings(nodeItem.operationType, next);
 }
 
-function saveGroupTransferSettings(nodeItem, settings) {
+function saveNodeSettings(nodeItem, settings) {
+  if (!isGroupTransferNode(nodeItem)) {
+    saveSimpleTransferSettings(nodeItem, settings);
+    return;
+  }
   nodeItem.settings = { ...(nodeItem.settings || {}), groupTransfer: createGroupTransferSettings(settings) };
   applyGroupTransferTitle(nodeItem, nodeItem.settings.groupTransfer);
+}
+
+function saveSimpleTransferSettings(nodeItem, settings) {
+  nodeItem.settings = { ...(nodeItem.settings || {}), simpleTransfer: createSimpleTransferSettings(nodeItem.operationType, settings) };
+  applySimpleTransferTitle(nodeItem, nodeItem.settings.simpleTransfer);
 }
 
 function applyGroupTransferTitle(nodeItem, settings) {
@@ -1371,8 +1507,52 @@ function isGroupTransferNode(nodeItem) {
   return nodeItem?.kind === "transfer" && (!nodeItem.operationType || nodeItem.operationType === "group-transfer");
 }
 
+function isSimpleTransferNode(nodeItem) {
+  return Boolean(nodeItem?.kind === "transfer" && SIMPLE_TRANSFER_CONFIG[nodeItem.operationType]);
+}
+
+function isConfigurableTransferNode(nodeItem) {
+  return isGroupTransferNode(nodeItem) || isSimpleTransferNode(nodeItem);
+}
+
+function isTransferWithFallbackNode(nodeItem) {
+  return isConfigurableTransferNode(nodeItem);
+}
+
+function settingsTitleForNode(nodeItem) {
+  if (isGroupTransferNode(nodeItem)) return "На группу";
+  return SIMPLE_TRANSFER_CONFIG[nodeItem.operationType]?.title || nodeItem.title;
+}
+
+function applySimpleTransferTitle(nodeItem, settings) {
+  const config = SIMPLE_TRANSFER_CONFIG[nodeItem.operationType];
+  if (nodeItem.operationType === "employee-transfer") {
+    nodeItem.title = settings.employeeName ? `${config.title}: ${settings.employeeName}` : config.title;
+    nodeItem.subtitle = settings.employeeName ? `Ожидание ответа: ${formatTimeout(settings.responseTimeout, settings.timeoutUnit)}` : config.emptySubtitle;
+    return;
+  }
+  nodeItem.title = config.title;
+  nodeItem.subtitle = `Ожидание ответа: ${formatTimeout(settings.responseTimeout, settings.timeoutUnit)}`;
+}
+
+function normalizeComparableSimpleTransferSettings(operationType, settings) {
+  const normalized = createSimpleTransferSettings(operationType, settings);
+  return {
+    operationType,
+    employeeName: normalized.employeeName || "",
+    responseTimeout: sanitizePositiveInteger(normalized.responseTimeout, 60),
+    timeoutUnit: normalized.timeoutUnit,
+    cycleLimit: sanitizePositiveInteger(normalized.cycleLimit, 1),
+  };
+}
+
 function inferGroupName(title = "") {
   const match = String(title).match(/^На группу:\s*(.+)$/);
+  return match ? match[1] : "";
+}
+
+function inferEmployeeName(title = "") {
+  const match = String(title).match(/^На сотрудника:\s*(.+)$/);
   return match ? match[1] : "";
 }
 
