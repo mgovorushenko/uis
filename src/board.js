@@ -12,7 +12,7 @@ const NODE_PORT_RIGHT_COMPACT_X = NODE_W + 20;
 const NODE_PORT_R = 3;
 const NODE_PORT_EDGE_GAP = 8;
 const NODE_CREATE_GAP_X = 80;
-const EDGE_LABEL_SIDE_GAP = 40;
+const EDGE_LABEL_SIDE_GAP = 60;
 const EDGE_LABEL_PADDING_X = 10;
 const GROUP_TRANSFER_EMPLOYEES_BY_GROUP = {
   "Отдел продаж": ["Лемаева Юлия", "Васнецов Николай", "Смирнова Алина", "Орлов Денис"],
@@ -867,18 +867,21 @@ function edgePath(d) {
   if (!route) return "";
   if (route.points) return roundedPolylinePath(route.points, route.radius);
 
-  const { x1, y1, x2, y2, midX, radius } = route;
+  const { x1, y1, x2, y2, layoutX1, layoutX2, midX, radius } = route;
   if (Math.abs(y2 - y1) < 1) return `M ${x1} ${y1} L ${x2} ${y2}`;
 
   const directionY = y2 > y1 ? 1 : -1;
-  return [
-    `M ${x1} ${y1}`,
+  const commands = [`M ${x1} ${y1}`];
+  if (Math.abs(layoutX1 - x1) > 0.5) commands.push(`L ${layoutX1} ${y1}`);
+  commands.push(
     `L ${midX - radius} ${y1}`,
     `Q ${midX} ${y1} ${midX} ${y1 + directionY * radius}`,
     `L ${midX} ${y2 - directionY * radius}`,
     `Q ${midX} ${y2} ${midX + radius} ${y2}`,
-    `L ${x2} ${y2}`,
-  ].join(" ");
+    `L ${layoutX2} ${y2}`,
+  );
+  if (Math.abs(layoutX2 - x2) > 0.5) commands.push(`L ${x2} ${y2}`);
+  return commands.join(" ");
 }
 
 function edgeLabelPoint(d, labelWidth = EDGE_LABEL_MAX_WIDTH) {
@@ -892,37 +895,41 @@ function edgeLabelPoint(d, labelWidth = EDGE_LABEL_MAX_WIDTH) {
 
 function edgeRoute(sourceNode, targetNode, edgeItem = null) {
   const x1 = sourceNode.x + (isNodePortVisible(sourceNode.id) ? nodeRightPortX(sourceNode) + NODE_PORT_R + NODE_PORT_EDGE_GAP : NODE_W + NODE_PORT_EDGE_GAP);
+  const layoutX1 = sourceNode.x + NODE_W + NODE_PORT_EDGE_GAP;
   const y1 = sourceNode.y + NODE_H / 2;
   const x2 = targetNode.x + (isNodePortVisible(targetNode.id) && canReceiveInput(targetNode) ? NODE_PORT_LEFT_X - NODE_PORT_R - NODE_PORT_EDGE_GAP : -NODE_PORT_EDGE_GAP);
   const layoutX2 = targetNode.x - NODE_PORT_EDGE_GAP;
   const y2 = targetNode.y + NODE_H / 2;
-  if (layoutX2 <= x1 + 48 && Math.abs(y2 - y1) > 1) {
+  if (layoutX2 <= layoutX1 + 48 && Math.abs(y2 - y1) > 1) {
     const labelWidth = edgeItem?.label ? estimateEdgeLabelWidth(edgeItem.label) : 0;
-    const outwardX = x1 + 64;
+    const outwardX = layoutX1 + 64;
     const labelLeftX = targetNode.x - EDGE_LABEL_SIDE_GAP * 2 - labelWidth;
     const bridgeX = Math.min(layoutX2 - 64, labelLeftX - 40);
     const midY = y1 + (y2 - y1) / 2;
-    const points = [
-      { x: x1, y: y1 },
+    const points = [{ x: x1, y: y1 }];
+    if (Math.abs(layoutX1 - x1) > 0.5) points.push({ x: layoutX1, y: y1 });
+    points.push(
       { x: outwardX, y: y1 },
       { x: outwardX, y: midY },
       { x: bridgeX, y: midY },
       { x: bridgeX, y: y2 },
       { x: layoutX2, y: y2 },
-    ];
+    );
     if (Math.abs(layoutX2 - x2) > 0.5) points.push({ x: x2, y: y2 });
     return {
       x1,
       y1,
       x2,
       y2,
+      layoutX1,
+      layoutX2,
       radius: 18,
       points,
     };
   }
-  const midX = layoutX2 > x1 ? x1 + (layoutX2 - x1) / 2 : Math.max(x1 + 56, targetNode.x + NODE_W + 56);
-  const radius = Math.min(18, Math.abs(midX - x1) / 2, Math.abs(layoutX2 - midX) / 2, Math.abs(y2 - y1) / 2);
-  return { x1, y1, x2, y2, midX, radius };
+  const midX = layoutX2 > layoutX1 ? layoutX1 + (layoutX2 - layoutX1) / 2 : Math.max(layoutX1 + 56, targetNode.x + NODE_W + 56);
+  const radius = Math.min(18, Math.abs(midX - layoutX1) / 2, Math.abs(layoutX2 - midX) / 2, Math.abs(y2 - y1) / 2);
+  return { x1, y1, x2, y2, layoutX1, layoutX2, midX, radius };
 }
 
 function roundedPolylinePath(points, radius) {
