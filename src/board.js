@@ -158,6 +158,7 @@ let appState = loadAppState();
 let state = getCurrentScenario()?.board || createInitialBoard(["Telegram", "Email"]);
 let selectedId = null;
 let hoveredId = null;
+let draggedNodeId = null;
 let pendingSourceId = null;
 let operationSourceId = null;
 let operationReplaceId = null;
@@ -456,6 +457,8 @@ function renderNodes() {
           const [pointerX, pointerY] = transform.invert(d3.pointer(event, svg.node()));
           d.dragOffsetX = pointerX - d.x;
           d.dragOffsetY = pointerY - d.y;
+          d.dragMoved = false;
+          draggedNodeId = d.id;
           selectedId = d.id;
           pushHistory();
           renderProperties();
@@ -467,13 +470,19 @@ function renderNodes() {
           const [pointerX, pointerY] = transform.invert(d3.pointer(event, svg.node()));
           d.x = pointerX - (d.dragOffsetX || 0);
           d.y = pointerY - (d.dragOffsetY || 0);
+          d.dragMoved = true;
           d3.select(this).attr("transform", `translate(${d.x},${d.y})`);
           renderEdges();
         })
         .on("end", function (event, d) {
+          const wasMoved = Boolean(d.dragMoved);
           delete d.dragOffsetX;
           delete d.dragOffsetY;
+          delete d.dragMoved;
+          draggedNodeId = null;
           if (hoveredId === d.id) hoveredId = null;
+          if (wasMoved && selectedId === d.id) selectedId = null;
+          d3.select(this).classed("is-selected", d.id === selectedId).classed("is-hover-suppressed", wasMoved);
           updateNodeText(this, d, d.id === selectedId);
           renderEdges();
           schedulePersistState();
@@ -504,11 +513,14 @@ function renderNodes() {
     .classed("is-muted", (d) => d.muted)
     .classed("is-placeholder", (d) => isPlaceholderNode(d))
     .on("mouseenter", function (event, d) {
+      if (d3.select(this).classed("is-hover-suppressed")) return;
+      if (draggedNodeId === d.id) return;
       hoveredId = d.id;
       updateNodeText(this, d, true);
       renderEdges();
     })
     .on("mouseleave", function (event, d) {
+      d3.select(this).classed("is-hover-suppressed", false);
       if (hoveredId === d.id) hoveredId = null;
       updateNodeText(this, d, d.id === selectedId);
       renderEdges();
