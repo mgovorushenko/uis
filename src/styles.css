@@ -584,13 +584,32 @@ body.is-board-panning #scenarioSvg {
 }
 
 .edge-label-svg {
-  pointer-events: none;
+  pointer-events: all;
   filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.08));
 }
 
 .edge-label-svg text {
   font: var(--cmgui-font-caption);
   dominant-baseline: middle;
+  pointer-events: none;
+}
+
+.edge-tooltip {
+  position: fixed;
+  z-index: 110;
+  display: none;
+  max-width: 280px;
+  padding: 8px 12px;
+  border-radius: var(--cmgui-border-radius-medium);
+  background: var(--cmgui-color-text-primary);
+  color: var(--cmgui-color-text-invert);
+  box-shadow: var(--cmgui-shadow-large);
+  font: var(--cmgui-font-caption);
+  pointer-events: none;
+}
+
+.edge-tooltip.is-open {
+  display: block;
 }
 
 .top-bar {
@@ -1412,6 +1431,81 @@ body.is-node-settings-open .node-settings-sidebar {
 
 .contact-wait-row {
   flex-wrap: wrap;
+}
+
+.menu-message-textarea .cmgui-text-field-wrapper {
+  height: 120px;
+  min-height: 120px;
+}
+
+.menu-message-textarea textarea.cmgui-text-field-input {
+  min-height: 94px;
+}
+
+.menu-wait-row {
+  flex-wrap: wrap;
+}
+
+.menu-buttons-card {
+  gap: 20px;
+}
+
+.menu-buttons-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.menu-button-row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 44px;
+  gap: 8px;
+  align-items: center;
+}
+
+.menu-button-row.is-dragging {
+  opacity: 0.55;
+}
+
+.menu-button-row.is-drop-target .cmgui-text-field-wrapper {
+  border-color: var(--cmgui-color-border-hover);
+}
+
+.menu-button-order {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.menu-button-input {
+  min-width: 0;
+}
+
+.menu-button-remove {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--cmgui-color-border-secondary);
+  border-radius: var(--cmgui-border-radius-button);
+  background: transparent;
+  color: var(--cmgui-color-icon-primary);
+  cursor: pointer;
+}
+
+.menu-button-remove:hover:not(:disabled) {
+  color: var(--cmgui-color-icon-secondary);
+}
+
+.menu-button-remove:disabled {
+  color: var(--cmgui-color-icon-disabled);
+  cursor: default;
+}
+
+.menu-add-button {
+  align-self: flex-start;
+  color: var(--cmgui-color-text-primary);
 }
 
 .cmgui-select-container {

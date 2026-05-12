@@ -45,6 +45,10 @@ const SIMPLE_TRANSFER_CONFIG = {
 };
 const INFO_MESSAGE_OPERATION = "info-message";
 const CONTACT_FORM_OPERATION = "contact-form";
+const MENU_OPERATION = "menu-operation";
+const MENU_BUTTON_MAX_LENGTH = 128;
+const MENU_BUTTON_MAX_COUNT = 15;
+const EDGE_LABEL_MAX_WIDTH = 160;
 const icons = {
   search: '<circle cx="9" cy="9" r="5"></circle><path d="m13 13 4 4"></path>',
   star: '<path d="m10 2 2.5 5.1 5.6.8-4 3.9.9 5.5-5-2.6-5 2.6.9-5.5-4-3.9 5.6-.8L10 2Z"></path>',
@@ -126,6 +130,7 @@ const catalog = {
   transfer: { title: "На группу: Отдел продаж", subtitle: "Ожидание ответа: 1 мин.", color: "var(--cmgui-color-special-2)", icon: "last-manager" },
   success: { title: "Чат взят в работу", subtitle: "", color: "var(--cmgui-color-special-1)", icon: "success" },
   message: { title: "Информационное сообщение", subtitle: "Следующая операция через: 1 сек.", color: "var(--cmgui-color-special-15)", icon: "info-message" },
+  menuNode: { title: "Меню", subtitle: "Ожидание нажатия кнопки: 20 сек.", color: "var(--cmgui-color-special-13)", icon: "menu" },
   empty: { title: "Добавить операцию", subtitle: "", color: "var(--cmgui-color-bg-main-gray-dark)", icon: "attention", muted: true },
   finish: { title: "Завершить сценарий через 72 ч", subtitle: "После отправить чат: Всем сотрудникам", color: "var(--cmgui-color-special-21)", icon: "node-connection-line" },
 };
@@ -599,11 +604,28 @@ function renderEdges() {
     const group = d3.select(this);
     const p = edgeLabelPoint(d);
     const text = group.select("text").text(d.label);
-    const width = Math.ceil(text.node().getComputedTextLength()) + edgeLabelPaddingX * 2;
+    const maxTextWidth = EDGE_LABEL_MAX_WIDTH - edgeLabelPaddingX * 2;
+    fitSvgText(text, d.label, maxTextWidth);
+    const width = Math.min(EDGE_LABEL_MAX_WIDTH, Math.ceil(text.node().getComputedTextLength()) + edgeLabelPaddingX * 2);
     group.attr("transform", `translate(${p.x - width / 2},${p.y - 12})`).attr("class", "edge-label-svg");
     group.select("rect").attr("width", width).attr("height", 24).attr("fill", colorForTone);
     text.attr("x", edgeLabelPaddingX).attr("y", 12).attr("fill", "white").attr("font", "var(--cmgui-font-caption)");
+    group.on("mouseenter", (event) => showEdgeTooltip(event, d.label)).on("mouseleave", hideEdgeTooltip);
   });
+}
+
+function showEdgeTooltip(event, text) {
+  if (!text) return;
+  const tooltip = document.querySelector("#edgeTooltip");
+  if (!tooltip) return;
+  tooltip.textContent = text;
+  tooltip.style.left = `${event.clientX + 12}px`;
+  tooltip.style.top = `${event.clientY + 12}px`;
+  tooltip.classList.add("is-open");
+}
+
+function hideEdgeTooltip() {
+  document.querySelector("#edgeTooltip")?.classList.remove("is-open");
 }
 
 function updateNodeText(groupElement, nodeData, compact) {
@@ -795,6 +817,13 @@ function configureNodeForOperation(nodeItem, operationType) {
     nodeItem.icon = "form";
     nodeItem.settings = { contactForm: createContactFormSettings() };
   }
+  if (operationType === MENU_OPERATION) {
+    nodeItem.title = "Меню";
+    nodeItem.subtitle = "Ожидание нажатия кнопки: 20 сек.";
+    nodeItem.color = "var(--cmgui-color-special-13)";
+    nodeItem.icon = "menu";
+    nodeItem.settings = { menu: createMenuSettings() };
+  }
 }
 
 function createOutputPlaceholdersFor(sourceNode) {
@@ -852,8 +881,22 @@ function nodeOutputs(nodeItem) {
       { key: "expired", label: "Форма не заполнена", tone: "plain", placeholder: true, offsetY: 92 },
     ];
   }
+  if (isMenuNode(nodeItem)) return menuOutputs(nodeItem);
   if (isTransferWithFallbackNode(nodeItem)) return [{ key: "failed", label: "Никто не ответил", tone: "plain", placeholder: true }];
   return [{ key: "main", label: "" }];
+}
+
+function menuOutputs(nodeItem) {
+  const settings = getMenuSettings(nodeItem);
+  const count = Math.max(1, settings.buttons.length);
+  const center = (count - 1) / 2;
+  return settings.buttons.map((button, index) => ({
+    key: button.id,
+    label: button.text || `Кнопка ${index + 1}`,
+    tone: "plain",
+    placeholder: true,
+    offsetY: Math.round((index - center) * 92),
+  }));
 }
 
 function firstFreeOutput(nodeItem) {
@@ -1021,6 +1064,7 @@ function stableStringifySettings(nodeItem, settings) {
   if (isGroupTransferNode(nodeItem)) return JSON.stringify(normalizeComparableGroupTransferSettings(settings));
   if (isInfoMessageNode(nodeItem)) return JSON.stringify(normalizeComparableInfoMessageSettings(settings));
   if (isContactFormNode(nodeItem)) return JSON.stringify(normalizeComparableContactFormSettings(settings));
+  if (isMenuNode(nodeItem)) return JSON.stringify(normalizeComparableMenuSettings(settings));
   return JSON.stringify(normalizeComparableSimpleTransferSettings(nodeItem.operationType, settings));
 }
 
@@ -1110,6 +1154,7 @@ function renderPrimarySettingsCard(nodeItem, settings, errors) {
   if (isGroupTransferNode(nodeItem)) return settings.groupName ? renderGroupTransferCard(settings) : renderEmptyGroupTransferCard(errors);
   if (isInfoMessageNode(nodeItem)) return renderInfoMessageCard(settings, errors);
   if (isContactFormNode(nodeItem)) return renderContactFormCard(settings);
+  if (isMenuNode(nodeItem)) return renderMenuCard(settings, errors);
   return renderSimpleTransferCard(nodeItem, settings, errors);
 }
 
@@ -1214,6 +1259,49 @@ function renderContactFormCard(settings) {
   </section>`;
 }
 
+function renderMenuCard(settings, errors = {}) {
+  return `<section class="node-settings-card menu-settings-card">
+    <div class="node-settings-card-head is-static">
+      <span>Основные параметры</span>
+    </div>
+    ${renderSettingsAlert("Клиент получит сообщение и предложение выбрать какое-либо действие. От его выбора зависит следующая операция сценария.")}
+    <label class="cmgui-text-field info-message-textarea menu-message-textarea">
+      <span class="cmgui-text-field-wrapper is-textarea ${errors.messageText ? "is-error" : ""}">
+        <textarea class="cmgui-text-field-input" id="menuMessageInput" placeholder="Текст сообщения*">${escapeHtml(settings.messageText || "")}</textarea>
+      </span>
+    </label>
+    ${renderMenuWait(settings)}
+  </section>
+  <section class="node-settings-card menu-buttons-card">
+    <div class="node-settings-card-head is-static">
+      <span>Кнопки меню</span>
+    </div>
+    <div class="menu-buttons-list">
+      ${settings.buttons.map((button, index) => renderMenuButtonRow(button, index, settings.buttons.length, errors)).join("")}
+    </div>
+    <button class="cmgui-button cmgui-button-size-medium cmgui-button-secondary cmgui-button-outline menu-add-button" type="button" id="addMenuButton" ${settings.buttons.length >= MENU_BUTTON_MAX_COUNT ? "disabled" : ""}>
+      <span class="cmgui-icon">${iconSvg("add-20", 20)}</span>
+      <span>Добавить кнопку</span>
+    </button>
+  </section>`;
+}
+
+function renderMenuButtonRow(button, index, total, errors = {}) {
+  const hasError = errors.buttons?.[button.id];
+  return `<div class="menu-button-row" data-menu-button-row="${escapeAttr(button.id)}" draggable="true">
+    <div class="menu-button-order">
+      <button class="drag-icon" type="button" data-menu-drag-handle="${escapeAttr(button.id)}" title="Перетащить" aria-label="Перетащить">${iconSvg("drag-and-drop", 20)}</button>
+      <span class="order-badge">${index + 1}</span>
+    </div>
+    <label class="cmgui-text-field menu-button-input">
+      <span class="cmgui-text-field-wrapper ${hasError ? "is-error" : ""}">
+        <input class="cmgui-text-field-input" data-menu-button-input="${escapeAttr(button.id)}" maxlength="${MENU_BUTTON_MAX_LENGTH}" value="${escapeAttr(button.text)}" placeholder="Текст в кнопке*" />
+      </span>
+    </label>
+    <button class="menu-button-remove" type="button" data-menu-button-remove="${escapeAttr(button.id)}" title="Удалить" aria-label="Удалить" ${total <= 1 ? "disabled" : ""}>${iconSvg("cancel", 20)}</button>
+  </div>`;
+}
+
 function renderSimpleSelect(id, placeholder, value, options, isOpen) {
   const selected = options.find(([optionValue]) => optionValue === value);
   return `<div class="cmgui-select-container simple-select">
@@ -1293,6 +1381,17 @@ function renderContactWait(settings) {
     <span class="response-label">Ожидание контактов</span>
     <input class="response-input" id="contactWaitInput" value="${settings.contactWait}" inputmode="numeric" />
     <div class="segment-control" role="group" aria-label="Единица времени ожидания контактов">
+      <button class="${settings.timeoutUnit === "seconds" ? "is-active" : ""}" type="button" data-time-unit="seconds">Секунд</button>
+      <button class="${settings.timeoutUnit === "minutes" ? "is-active" : ""}" type="button" data-time-unit="minutes">Минут</button>
+    </div>
+  </div>`;
+}
+
+function renderMenuWait(settings) {
+  return `<div class="response-row menu-wait-row">
+    <span class="response-label">Ожидание нажатия кнопки:</span>
+    <input class="response-input" id="menuWaitInput" value="${settings.waitTime}" inputmode="numeric" />
+    <div class="segment-control" role="group" aria-label="Единица времени ожидания кнопки">
       <button class="${settings.timeoutUnit === "seconds" ? "is-active" : ""}" type="button" data-time-unit="seconds">Секунд</button>
       <button class="${settings.timeoutUnit === "minutes" ? "is-active" : ""}" type="button" data-time-unit="minutes">Минут</button>
     </div>
@@ -1464,6 +1563,89 @@ function wireNodeSettingsSidebar(sidebar, nodeItem, settings) {
     const contactWait = sanitizePositiveInteger(event.target.value, settings.contactWait);
     updateNodeSettingsDraft(nodeItem, { contactWait });
   });
+  sidebar.querySelector("#menuWaitInput")?.addEventListener("input", (event) => {
+    const waitTime = sanitizePositiveInteger(event.target.value, settings.waitTime);
+    updateNodeSettingsDraft(nodeItem, { waitTime });
+  });
+  sidebar.querySelector("#menuMessageInput")?.addEventListener("input", (event) => {
+    const errors = { ...(settingsErrors[nodeItem.id] || {}) };
+    if (event.target.value.trim()) {
+      delete errors.messageText;
+      settingsErrors[nodeItem.id] = errors;
+      event.target.closest(".cmgui-text-field-wrapper")?.classList.remove("is-error");
+    }
+    updateNodeSettingsDraft(nodeItem, { messageText: event.target.value });
+  });
+  sidebar.querySelector("#menuMessageInput")?.addEventListener("blur", (event) => {
+    if (event.target.value.trim()) return;
+    settingsErrors[nodeItem.id] = { ...(settingsErrors[nodeItem.id] || {}), messageText: true };
+    event.target.closest(".cmgui-text-field-wrapper")?.classList.add("is-error");
+  });
+  sidebar.querySelectorAll("[data-menu-button-input]").forEach((input) => {
+    input.addEventListener("input", (event) => {
+      const id = event.target.dataset.menuButtonInput;
+      const text = event.target.value.slice(0, MENU_BUTTON_MAX_LENGTH);
+      const draft = getNodeSettingsDraft(nodeItem);
+      const buttons = draft.buttons.map((button) => (button.id === id ? { ...button, text } : button));
+      const errors = { ...(settingsErrors[nodeItem.id] || {}) };
+      if (text.trim() && errors.buttons) {
+        delete errors.buttons[id];
+        settingsErrors[nodeItem.id] = errors;
+        event.target.closest(".cmgui-text-field-wrapper")?.classList.remove("is-error");
+      }
+      updateNodeSettingsDraft(nodeItem, { buttons });
+    });
+    input.addEventListener("blur", (event) => {
+      if (event.target.value.trim()) return;
+      const id = event.target.dataset.menuButtonInput;
+      settingsErrors[nodeItem.id] = {
+        ...(settingsErrors[nodeItem.id] || {}),
+        buttons: { ...((settingsErrors[nodeItem.id] || {}).buttons || {}), [id]: true },
+      };
+      event.target.closest(".cmgui-text-field-wrapper")?.classList.add("is-error");
+    });
+  });
+  sidebar.querySelector("#addMenuButton")?.addEventListener("click", () => {
+    const draft = getNodeSettingsDraft(nodeItem);
+    if (draft.buttons.length >= MENU_BUTTON_MAX_COUNT) return;
+    updateNodeSettingsDraft(nodeItem, { buttons: [...draft.buttons, createMenuButton(`Кнопка ${draft.buttons.length + 1}`)] });
+    renderNodeSettingsSidebar();
+  });
+  sidebar.querySelectorAll("[data-menu-button-remove]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const draft = getNodeSettingsDraft(nodeItem);
+      if (draft.buttons.length <= 1) return;
+      updateNodeSettingsDraft(nodeItem, { buttons: draft.buttons.filter((item) => item.id !== button.dataset.menuButtonRemove) });
+      renderNodeSettingsSidebar();
+    });
+  });
+  sidebar.querySelectorAll("[data-menu-button-row]").forEach((row) => {
+    row.addEventListener("dragstart", (event) => {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", row.dataset.menuButtonRow);
+      row.classList.add("is-dragging");
+    });
+    row.addEventListener("dragend", () => row.classList.remove("is-dragging"));
+    row.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      row.classList.add("is-drop-target");
+    });
+    row.addEventListener("dragleave", () => row.classList.remove("is-drop-target"));
+    row.addEventListener("drop", (event) => {
+      event.preventDefault();
+      row.classList.remove("is-drop-target");
+      const fromId = event.dataTransfer.getData("text/plain");
+      const toId = row.dataset.menuButtonRow;
+      if (!fromId || !toId || fromId === toId) return;
+      const draft = getNodeSettingsDraft(nodeItem);
+      const fromIndex = draft.buttons.findIndex((button) => button.id === fromId);
+      const toIndex = draft.buttons.findIndex((button) => button.id === toId);
+      if (fromIndex < 0 || toIndex < 0) return;
+      updateNodeSettingsDraft(nodeItem, { buttons: moveArrayItem(draft.buttons, fromIndex, toIndex) });
+      renderNodeSettingsSidebar();
+    });
+  });
   sidebar.querySelector("#messageTextInput")?.addEventListener("input", (event) => {
     const errors = { ...(settingsErrors[nodeItem.id] || {}) };
     if (event.target.value.trim()) {
@@ -1578,6 +1760,7 @@ function collectNodeSettings(sidebar, nodeItem, settings) {
   if (isGroupTransferNode(nodeItem)) return collectGroupTransferSettings(sidebar, settings);
   if (isInfoMessageNode(nodeItem)) return collectInfoMessageSettings(sidebar, settings);
   if (isContactFormNode(nodeItem)) return collectContactFormSettings(sidebar, settings);
+  if (isMenuNode(nodeItem)) return collectMenuSettings(sidebar, settings);
   return collectSimpleTransferSettings(sidebar, nodeItem, settings);
 }
 
@@ -1606,10 +1789,24 @@ function collectContactFormSettings(sidebar, settings) {
   });
 }
 
+function collectMenuSettings(sidebar, settings) {
+  return createMenuSettings({
+    ...settings,
+    messageText: sidebar.querySelector("#menuMessageInput")?.value || "",
+    waitTime: sanitizePositiveInteger(sidebar.querySelector("#menuWaitInput")?.value, settings.waitTime),
+    cycleLimit: sanitizePositiveInteger(sidebar.querySelector("#cycleLimitInput")?.value, settings.cycleLimit),
+    buttons: settings.buttons.map((button) => ({
+      ...button,
+      text: (sidebar.querySelector(`[data-menu-button-input="${cssEscape(button.id)}"]`)?.value || button.text).slice(0, MENU_BUTTON_MAX_LENGTH),
+    })),
+  });
+}
+
 function validateNodeSettings(nodeItem, settings) {
   if (isGroupTransferNode(nodeItem)) return settings.groupName ? {} : { groupName: "Выберите отдел" };
   if (isInfoMessageNode(nodeItem)) return settings.messageText.trim() ? {} : { messageText: true };
   if (isContactFormNode(nodeItem)) return {};
+  if (isMenuNode(nodeItem)) return validateMenuSettings(settings);
   const config = SIMPLE_TRANSFER_CONFIG[nodeItem.operationType];
   if (config?.requiredField === "employeeName" && !settings.employeeName) return { employeeName: config.requiredError };
   return {};
@@ -1619,7 +1816,19 @@ function closeDropdownPatchForNode(nodeItem) {
   if (isGroupTransferNode(nodeItem)) return { groupDropdownOpen: false, distributionDropdownOpen: false };
   if (isInfoMessageNode(nodeItem)) return {};
   if (isContactFormNode(nodeItem)) return {};
+  if (isMenuNode(nodeItem)) return {};
   return { employeeDropdownOpen: false };
+}
+
+function validateMenuSettings(settings) {
+  const errors = {};
+  if (!settings.messageText.trim()) errors.messageText = true;
+  const buttonErrors = {};
+  settings.buttons.forEach((button) => {
+    if (!button.text.trim()) buttonErrors[button.id] = true;
+  });
+  if (Object.keys(buttonErrors).length) errors.buttons = buttonErrors;
+  return errors;
 }
 
 function createGroupTransferSettings(overrides = {}) {
@@ -1680,6 +1889,34 @@ function createContactFormSettings(overrides = {}) {
   return { ...defaults, ...overrides };
 }
 
+function createMenuSettings(overrides = {}) {
+  const defaultButtons = [createMenuButton("Кнопка 1")];
+  const settings = {
+    messageText: "",
+    waitTime: 20,
+    timeoutUnit: "seconds",
+    cycleLimit: 1,
+    technicalOpen: false,
+    buttons: defaultButtons,
+    ...overrides,
+  };
+  const buttons = Array.isArray(settings.buttons) && settings.buttons.length ? settings.buttons : defaultButtons;
+  return {
+    ...settings,
+    buttons: buttons.slice(0, MENU_BUTTON_MAX_COUNT).map((button, index) => ({
+      id: button.id || `menu-button-${Date.now().toString(36)}-${index}`,
+      text: String(button.text || `Кнопка ${index + 1}`).slice(0, MENU_BUTTON_MAX_LENGTH),
+    })),
+  };
+}
+
+function createMenuButton(text = "") {
+  return {
+    id: `menu-button-${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 6)}`,
+    text: String(text).slice(0, MENU_BUTTON_MAX_LENGTH),
+  };
+}
+
 function createEmployeesForGroup(groupName) {
   const names = GROUP_TRANSFER_EMPLOYEES_BY_GROUP[groupName] || GROUP_TRANSFER_EMPLOYEES_BY_GROUP["Отдел продаж"];
   return names.map((name, index) => ({ name, enabled: true, timeout: index === names.length - 1 && names.length > 2 ? 1500 : 15 }));
@@ -1730,10 +1967,19 @@ function getContactFormSettings(nodeItem) {
   });
 }
 
+function getMenuSettings(nodeItem) {
+  const existing = nodeItem.settings?.menu || {};
+  return createMenuSettings({
+    ...existing,
+    technicalOpen: existing.technicalOpen ?? false,
+  });
+}
+
 function getNodeSettings(nodeItem) {
   if (isGroupTransferNode(nodeItem)) return getGroupTransferSettings(nodeItem);
   if (isInfoMessageNode(nodeItem)) return getInfoMessageSettings(nodeItem);
   if (isContactFormNode(nodeItem)) return getContactFormSettings(nodeItem);
+  if (isMenuNode(nodeItem)) return getMenuSettings(nodeItem);
   return getSimpleTransferSettings(nodeItem);
 }
 
@@ -1756,10 +2002,18 @@ function updateNodeSettingsDraft(nodeItem, patch) {
     settingsDrafts[nodeItem.id] = createContactFormSettings(next);
     return;
   }
+  if (isMenuNode(nodeItem)) {
+    settingsDrafts[nodeItem.id] = createMenuSettings(next);
+    return;
+  }
   settingsDrafts[nodeItem.id] = createSimpleTransferSettings(nodeItem.operationType, next);
 }
 
 function saveNodeSettings(nodeItem, settings) {
+  if (isMenuNode(nodeItem)) {
+    saveMenuSettings(nodeItem, settings);
+    return;
+  }
   if (isContactFormNode(nodeItem)) {
     saveContactFormSettings(nodeItem, settings);
     return;
@@ -1791,6 +2045,12 @@ function saveContactFormSettings(nodeItem, settings) {
   applyContactFormTitle(nodeItem, nodeItem.settings.contactForm);
 }
 
+function saveMenuSettings(nodeItem, settings) {
+  nodeItem.settings = { ...(nodeItem.settings || {}), menu: createMenuSettings(settings) };
+  applyMenuTitle(nodeItem, nodeItem.settings.menu);
+  syncMenuEdges(nodeItem);
+}
+
 function applyGroupTransferTitle(nodeItem, settings) {
   nodeItem.title = settings.groupName ? `На группу: ${settings.groupName}` : "На группу";
   nodeItem.subtitle = settings.groupName ? `Ожидание ответа: ${formatTimeout(settings.responseTimeout, settings.timeoutUnit)}` : "Группа не выбрана";
@@ -1812,12 +2072,16 @@ function isContactFormNode(nodeItem) {
   return nodeItem?.kind === "form" && nodeItem.operationType === CONTACT_FORM_OPERATION;
 }
 
+function isMenuNode(nodeItem) {
+  return nodeItem?.kind === "menuNode" && nodeItem.operationType === MENU_OPERATION;
+}
+
 function isConfigurableTransferNode(nodeItem) {
   return isGroupTransferNode(nodeItem) || isSimpleTransferNode(nodeItem);
 }
 
 function isConfigurableNode(nodeItem) {
-  return isConfigurableTransferNode(nodeItem) || isInfoMessageNode(nodeItem) || isContactFormNode(nodeItem);
+  return isConfigurableTransferNode(nodeItem) || isInfoMessageNode(nodeItem) || isContactFormNode(nodeItem) || isMenuNode(nodeItem);
 }
 
 function isTransferWithFallbackNode(nodeItem) {
@@ -1826,6 +2090,7 @@ function isTransferWithFallbackNode(nodeItem) {
 
 function settingsTitleForNode(nodeItem) {
   if (isContactFormNode(nodeItem)) return "Форма сбора контактов";
+  if (isMenuNode(nodeItem)) return "Меню";
   if (isInfoMessageNode(nodeItem)) return "Информационное сообщение";
   if (isGroupTransferNode(nodeItem)) return "На группу";
   return SIMPLE_TRANSFER_CONFIG[nodeItem.operationType]?.title || nodeItem.title;
@@ -1850,6 +2115,11 @@ function applyInfoMessageTitle(nodeItem, settings) {
 function applyContactFormTitle(nodeItem, settings) {
   nodeItem.title = "Форма сбора контактов";
   nodeItem.subtitle = `Ожидание контактов: ${formatTimeout(settings.contactWait, settings.timeoutUnit)}`;
+}
+
+function applyMenuTitle(nodeItem, settings) {
+  nodeItem.title = "Меню";
+  nodeItem.subtitle = `Ожидание нажатия кнопки: ${formatTimeout(settings.waitTime, settings.timeoutUnit)}`;
 }
 
 function normalizeComparableSimpleTransferSettings(operationType, settings) {
@@ -1884,6 +2154,43 @@ function normalizeComparableContactFormSettings(settings) {
     timeoutUnit: normalized.timeoutUnit,
     cycleLimit: sanitizePositiveInteger(normalized.cycleLimit, 1),
   };
+}
+
+function normalizeComparableMenuSettings(settings) {
+  const normalized = createMenuSettings(settings);
+  return {
+    messageText: normalized.messageText || "",
+    waitTime: sanitizePositiveInteger(normalized.waitTime, 20),
+    timeoutUnit: normalized.timeoutUnit,
+    cycleLimit: sanitizePositiveInteger(normalized.cycleLimit, 1),
+    buttons: normalized.buttons.map((button) => ({ id: button.id, text: button.text || "" })),
+  };
+}
+
+function syncMenuEdges(nodeItem) {
+  const outputs = menuOutputs(nodeItem);
+  const outputIds = new Set(outputs.map((output) => output.key));
+  const removedPlaceholderTargets = state.edges
+    .filter((edgeItem) => edgeItem.source === nodeItem.id && !outputIds.has(edgeItem.outputKey))
+    .map((edgeItem) => edgeItem.target)
+    .filter((targetId) => isPlaceholderNode(getNode(targetId)));
+  if (removedPlaceholderTargets.length) {
+    const removedIds = new Set(removedPlaceholderTargets);
+    state.nodes = state.nodes.filter((item) => !removedIds.has(item.id));
+    state.edges = state.edges.filter((edgeItem) => !removedIds.has(edgeItem.source) && !removedIds.has(edgeItem.target));
+  }
+  state.edges = state.edges.filter((edgeItem) => edgeItem.source !== nodeItem.id || outputIds.has(edgeItem.outputKey));
+  state.edges.forEach((edgeItem) => {
+    if (edgeItem.source !== nodeItem.id) return;
+    const output = outputs.find((item) => item.key === edgeItem.outputKey);
+    if (output) edgeItem.label = output.label;
+  });
+  createOutputPlaceholdersFor(nodeItem);
+}
+
+function cssEscape(value) {
+  if (window.CSS?.escape) return CSS.escape(value);
+  return String(value).replace(/"/g, '\\"');
 }
 
 function inferGroupName(title = "") {
