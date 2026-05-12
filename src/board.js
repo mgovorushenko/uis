@@ -876,6 +876,7 @@ function createOutputPlaceholdersFor(sourceNode) {
     if (!output.placeholder) return;
     createPlaceholderForOutput(sourceNode, output);
   });
+  alignOutputPlaceholdersFor(sourceNode);
 }
 
 function createFallbackPlaceholderFor(sourceNode) {
@@ -901,6 +902,22 @@ function createOutputEdge(sourceNode, targetId, outputKey = null) {
   return edge(sourceNode.id, targetId, output.label || "", output.tone || "plain", output.key);
 }
 
+function alignOutputPlaceholdersFor(sourceNode) {
+  if (!sourceNode) return;
+  const outputs = nodeOutputs(sourceNode).filter((output) => output.placeholder);
+  if (!outputs.length) return;
+  const outputByKey = new Map(outputs.map((output) => [output.key, output]));
+  const gap = placeholderCreateGap(sourceNode);
+  state.edges.forEach((edgeItem) => {
+    if (edgeItem.source !== sourceNode.id) return;
+    const output = outputByKey.get(edgeItem.outputKey);
+    const targetNode = getNode(edgeItem.target);
+    if (!output || !isPlaceholderNode(targetNode)) return;
+    targetNode.x = sourceNode.x + NODE_W + gap;
+    targetNode.y = sourceNode.y + (output.offsetY || 0);
+  });
+}
+
 function centerNodePosition() {
   const transform = d3.zoomTransform(svg.node());
   const rect = svg.node().getBoundingClientRect();
@@ -910,13 +927,16 @@ function centerNodePosition() {
 
 function nextNodePosition(sourceNode, outputKey = null) {
   const output = outputKey ? nodeOutputs(sourceNode).find((item) => item.key === outputKey) : firstFreeOutput(sourceNode);
-  const gap = output?.placeholder ? placeholderCreateGap(output) : NODE_CREATE_GAP_X;
+  const gap = output?.placeholder ? placeholderCreateGap(sourceNode) : NODE_CREATE_GAP_X;
   const offsetY = output?.offsetY || 0;
   return { x: sourceNode.x + NODE_W + gap, y: sourceNode.y + offsetY };
 }
 
-function placeholderCreateGap(output) {
-  return estimateEdgeLabelWidth(output?.label || "") + EDGE_LABEL_SIDE_GAP * 2;
+function placeholderCreateGap(sourceNode) {
+  const widestLabel = nodeOutputs(sourceNode)
+    .filter((output) => output.placeholder)
+    .reduce((maxWidth, output) => Math.max(maxWidth, estimateEdgeLabelWidth(output.label || "")), 0);
+  return widestLabel + EDGE_LABEL_SIDE_GAP * 2;
 }
 
 function estimateEdgeLabelWidth(label) {
