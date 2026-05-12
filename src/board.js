@@ -1,6 +1,6 @@
 const APP_STORAGE_KEY = "chat-scenarios-app-v1";
 const LEGACY_STORAGE_KEY = "chat-scenario-board-d3-v1";
-const ICON_ASSET_VERSION = "2026-05-12-2";
+const ICON_ASSET_VERSION = "2026-05-12-3";
 const NODE_W = 300;
 const NODE_H = 60;
 const NODE_HOVER_H = 62;
@@ -53,9 +53,11 @@ const MENU_BUTTON_MAX_COUNT = 15;
 const SCHEDULE_MAX_COUNT = 20;
 const EDGE_LABEL_MAX_WIDTH = 160;
 const AVAILABLE_SCHEDULES = [
+  "Будние дни",
+  "Праздники",
   "Рабочее время",
   "Нерабочее время",
-  "Выходные и праздники",
+  "Выходные дни",
   "Ночная смена",
   "VIP-линия",
   "Дежурная группа",
@@ -113,6 +115,7 @@ const designSystemIconFiles = {
   minus: "./assets/icons/math-minus-16.svg",
   plus: "./assets/icons/math-plus-16.svg",
   clock: "./assets/icons/time-16.svg",
+  "fullscreen-20": "./assets/icons/fullscreen_20.svg",
   help: "./assets/icons/question-16.svg",
   cancel: "./assets/icons/cancel_20.svg",
   employees: "./assets/icons/employees_20.svg",
@@ -148,6 +151,7 @@ const designSystemIconFiles = {
   "arrows-both-ways": "./assets/icons/arrows-both-ways_20.svg",
   "copy-20": "./assets/icons/copy_20.svg",
   delete: "./assets/icons/delete_20.svg",
+  "warning-message-filled-20": "./assets/icons/warning-message-filled_20.svg",
 };
 const designSystemIcons = {};
 
@@ -158,7 +162,7 @@ const catalog = {
   success: { title: "Чат взят в работу", subtitle: "", color: "var(--cmgui-color-special-1)", icon: "success" },
   message: { title: "Информационное сообщение", subtitle: "Следующая операция через: 1 сек.", color: "var(--cmgui-color-special-15)", icon: "info-message" },
   menuNode: { title: "Меню", subtitle: "Ожидание нажатия кнопки: 20 сек.", color: "var(--cmgui-color-special-13)", icon: "menu" },
-  schedule: { title: "Распределение по графику", subtitle: "Графиков: 1", color: "var(--cmgui-color-special-13)", icon: "time-20" },
+  schedule: { title: "Распределение по графику", subtitle: "График: Будние дни", color: "var(--cmgui-color-special-13)", icon: "time-20" },
   empty: { title: "Добавить операцию", subtitle: "", color: "var(--cmgui-color-bg-main-gray-dark)", icon: "attention", muted: true },
   finish: { title: "Завершить сценарий через 72 ч", subtitle: "После отправить чат: Всем сотрудникам", color: "var(--cmgui-color-special-21)", icon: "node-connection-line" },
 };
@@ -549,6 +553,7 @@ function renderNodes() {
   const moreButton = enter.append("g").attr("class", "node-more-icon").attr("transform", `translate(${NODE_W - 48},8)`);
   moreButton.append("rect").attr("class", "node-more-hitarea").attr("width", 44).attr("height", 44).attr("rx", 22);
   moreButton.append("g").attr("class", "node-more-graphic").attr("transform", "translate(12,12)");
+  enter.append("g").attr("class", "node-status-badge").attr("transform", `translate(${NODE_W - 9},-7)`);
 
   const merged = enter.merge(nodes);
   merged
@@ -594,7 +599,8 @@ function renderNodes() {
   merged.select(".node-icon-svg").html((d) => iconSvg(isPlaceholderNode(d) ? "add-20" : d.icon, 20));
   merged.select(".node-icon-svg").attr("transform", (d) => (isPlaceholderNode(d) ? "translate(22,20)" : "translate(22,20)"));
   merged.select(".node-add-icon").html(() => iconSvg("add", 16));
-  merged.select(".node-more-graphic").html((d) => iconSvg(isPlaceholderNode(d) ? "delete" : "more", 20));
+  merged.select(".node-more-graphic").html((d) => iconSvg(isPlaceholderNode(d) ? "delete" : isScheduleNode(d) ? "fullscreen-20" : "more", 20));
+  merged.select(".node-status-badge").html((d) => (isScheduleNode(d) ? iconSvg("warning-message-filled-20", 20) : ""));
   merged.select(".node-more-icon").attr("transform", (d) => (isPlaceholderNode(d) ? `translate(${NODE_W - 36},20)` : `translate(${NODE_W - 48},8)`));
   merged.select(".node-more-hitarea").attr("width", (d) => (isPlaceholderNode(d) ? 20 : 44)).attr("height", (d) => (isPlaceholderNode(d) ? 20 : 44)).attr("rx", (d) => (isPlaceholderNode(d) ? 10 : 22));
   merged.select(".node-more-graphic").attr("transform", (d) => (isPlaceholderNode(d) ? "translate(0,0)" : "translate(12,12)"));
@@ -620,6 +626,11 @@ function renderNodes() {
     event.stopPropagation();
     if (isPlaceholderNode(d)) {
       removeNodeById(d.id);
+      return;
+    }
+    if (isScheduleNode(d)) {
+      selectedId = d.id;
+      openNodeSettings(d.id);
       return;
     }
     if (isStartNode(d)) return;
@@ -1147,11 +1158,12 @@ function configureNodeForOperation(nodeItem, operationType) {
     nodeItem.settings = { menu: createMenuSettings() };
   }
   if (operationType === SCHEDULE_OPERATION) {
+    const settings = createScheduleSettings();
     nodeItem.title = "Распределение по графику";
-    nodeItem.subtitle = "1 график";
     nodeItem.color = "var(--cmgui-color-special-13)";
     nodeItem.icon = "time-20";
-    nodeItem.settings = { schedule: createScheduleSettings() };
+    nodeItem.settings = { schedule: settings };
+    applyScheduleTitle(nodeItem, settings);
   }
 }
 
@@ -2446,14 +2458,6 @@ function createEmployeesForGroup(groupName) {
   return names.map((name, index) => ({ name, enabled: true, timeout: index === names.length - 1 && names.length > 2 ? 1500 : 15 }));
 }
 
-function formatScheduleCount(count) {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return "график";
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "графика";
-  return "графиков";
-}
-
 function formatEmployeeCount(count) {
   const mod10 = count % 10;
   const mod100 = count % 100;
@@ -2683,9 +2687,9 @@ function applyMenuTitle(nodeItem, settings) {
 }
 
 function applyScheduleTitle(nodeItem, settings) {
-  const count = settings.schedules.length;
+  const names = settings.schedules.map((schedule) => schedule.name).filter(Boolean);
   nodeItem.title = "Распределение по графику";
-  nodeItem.subtitle = `${count} ${formatScheduleCount(count)}`;
+  nodeItem.subtitle = names.length ? `График: ${names.join(", ")}` : "График не выбран";
 }
 
 function normalizeComparableSimpleTransferSettings(operationType, settings) {
