@@ -79,6 +79,7 @@ const icons = {
     '<path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M10.044 3.502L10.087 3.508L10.129 3.517L10.171 3.53L10.211 3.547L10.25 3.567L10.287 3.59L10.321 3.617L10.354 3.646L10.383 3.679L10.41 3.713L10.433 3.75L10.453 3.789L10.47 3.829L10.483 3.871L10.492 3.913L10.498 3.956L10.5 4V9.5H16L16.044 9.502L16.087 9.508L16.129 9.517L16.171 9.53L16.211 9.547L16.25 9.567L16.287 9.59L16.321 9.617L16.354 9.646L16.383 9.679L16.41 9.713L16.433 9.75L16.453 9.789L16.47 9.829L16.483 9.871L16.492 9.913L16.498 9.956L16.5 10L16.498 10.044L16.492 10.087L16.483 10.129L16.47 10.171L16.453 10.211L16.433 10.25L16.41 10.287L16.383 10.321L16.354 10.354L16.321 10.383L16.287 10.41L16.25 10.433L16.211 10.453L16.171 10.47L16.129 10.483L16.087 10.492L16.044 10.498L16 10.5H10.5V16L10.498 16.044L10.492 16.087L10.483 16.129L10.47 16.171L10.453 16.211L10.433 16.25L10.41 16.287L10.383 16.321L10.354 16.354L10.321 16.383L10.287 16.41L10.25 16.433L10.211 16.453L10.171 16.47L10.129 16.483L10.087 16.492L10.044 16.498L10 16.5L9.95599 16.498L9.91302 16.492L9.87097 16.483L9.82898 16.47L9.789 16.453L9.75 16.433L9.71301 16.41L9.67902 16.383L9.646 16.354L9.617 16.321L9.59003 16.287L9.56702 16.25L9.547 16.211L9.53003 16.171L9.51703 16.129L9.508 16.087L9.50201 16.044L9.5 16V10.5H4L3.95599 10.498L3.91302 10.492L3.87097 10.483L3.82898 10.47L3.789 10.453L3.75 10.433L3.71301 10.41L3.67902 10.383L3.646 10.354L3.617 10.321L3.59003 10.287L3.56702 10.25L3.547 10.211L3.53003 10.171L3.51703 10.129L3.508 10.087L3.50201 10.044L3.5 10L3.50201 9.956L3.508 9.913L3.51703 9.871L3.53003 9.829L3.547 9.789L3.56702 9.75L3.59003 9.713L3.617 9.679L3.646 9.646L3.67902 9.617L3.71301 9.59L3.75 9.567L3.789 9.547L3.82898 9.53L3.87097 9.517L3.91302 9.508L3.95599 9.502L4 9.5H9.5V4L9.50201 3.956L9.508 3.913L9.51703 3.871L9.53003 3.829L9.547 3.789L9.56702 3.75L9.59003 3.713L9.617 3.679L9.646 3.646L9.67902 3.617L9.71301 3.59L9.75 3.567L9.789 3.547L9.82898 3.53L9.87097 3.517L9.91302 3.508L9.95599 3.502L10 3.5L10.044 3.502Z"></path>',
   more:
     '<path fill="currentColor" d="M5.49814 10.0001C5.49814 9.17164 4.82655 8.5 3.99809 8.5C3.16964 8.5 2.49805 9.17164 2.49805 10.0001C2.49805 10.8285 3.16964 11.5001 3.99809 11.5001C4.82655 11.5001 5.49814 10.8285 5.49814 10.0001Z"></path><path fill="currentColor" d="M11.4981 10.0001C11.4981 9.17164 10.8265 8.5 9.99809 8.5C9.16964 8.5 8.49805 9.17164 8.49805 10.0001C8.49805 10.8285 9.16964 11.5001 9.99809 11.5001C10.8265 11.5001 11.4981 10.8285 11.4981 10.0001Z"></path><path fill="currentColor" d="M15.9981 8.5C16.8265 8.5 17.4981 9.17164 17.4981 10.0001C17.4981 10.8285 16.8265 11.5001 15.9981 11.5001C15.1696 11.5001 14.498 10.8285 14.498 10.0001C14.498 9.17164 15.1696 8.5 15.9981 8.5Z"></path>',
+  "copy-20": '<rect x="7" y="5" width="9" height="11" rx="1"></rect><path d="M4 13V3h9"></path>',
 };
 const designSystemIconFiles = {
   "arrow-left": "./assets/icons/arrow-left-16.svg",
@@ -112,6 +113,7 @@ const designSystemIconFiles = {
   add: "./assets/icons/add_16.svg",
   "add-20": "./assets/icons/add_20.svg",
   more: "./assets/icons/more-horisontal_20.svg",
+  "edit-20": "./assets/icons/edit-16.svg",
   "arrow-down": "./assets/icons/arrow-down_20.svg",
   "arrow-up": "./assets/icons/arrow-up_20.svg",
   "arrow-list-down": "./assets/icons/arrow-list-down_20.svg",
@@ -164,6 +166,8 @@ let operationSourceId = null;
 let operationReplaceId = null;
 let operationOutputKey = null;
 let outcomeMenuSourceId = null;
+let contextMenuNodeId = null;
+let titleEditingNodeId = null;
 let settingsNodeId = null;
 let settingsDrafts = {};
 let settingsErrors = {};
@@ -274,6 +278,8 @@ function wireControls() {
     "click",
     (event) => {
       if (outcomeMenuSourceId && !event.target.closest("#outcomeMenu") && !event.target.closest(".node-add-button")) closeOutcomeMenu();
+      if (contextMenuNodeId && !event.target.closest("#nodeContextMenu") && !event.target.closest(".node-more-icon")) closeNodeContextMenu();
+      if (titleEditingNodeId && !event.target.closest("#nodeTitleEditor")) commitNodeTitleEdit();
       if (!document.body.classList.contains("is-node-settings-open") || isSettingsCloseConfirmOpen) return;
       if (event.target.closest("#nodeSettingsSidebar") || event.target.closest("#nodeSettingsCloseConfirm")) return;
       requestNodeSettingsClose();
@@ -308,6 +314,18 @@ function wireControls() {
     closeOutcomeMenu();
     openOperationModal(sourceId, null, outputKey);
   });
+  document.querySelector("#nodeContextMenu").addEventListener("click", handleNodeContextMenuClick);
+  document.querySelector("#nodeTitleEditor").addEventListener("blur", commitNodeTitleEdit);
+  document.querySelector("#nodeTitleEditor").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      event.currentTarget.blur();
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeNodeTitleEditor(false);
+    }
+  });
   document.querySelector("#nodeSettingsBackdrop").addEventListener("click", handleNodeSettingsBackdropClick);
   document.querySelector("#nodeSettingsCloseConfirmMask").addEventListener("click", (event) => {
     if (event.target.id === "nodeSettingsCloseConfirmMask") closeSettingsCloseConfirm();
@@ -325,7 +343,7 @@ function wireControls() {
       const outputKey = operationOutputKey;
       const operationType = card.dataset.operation || null;
       closeOperationModal();
-      const nodeId = replaceId ? replacePlaceholderNode(replaceId, card.dataset.kind || "empty", operationType) : addNode(card.dataset.kind || "empty", sourceId, operationType, outputKey);
+      const nodeId = replaceId ? replaceNodeFromOperation(replaceId, card.dataset.kind || "empty", operationType) : addNode(card.dataset.kind || "empty", sourceId, operationType, outputKey);
       const nodeItem = getNode(nodeId);
       if (nodeItem && isConfigurableNode(nodeItem)) {
         pendingSettingsNodeIds.add(nodeId);
@@ -575,7 +593,11 @@ function renderNodes() {
   });
   merged.select(".node-more-icon").on("click", (event, d) => {
     event.stopPropagation();
-    if (isPlaceholderNode(d)) removeNodeById(d.id);
+    if (isPlaceholderNode(d)) {
+      removeNodeById(d.id);
+      return;
+    }
+    openNodeContextMenu(d.id);
   });
   merged.select(".node-hover-dot-right").on("click", (event, d) => {
     event.stopPropagation();
@@ -600,8 +622,153 @@ function renderNodes() {
     hoveredId = null;
     pendingSourceId = null;
     operationSourceId = null;
+    closeNodeContextMenu();
     render();
   });
+}
+
+function openNodeContextMenu(nodeId) {
+  const nodeItem = getNode(nodeId);
+  const menu = document.querySelector("#nodeContextMenu");
+  if (!nodeItem || !menu) return;
+  closeOutcomeMenu();
+  closeNodeTitleEditor(false);
+  contextMenuNodeId = nodeId;
+  selectedId = nodeId;
+  const transform = d3.zoomTransform(svg.node());
+  const screen = transform.apply([nodeItem.x + NODE_W - 8, nodeItem.y + 30]);
+  menu.innerHTML = renderNodeContextMenu();
+  menu.style.visibility = "hidden";
+  menu.classList.add("is-open");
+  menu.setAttribute("aria-hidden", "false");
+  const menuWidth = menu.offsetWidth;
+  menu.style.left = `${Math.round(Math.min(screen[0] + 8, window.innerWidth - menuWidth - 16))}px`;
+  menu.style.top = `${Math.round(screen[1] - 24)}px`;
+  menu.style.visibility = "";
+  render();
+}
+
+function renderNodeContextMenu() {
+  return `<button class="node-context-menu-item" type="button" data-node-menu-action="rename">
+      <span class="cmgui-icon">${iconSvg("edit-20", 20)}</span>
+      <span>Переименовать</span>
+    </button>
+    <button class="node-context-menu-item" type="button" data-node-menu-action="replace">
+      <span class="cmgui-icon">${iconSvg("arrows-both-ways", 20)}</span>
+      <span>Заменить</span>
+    </button>
+    <button class="node-context-menu-item" type="button" data-node-menu-action="copy">
+      <span class="cmgui-icon">${iconSvg("copy-20", 20)}</span>
+      <span>Копировать</span>
+    </button>
+    <button class="node-context-menu-item" type="button" data-node-menu-action="delete">
+      <span class="cmgui-icon">${iconSvg("delete", 20)}</span>
+      <span>Удалить</span>
+    </button>`;
+}
+
+function closeNodeContextMenu() {
+  contextMenuNodeId = null;
+  const menu = document.querySelector("#nodeContextMenu");
+  if (!menu) return;
+  menu.classList.remove("is-open");
+  menu.setAttribute("aria-hidden", "true");
+  menu.innerHTML = "";
+}
+
+function handleNodeContextMenuClick(event) {
+  const button = event.target.closest("[data-node-menu-action]");
+  if (!button || !contextMenuNodeId) return;
+  event.stopPropagation();
+  const nodeId = contextMenuNodeId;
+  const action = button.dataset.nodeMenuAction;
+  closeNodeContextMenu();
+  if (action === "rename") {
+    startNodeTitleEdit(nodeId);
+    return;
+  }
+  if (action === "replace") {
+    openOperationModal(null, nodeId);
+    return;
+  }
+  if (action === "copy") {
+    copyNodeWithoutLinks(nodeId);
+    return;
+  }
+  if (action === "delete") removeNodeById(nodeId);
+}
+
+function startNodeTitleEdit(nodeId) {
+  const nodeItem = getNode(nodeId);
+  const input = document.querySelector("#nodeTitleEditor");
+  if (!nodeItem || !input) return;
+  titleEditingNodeId = nodeId;
+  selectedId = nodeId;
+  const transform = d3.zoomTransform(svg.node());
+  const [x, y] = transform.apply([nodeItem.x + 60, nodeItem.y + 13]);
+  input.value = nodeItem.title || "";
+  input.style.left = `${Math.round(x)}px`;
+  input.style.top = `${Math.round(y)}px`;
+  input.style.width = `${Math.round((isPlaceholderNode(nodeItem) ? 176 : NODE_TEXT_DEFAULT_WIDTH) * transform.k)}px`;
+  input.classList.add("is-open");
+  input.focus();
+  input.select();
+}
+
+function commitNodeTitleEdit() {
+  if (!titleEditingNodeId) return;
+  const input = document.querySelector("#nodeTitleEditor");
+  const nodeItem = getNode(titleEditingNodeId);
+  if (!input || !nodeItem) {
+    closeNodeTitleEditor(false);
+    return;
+  }
+  pushHistory();
+  const title = input.value.trim() || defaultTitleForNode(nodeItem);
+  nodeItem.title = title;
+  closeNodeTitleEditor(false);
+  selectedId = nodeItem.id;
+  render();
+  schedulePersistState();
+}
+
+function closeNodeTitleEditor(shouldCommit = true) {
+  if (shouldCommit) {
+    commitNodeTitleEdit();
+    return;
+  }
+  titleEditingNodeId = null;
+  const input = document.querySelector("#nodeTitleEditor");
+  if (!input) return;
+  input.classList.remove("is-open");
+}
+
+function defaultTitleForNode(nodeItem) {
+  if (!nodeItem) return "Операция";
+  if (nodeItem.operationType === "group-transfer") return "На группу";
+  if (SIMPLE_TRANSFER_CONFIG[nodeItem.operationType]) return SIMPLE_TRANSFER_CONFIG[nodeItem.operationType].title;
+  if (nodeItem.operationType === INFO_MESSAGE_OPERATION) return "Информационное сообщение";
+  if (nodeItem.operationType === CONTACT_FORM_OPERATION) return "Форма сбора контактов";
+  if (nodeItem.operationType === MENU_OPERATION) return "Меню";
+  return catalog[nodeItem.kind]?.title || "Операция";
+}
+
+function copyNodeWithoutLinks(nodeId) {
+  const sourceNode = getNode(nodeId);
+  if (!sourceNode) return;
+  pushHistory();
+  const copy = clone(sourceNode);
+  copy.id = `${sourceNode.kind}-${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 6)}`;
+  copy.x = sourceNode.x + NODE_W + NODE_CREATE_GAP_X;
+  copy.y = sourceNode.y;
+  delete copy.dragOffsetX;
+  delete copy.dragOffsetY;
+  delete copy.dragMoved;
+  state.nodes.push(copy);
+  selectedId = copy.id;
+  hoveredId = null;
+  render();
+  schedulePersistState();
 }
 
 function isPointerOverNode(event, nodeItem) {
@@ -866,6 +1033,50 @@ function replacePlaceholderNode(replaceId, kind, operationType = null) {
   return replaceId;
 }
 
+function replaceNodeFromOperation(replaceId, kind, operationType = null) {
+  const target = getNode(replaceId);
+  if (!target) return addNode(kind, null, operationType);
+  if (isPlaceholderNode(target)) return replacePlaceholderNode(replaceId, kind, operationType);
+  pushHistory();
+  closeNodeSettings(false);
+  const previousOutgoing = state.edges.filter((edgeItem) => edgeItem.source === replaceId);
+  const previousTargets = new Set(previousOutgoing.map((edgeItem) => edgeItem.target));
+  const nextNode = node(replaceId, kind, target.x, target.y);
+  configureNodeForOperation(nextNode, operationType);
+  Object.assign(target, nextNode);
+  const outputsByKey = new Map(nodeOutputs(target).map((output) => [output.key, output]));
+  const keptTargetIds = new Set();
+  state.edges = state.edges.filter((edgeItem) => {
+    if (edgeItem.source !== replaceId) return true;
+    const output = outputsByKey.get(edgeItem.outputKey || "main");
+    if (!output) return false;
+    edgeItem.label = output.label || "";
+    edgeItem.tone = output.tone || "plain";
+    keptTargetIds.add(edgeItem.target);
+    return true;
+  });
+  removeDetachedPlaceholderTargets(previousTargets, keptTargetIds);
+  createOutputPlaceholdersFor(target);
+  selectedId = replaceId;
+  render();
+  schedulePersistState();
+  return replaceId;
+}
+
+function removeDetachedPlaceholderTargets(candidateIds, keptIds = new Set()) {
+  const removeIds = new Set(
+    Array.from(candidateIds).filter((targetId) => {
+      if (keptIds.has(targetId)) return false;
+      const targetNode = getNode(targetId);
+      if (!isPlaceholderNode(targetNode)) return false;
+      return !state.edges.some((edgeItem) => edgeItem.target === targetId || edgeItem.source === targetId);
+    }),
+  );
+  if (!removeIds.size) return;
+  state.nodes = state.nodes.filter((nodeItem) => !removeIds.has(nodeItem.id));
+  state.edges = state.edges.filter((edgeItem) => !removeIds.has(edgeItem.source) && !removeIds.has(edgeItem.target));
+}
+
 function configureNodeForOperation(nodeItem, operationType) {
   if (operationType) nodeItem.operationType = operationType;
   if (operationType === "group-transfer") {
@@ -1066,6 +1277,8 @@ function renderOutcomeMenuItem(output) {
 
 function openOperationModal(sourceId = null, replaceId = null, outputKey = null) {
   closeOutcomeMenu();
+  closeNodeContextMenu();
+  closeNodeTitleEditor(false);
   operationSourceId = sourceId;
   operationReplaceId = replaceId;
   operationOutputKey = outputKey;
@@ -2450,6 +2663,8 @@ function removeNodeById(nodeId) {
     operationOutputKey = null;
   }
   if (outcomeMenuSourceId && nodeIdsToRemove.has(outcomeMenuSourceId)) closeOutcomeMenu();
+  if (contextMenuNodeId && nodeIdsToRemove.has(contextMenuNodeId)) closeNodeContextMenu();
+  if (titleEditingNodeId && nodeIdsToRemove.has(titleEditingNodeId)) closeNodeTitleEditor(false);
   selectedId = null;
   hoveredId = null;
   render();

@@ -612,6 +612,72 @@ body.is-board-panning #scenarioSvg {
   display: block;
 }
 
+.node-context-menu {
+  position: fixed;
+  z-index: 110;
+  display: none;
+  width: 220px;
+  padding: 16px 12px 12px;
+  flex-direction: column;
+  background: var(--cmgui-color-bg-main-white);
+  border-radius: 12px;
+  box-shadow: var(--cmgui-shadow-large);
+}
+
+.node-context-menu.is-open {
+  display: flex;
+}
+
+.node-context-menu-item {
+  width: 100%;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--cmgui-color-text-primary);
+  font: var(--cmgui-font-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.node-context-menu-item .cmgui-icon {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cmgui-color-icon-primary);
+}
+
+.node-context-menu-item:hover {
+  background: var(--cmgui-color-bg-hover, #f5f5f5);
+}
+
+.node-context-menu-item:hover .cmgui-icon {
+  color: var(--cmgui-color-icon-secondary);
+}
+
+.node-title-editor {
+  position: fixed;
+  z-index: 120;
+  display: none;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: var(--cmgui-color-bg-main-white);
+  color: var(--cmgui-color-text-primary);
+  font: var(--cmgui-font-body);
+}
+
+.node-title-editor.is-open {
+  display: block;
+}
+
 .top-bar {
   position: absolute;
   z-index: 18;
