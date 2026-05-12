@@ -667,8 +667,9 @@ function edgePath(d) {
   const a = getNode(d.source);
   const b = getNode(d.target);
   if (!a || !b) return "";
-  const route = edgeRoute(a, b);
+  const route = edgeRoute(a, b, d);
   if (!route) return "";
+  if (route.points) return roundedPolylinePath(route.points, route.radius);
 
   const { x1, y1, x2, y2, midX, radius } = route;
   if (Math.abs(y2 - y1) < 1) return `M ${x1} ${y1} L ${x2} ${y2}`;
@@ -688,19 +689,67 @@ function edgeLabelPoint(d, labelWidth = EDGE_LABEL_MAX_WIDTH) {
   const a = getNode(d.source);
   const b = getNode(d.target);
   if (!a || !b) return { x: 0, y: 0 };
-  const route = edgeRoute(a, b);
+  const route = edgeRoute(a, b, d);
   if (!route) return { x: 0, y: 0 };
   return { x: b.x - EDGE_LABEL_SIDE_GAP - labelWidth / 2, y: route.y2 };
 }
 
-function edgeRoute(sourceNode, targetNode) {
+function edgeRoute(sourceNode, targetNode, edgeItem = null) {
   const x1 = sourceNode.x + (isNodePortVisible(sourceNode.id) ? nodeRightPortX(sourceNode) + NODE_PORT_R + NODE_PORT_EDGE_GAP : NODE_W + NODE_PORT_EDGE_GAP);
   const y1 = sourceNode.y + NODE_H / 2;
   const x2 = targetNode.x + (isNodePortVisible(targetNode.id) && canReceiveInput(targetNode) ? NODE_PORT_LEFT_X - NODE_PORT_R - NODE_PORT_EDGE_GAP : -NODE_PORT_EDGE_GAP);
   const y2 = targetNode.y + NODE_H / 2;
+  if (x2 <= x1 + 48 && Math.abs(y2 - y1) > 1) {
+    const labelWidth = edgeItem?.label ? estimateEdgeLabelWidth(edgeItem.label) : 0;
+    const outwardX = x1 + 64;
+    const labelLeftX = targetNode.x - EDGE_LABEL_SIDE_GAP * 2 - labelWidth;
+    const bridgeX = Math.min(x2 - 64, labelLeftX - 40);
+    const midY = y1 + (y2 - y1) / 2;
+    return {
+      x1,
+      y1,
+      x2,
+      y2,
+      radius: 18,
+      points: [
+        { x: x1, y: y1 },
+        { x: outwardX, y: y1 },
+        { x: outwardX, y: midY },
+        { x: bridgeX, y: midY },
+        { x: bridgeX, y: y2 },
+        { x: x2, y: y2 },
+      ],
+    };
+  }
   const midX = x2 > x1 ? x1 + (x2 - x1) / 2 : Math.max(x1 + 56, targetNode.x + NODE_W + 56);
   const radius = Math.min(18, Math.abs(midX - x1) / 2, Math.abs(x2 - midX) / 2, Math.abs(y2 - y1) / 2);
   return { x1, y1, x2, y2, midX, radius };
+}
+
+function roundedPolylinePath(points, radius) {
+  if (points.length < 2) return "";
+  const commands = [`M ${points[0].x} ${points[0].y}`];
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const prev = points[index - 1];
+    const current = points[index];
+    const next = points[index + 1];
+    const before = shortenPoint(current, prev, radius);
+    const after = shortenPoint(current, next, radius);
+    commands.push(`L ${before.x} ${before.y}`);
+    commands.push(`Q ${current.x} ${current.y} ${after.x} ${after.y}`);
+  }
+  const last = points[points.length - 1];
+  commands.push(`L ${last.x} ${last.y}`);
+  return commands.join(" ");
+}
+
+function shortenPoint(from, toward, distance) {
+  const dx = toward.x - from.x;
+  const dy = toward.y - from.y;
+  const length = Math.hypot(dx, dy);
+  if (!length) return from;
+  const amount = Math.min(distance, length / 2);
+  return { x: from.x + (dx / length) * amount, y: from.y + (dy / length) * amount };
 }
 
 function isNodePortVisible(nodeId) {
