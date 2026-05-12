@@ -975,7 +975,6 @@ function renderEmptyGroupTransferCard(errors = {}) {
   return `<section class="node-settings-card">
     <div class="node-settings-card-head is-static">
       <span>Группа не выбрана</span>
-      <button class="node-settings-icon-button" type="button" title="Меню группы" aria-label="Меню группы">${iconSvg("more", 20)}</button>
     </div>
     <div class="group-picker">
       <button class="cmgui-button cmgui-button-size-medium cmgui-button-secondary cmgui-button-outline add-group-button" type="button" id="addGroupButton" aria-expanded="false">
