@@ -13,6 +13,7 @@ const NODE_PORT_R = 3;
 const NODE_PORT_EDGE_GAP = 8;
 const NODE_CREATE_GAP_X = 80;
 const EDGE_LABEL_SIDE_GAP = 40;
+const EDGE_LABEL_PADDING_X = 10;
 const GROUP_TRANSFER_EMPLOYEES_BY_GROUP = {
   "Отдел продаж": ["Лемаева Юлия", "Васнецов Николай", "Смирнова Алина", "Орлов Денис"],
   "Служба поддержки": ["Кузнецова Мария", "Павлов Игорь", "Романова Елена", "Фомин Артем", "Громова Дарья", "Соколов Кирилл"],
@@ -583,7 +584,6 @@ function renderNodes() {
 }
 
 function renderEdges() {
-  const edgeLabelPaddingX = 10;
   const edges = edgeLayer.selectAll(".scenario-edge").data(state.edges, (d) => d.id);
   edges.exit().remove();
   edges
@@ -599,17 +599,17 @@ function renderEdges() {
   labels.exit().remove();
   const enter = labels.enter().append("g").attr("class", "edge-label-svg");
   enter.append("rect").attr("rx", 4);
-  enter.append("text").attr("x", edgeLabelPaddingX).attr("y", 12);
+  enter.append("text").attr("x", EDGE_LABEL_PADDING_X).attr("y", 12);
   enter.merge(labels).each(function (d) {
     const group = d3.select(this);
     const text = group.select("text").text(d.label);
-    const maxTextWidth = EDGE_LABEL_MAX_WIDTH - edgeLabelPaddingX * 2;
+    const maxTextWidth = EDGE_LABEL_MAX_WIDTH - EDGE_LABEL_PADDING_X * 2;
     fitSvgText(text, d.label, maxTextWidth);
-    const width = Math.min(EDGE_LABEL_MAX_WIDTH, Math.ceil(text.node().getComputedTextLength()) + edgeLabelPaddingX * 2);
+    const width = Math.min(EDGE_LABEL_MAX_WIDTH, Math.ceil(text.node().getComputedTextLength()) + EDGE_LABEL_PADDING_X * 2);
     const p = edgeLabelPoint(d, width);
     group.attr("transform", `translate(${p.x - width / 2},${p.y - 12})`).attr("class", "edge-label-svg");
     group.select("rect").attr("width", width).attr("height", 24).attr("fill", colorForTone);
-    text.attr("x", edgeLabelPaddingX).attr("y", 12).attr("fill", "white").attr("font", "var(--cmgui-font-caption)");
+    text.attr("x", EDGE_LABEL_PADDING_X).attr("y", 12).attr("fill", "white").attr("font", "var(--cmgui-font-caption)");
     group.on("mouseenter", (event) => showEdgeTooltip(event, d.label)).on("mouseleave", hideEdgeTooltip);
   });
 }
@@ -869,7 +869,10 @@ function placeholderCreateGap(output) {
 
 function estimateEdgeLabelWidth(label) {
   if (!label) return 0;
-  return Math.min(EDGE_LABEL_MAX_WIDTH, Math.ceil(String(label).length * 6.2) + 20);
+  const canvas = estimateEdgeLabelWidth.canvas || (estimateEdgeLabelWidth.canvas = document.createElement("canvas"));
+  const context = canvas.getContext("2d");
+  context.font = "400 11px Roboto, sans-serif";
+  return Math.min(EDGE_LABEL_MAX_WIDTH, Math.ceil(context.measureText(String(label)).width) + EDGE_LABEL_PADDING_X * 2);
 }
 
 function nodeOutputs(nodeItem) {
