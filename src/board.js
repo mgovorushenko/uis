@@ -582,7 +582,7 @@ function renderNodes() {
   merged.select(".node-hover-dot-left").style("display", (d) => (canReceiveInput(d) ? null : "none"));
   merged.select(".node-hover-dot-right").attr("cx", (d) => nodeRightPortX(d)).style("display", (d) => (nodeOutputs(d).length ? null : "none"));
   merged.select(".node-add-button").style("display", (d) => (hasFreeOutputs(d) && !isPlaceholderNode(d) ? null : "none"));
-  merged.select(".node-more-icon").style("display", (d) => (isPlaceholderNode(d) || !isPlaceholderNode(d) ? null : "none"));
+  merged.select(".node-more-icon").style("display", (d) => (isStartNode(d) ? "none" : null));
   merged.each(function (d) {
     updateNodeText(this, d, d.id === selectedId || d.id === hoveredId);
   });
@@ -597,6 +597,7 @@ function renderNodes() {
       removeNodeById(d.id);
       return;
     }
+    if (isStartNode(d)) return;
     openNodeContextMenu(d.id);
   });
   merged.select(".node-hover-dot-right").on("click", (event, d) => {
@@ -1240,6 +1241,10 @@ function hasFreeOutputs(nodeItem) {
 
 function isPlaceholderNode(nodeItem) {
   return nodeItem?.kind === "empty";
+}
+
+function isStartNode(nodeItem) {
+  return nodeItem?.kind === "start";
 }
 
 function openOutcomeMenu(sourceId) {
