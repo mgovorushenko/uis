@@ -12,7 +12,7 @@ const NODE_PORT_RIGHT_COMPACT_X = NODE_W + 20;
 const NODE_PORT_R = 3;
 const NODE_PORT_EDGE_GAP = 8;
 const NODE_CREATE_GAP_X = 120;
-const FALLBACK_CREATE_GAP_X = 280;
+const EDGE_LABEL_SIDE_GAP = 40;
 const GROUP_TRANSFER_EMPLOYEES_BY_GROUP = {
   "Отдел продаж": ["Лемаева Юлия", "Васнецов Николай", "Смирнова Алина", "Орлов Денис"],
   "Служба поддержки": ["Кузнецова Мария", "Павлов Игорь", "Романова Елена", "Фомин Артем", "Громова Дарья", "Соколов Кирилл"],
@@ -602,11 +602,11 @@ function renderEdges() {
   enter.append("text").attr("x", edgeLabelPaddingX).attr("y", 12);
   enter.merge(labels).each(function (d) {
     const group = d3.select(this);
-    const p = edgeLabelPoint(d);
     const text = group.select("text").text(d.label);
     const maxTextWidth = EDGE_LABEL_MAX_WIDTH - edgeLabelPaddingX * 2;
     fitSvgText(text, d.label, maxTextWidth);
     const width = Math.min(EDGE_LABEL_MAX_WIDTH, Math.ceil(text.node().getComputedTextLength()) + edgeLabelPaddingX * 2);
+    const p = edgeLabelPoint(d, width);
     group.attr("transform", `translate(${p.x - width / 2},${p.y - 12})`).attr("class", "edge-label-svg");
     group.select("rect").attr("width", width).attr("height", 24).attr("fill", colorForTone);
     text.attr("x", edgeLabelPaddingX).attr("y", 12).attr("fill", "white").attr("font", "var(--cmgui-font-caption)");
@@ -681,20 +681,13 @@ function edgePath(d) {
   ].join(" ");
 }
 
-function edgeLabelPoint(d) {
+function edgeLabelPoint(d, labelWidth = EDGE_LABEL_MAX_WIDTH) {
   const a = getNode(d.source);
   const b = getNode(d.target);
   if (!a || !b) return { x: 0, y: 0 };
   const route = edgeRoute(a, b);
   if (!route) return { x: 0, y: 0 };
-  const horizontalDistance = Math.abs(route.x2 - route.x1);
-  if ((d.outputKey || "main") === "failed") {
-    return { x: route.x2 - Math.min(112, horizontalDistance / 2), y: route.y2 };
-  }
-  if (Math.abs(route.y2 - route.y1) < 1 || horizontalDistance > 180) {
-    return { x: route.x1 + Math.min(94, horizontalDistance / 2), y: route.y1 };
-  }
-  return { x: route.midX, y: (route.y1 + route.y2) / 2 };
+  return { x: route.x2 - EDGE_LABEL_SIDE_GAP - labelWidth / 2, y: route.y2 };
 }
 
 function edgeRoute(sourceNode, targetNode) {
@@ -865,16 +858,25 @@ function centerNodePosition() {
 
 function nextNodePosition(sourceNode, outputKey = null) {
   const output = outputKey ? nodeOutputs(sourceNode).find((item) => item.key === outputKey) : firstFreeOutput(sourceNode);
-  const gap = output?.placeholder ? FALLBACK_CREATE_GAP_X : NODE_CREATE_GAP_X;
+  const gap = output?.placeholder ? placeholderCreateGap(output) : NODE_CREATE_GAP_X;
   const offsetY = output?.offsetY || 0;
   return { x: sourceNode.x + NODE_W + gap, y: sourceNode.y + offsetY };
+}
+
+function placeholderCreateGap(output) {
+  return estimateEdgeLabelWidth(output?.label || "") + EDGE_LABEL_SIDE_GAP * 2 + 33;
+}
+
+function estimateEdgeLabelWidth(label) {
+  if (!label) return 0;
+  return Math.min(EDGE_LABEL_MAX_WIDTH, Math.ceil(String(label).length * 6.2) + 20);
 }
 
 function nodeOutputs(nodeItem) {
   if (!nodeItem) return [];
   if (isPlaceholderNode(nodeItem)) return [];
   if (nodeItem.kind === "start") return [{ key: "main", label: "" }];
-  if (isInfoMessageNode(nodeItem)) return [{ key: "delivered", label: "Сообщение доставлено", tone: "success" }];
+  if (isInfoMessageNode(nodeItem)) return [{ key: "delivered", label: "Сообщение доставлено", tone: "success", placeholder: true }];
   if (isContactFormNode(nodeItem)) {
     return [
       { key: "completed", label: "Форма заполнена", tone: "plain", placeholder: true, offsetY: -92 },
