@@ -1542,6 +1542,14 @@ body.is-node-settings-open .node-settings-sidebar {
   border-color: var(--cmgui-color-border-hover);
 }
 
+.menu-button-row.is-drop-target .cmgui-select-field {
+  border-color: var(--cmgui-color-border-hover);
+}
+
+.schedule-select.is-error .cmgui-select-field {
+  border-color: var(--cmgui-color-border-error);
+}
+
 .menu-button-order {
   display: flex;
   align-items: center;
@@ -1549,6 +1557,10 @@ body.is-node-settings-open .node-settings-sidebar {
 }
 
 .menu-button-input {
+  min-width: 0;
+}
+
+.schedule-select {
   min-width: 0;
 }
 

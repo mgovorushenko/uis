@@ -47,9 +47,33 @@ const SIMPLE_TRANSFER_CONFIG = {
 const INFO_MESSAGE_OPERATION = "info-message";
 const CONTACT_FORM_OPERATION = "contact-form";
 const MENU_OPERATION = "menu-operation";
+const SCHEDULE_OPERATION = "schedule-distribution";
 const MENU_BUTTON_MAX_LENGTH = 128;
 const MENU_BUTTON_MAX_COUNT = 15;
+const SCHEDULE_MAX_COUNT = 20;
 const EDGE_LABEL_MAX_WIDTH = 160;
+const AVAILABLE_SCHEDULES = [
+  "Рабочее время",
+  "Нерабочее время",
+  "Выходные и праздники",
+  "Ночная смена",
+  "VIP-линия",
+  "Дежурная группа",
+  "Обеденный перерыв",
+  "Регион Москва",
+  "Регион Санкт-Петербург",
+  "Техническая поддержка 24/7",
+  "Первая линия",
+  "Вторая линия",
+  "Коммерческий отдел",
+  "Отдел внедрения",
+  "Контроль качества",
+  "Смена выходного дня",
+  "Утренний график",
+  "Вечерний график",
+  "Федеральная поддержка",
+  "Экстренные обращения",
+];
 const icons = {
   search: '<circle cx="9" cy="9" r="5"></circle><path d="m13 13 4 4"></path>',
   star: '<path d="m10 2 2.5 5.1 5.6.8-4 3.9.9 5.5-5-2.6-5 2.6.9-5.5-4-3.9 5.6-.8L10 2Z"></path>',
@@ -134,6 +158,7 @@ const catalog = {
   success: { title: "Чат взят в работу", subtitle: "", color: "var(--cmgui-color-special-1)", icon: "success" },
   message: { title: "Информационное сообщение", subtitle: "Следующая операция через: 1 сек.", color: "var(--cmgui-color-special-15)", icon: "info-message" },
   menuNode: { title: "Меню", subtitle: "Ожидание нажатия кнопки: 20 сек.", color: "var(--cmgui-color-special-13)", icon: "menu" },
+  schedule: { title: "Распределение по графику", subtitle: "Графиков: 1", color: "var(--cmgui-color-special-13)", icon: "time-20" },
   empty: { title: "Добавить операцию", subtitle: "", color: "var(--cmgui-color-bg-main-gray-dark)", icon: "attention", muted: true },
   finish: { title: "Завершить сценарий через 72 ч", subtitle: "После отправить чат: Всем сотрудникам", color: "var(--cmgui-color-special-21)", icon: "node-connection-line" },
 };
@@ -751,6 +776,7 @@ function defaultTitleForNode(nodeItem) {
   if (nodeItem.operationType === INFO_MESSAGE_OPERATION) return "Информационное сообщение";
   if (nodeItem.operationType === CONTACT_FORM_OPERATION) return "Форма сбора контактов";
   if (nodeItem.operationType === MENU_OPERATION) return "Меню";
+  if (nodeItem.operationType === SCHEDULE_OPERATION) return "Распределение по графику";
   return catalog[nodeItem.kind]?.title || "Операция";
 }
 
@@ -1120,6 +1146,13 @@ function configureNodeForOperation(nodeItem, operationType) {
     nodeItem.icon = "menu";
     nodeItem.settings = { menu: createMenuSettings() };
   }
+  if (operationType === SCHEDULE_OPERATION) {
+    nodeItem.title = "Распределение по графику";
+    nodeItem.subtitle = "1 график";
+    nodeItem.color = "var(--cmgui-color-special-13)";
+    nodeItem.icon = "time-20";
+    nodeItem.settings = { schedule: createScheduleSettings() };
+  }
 }
 
 function createOutputPlaceholdersFor(sourceNode) {
@@ -1210,6 +1243,7 @@ function nodeOutputs(nodeItem) {
     ];
   }
   if (isMenuNode(nodeItem)) return menuOutputs(nodeItem);
+  if (isScheduleNode(nodeItem)) return scheduleOutputs(nodeItem);
   if (isTransferWithFallbackNode(nodeItem)) return [{ key: "failed", label: "Никто не ответил", tone: "plain", placeholder: true }];
   return [{ key: "main", label: "" }];
 }
@@ -1221,6 +1255,19 @@ function menuOutputs(nodeItem) {
   return settings.buttons.map((button, index) => ({
     key: button.id,
     label: button.text || `Кнопка ${index + 1}`,
+    tone: "plain",
+    placeholder: true,
+    offsetY: Math.round((index - center) * 92),
+  }));
+}
+
+function scheduleOutputs(nodeItem) {
+  const settings = getScheduleSettings(nodeItem);
+  const count = Math.max(1, settings.schedules.length);
+  const center = (count - 1) / 2;
+  return settings.schedules.map((schedule, index) => ({
+    key: schedule.id,
+    label: schedule.name || `График ${index + 1}`,
     tone: "plain",
     placeholder: true,
     offsetY: Math.round((index - center) * 92),
@@ -1399,6 +1446,7 @@ function stableStringifySettings(nodeItem, settings) {
   if (isInfoMessageNode(nodeItem)) return JSON.stringify(normalizeComparableInfoMessageSettings(settings));
   if (isContactFormNode(nodeItem)) return JSON.stringify(normalizeComparableContactFormSettings(settings));
   if (isMenuNode(nodeItem)) return JSON.stringify(normalizeComparableMenuSettings(settings));
+  if (isScheduleNode(nodeItem)) return JSON.stringify(normalizeComparableScheduleSettings(settings));
   return JSON.stringify(normalizeComparableSimpleTransferSettings(nodeItem.operationType, settings));
 }
 
@@ -1489,6 +1537,7 @@ function renderPrimarySettingsCard(nodeItem, settings, errors) {
   if (isInfoMessageNode(nodeItem)) return renderInfoMessageCard(settings, errors);
   if (isContactFormNode(nodeItem)) return renderContactFormCard(settings);
   if (isMenuNode(nodeItem)) return renderMenuCard(settings, errors);
+  if (isScheduleNode(nodeItem)) return renderScheduleCard(settings, errors);
   return renderSimpleTransferCard(nodeItem, settings, errors);
 }
 
@@ -1633,6 +1682,37 @@ function renderMenuButtonRow(button, index, total, errors = {}) {
       </span>
     </label>
     <button class="menu-button-remove" type="button" data-menu-button-remove="${escapeAttr(button.id)}" title="Удалить" aria-label="Удалить" ${total <= 1 ? "disabled" : ""}>${iconSvg("cancel", 20)}</button>
+  </div>`;
+}
+
+function renderScheduleCard(settings, errors = {}) {
+  return `<section class="node-settings-card schedule-settings-card">
+    <div class="node-settings-card-head is-static">
+      <span>График работы</span>
+    </div>
+    ${renderSettingsAlert("Чат будет обработан в зависимости от активного графика работы. Если активно сразу несколько графиков, то приоритетным будет тот, который находится выше")}
+    <div class="menu-buttons-list schedule-list">
+      ${settings.schedules.map((schedule, index) => renderScheduleRow(schedule, index, settings.schedules.length, errors)).join("")}
+    </div>
+    <button class="cmgui-button cmgui-button-size-medium cmgui-button-secondary cmgui-button-outline menu-add-button" type="button" id="addScheduleButton" ${settings.schedules.length >= SCHEDULE_MAX_COUNT ? "disabled" : ""}>
+      <span class="cmgui-icon">${iconSvg("add-20", 20)}</span>
+      <span>Добавить график</span>
+    </button>
+  </section>`;
+}
+
+function renderScheduleRow(schedule, index, total, errors = {}) {
+  const selectId = `scheduleSelect-${schedule.id}`;
+  const hasError = errors.schedules?.[schedule.id];
+  return `<div class="menu-button-row schedule-row" data-schedule-row="${escapeAttr(schedule.id)}" draggable="true">
+    <div class="menu-button-order">
+      <button class="drag-icon" type="button" data-schedule-drag-handle="${escapeAttr(schedule.id)}" title="Перетащить" aria-label="Перетащить">${iconSvg("drag-and-drop", 20)}</button>
+      <span class="order-badge">${index + 1}</span>
+    </div>
+    <div class="schedule-select ${hasError ? "is-error" : ""}">
+      ${renderSimpleSelect(selectId, "График*", schedule.name || "", AVAILABLE_SCHEDULES.map((name) => [name, name]), schedule.dropdownOpen)}
+    </div>
+    <button class="menu-button-remove" type="button" data-schedule-remove="${escapeAttr(schedule.id)}" title="Удалить" aria-label="Удалить" ${total <= 1 ? "disabled" : ""}>${iconSvg("cancel", 20)}</button>
   </div>`;
 }
 
@@ -1980,6 +2060,74 @@ function wireNodeSettingsSidebar(sidebar, nodeItem, settings) {
       renderNodeSettingsSidebar();
     });
   });
+  sidebar.querySelectorAll("[id^='scheduleSelect-']").forEach((button) => {
+    button.addEventListener("click", () => {
+      const scheduleId = button.id.replace("scheduleSelect-", "");
+      const draft = getNodeSettingsDraft(nodeItem);
+      updateNodeSettingsDraft(nodeItem, {
+        schedules: draft.schedules.map((schedule) => (schedule.id === scheduleId ? { ...schedule, dropdownOpen: !schedule.dropdownOpen } : { ...schedule, dropdownOpen: false })),
+      });
+      renderNodeSettingsSidebar();
+    });
+  });
+  sidebar.querySelectorAll("[data-dropdown-id^='scheduleSelect-']").forEach((button) => {
+    button.addEventListener("click", () => {
+      const scheduleId = button.dataset.dropdownId.replace("scheduleSelect-", "");
+      const value = button.dataset.dropdownValue;
+      const errors = { ...(settingsErrors[nodeItem.id] || {}) };
+      if (errors.schedules) {
+        delete errors.schedules[scheduleId];
+        settingsErrors[nodeItem.id] = errors;
+      }
+      const draft = getNodeSettingsDraft(nodeItem);
+      updateNodeSettingsDraft(nodeItem, {
+        schedules: draft.schedules.map((schedule) => (schedule.id === scheduleId ? { ...schedule, name: value, dropdownOpen: false } : { ...schedule, dropdownOpen: false })),
+      });
+      renderNodeSettingsSidebar();
+    });
+  });
+  sidebar.querySelector("#addScheduleButton")?.addEventListener("click", () => {
+    const draft = getNodeSettingsDraft(nodeItem);
+    if (draft.schedules.length >= SCHEDULE_MAX_COUNT) return;
+    const nextScheduleName = AVAILABLE_SCHEDULES.find((name) => !draft.schedules.some((schedule) => schedule.name === name)) || AVAILABLE_SCHEDULES[0];
+    updateNodeSettingsDraft(nodeItem, { schedules: [...draft.schedules, createScheduleItem(nextScheduleName)] });
+    renderNodeSettingsSidebar();
+  });
+  sidebar.querySelectorAll("[data-schedule-remove]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const draft = getNodeSettingsDraft(nodeItem);
+      if (draft.schedules.length <= 1) return;
+      updateNodeSettingsDraft(nodeItem, { schedules: draft.schedules.filter((item) => item.id !== button.dataset.scheduleRemove) });
+      renderNodeSettingsSidebar();
+    });
+  });
+  sidebar.querySelectorAll("[data-schedule-row]").forEach((row) => {
+    row.addEventListener("dragstart", (event) => {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", row.dataset.scheduleRow);
+      row.classList.add("is-dragging");
+    });
+    row.addEventListener("dragend", () => row.classList.remove("is-dragging"));
+    row.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      row.classList.add("is-drop-target");
+    });
+    row.addEventListener("dragleave", () => row.classList.remove("is-drop-target"));
+    row.addEventListener("drop", (event) => {
+      event.preventDefault();
+      row.classList.remove("is-drop-target");
+      const fromId = event.dataTransfer.getData("text/plain");
+      const toId = row.dataset.scheduleRow;
+      if (!fromId || !toId || fromId === toId) return;
+      const draft = getNodeSettingsDraft(nodeItem);
+      const fromIndex = draft.schedules.findIndex((schedule) => schedule.id === fromId);
+      const toIndex = draft.schedules.findIndex((schedule) => schedule.id === toId);
+      if (fromIndex < 0 || toIndex < 0) return;
+      updateNodeSettingsDraft(nodeItem, { schedules: moveArrayItem(draft.schedules, fromIndex, toIndex) });
+      renderNodeSettingsSidebar();
+    });
+  });
   sidebar.querySelector("#messageTextInput")?.addEventListener("input", (event) => {
     const errors = { ...(settingsErrors[nodeItem.id] || {}) };
     if (event.target.value.trim()) {
@@ -2095,6 +2243,7 @@ function collectNodeSettings(sidebar, nodeItem, settings) {
   if (isInfoMessageNode(nodeItem)) return collectInfoMessageSettings(sidebar, settings);
   if (isContactFormNode(nodeItem)) return collectContactFormSettings(sidebar, settings);
   if (isMenuNode(nodeItem)) return collectMenuSettings(sidebar, settings);
+  if (isScheduleNode(nodeItem)) return collectScheduleSettings(settings);
   return collectSimpleTransferSettings(sidebar, nodeItem, settings);
 }
 
@@ -2136,11 +2285,16 @@ function collectMenuSettings(sidebar, settings) {
   });
 }
 
+function collectScheduleSettings(settings) {
+  return createScheduleSettings(settings);
+}
+
 function validateNodeSettings(nodeItem, settings) {
   if (isGroupTransferNode(nodeItem)) return settings.groupName ? {} : { groupName: "Выберите отдел" };
   if (isInfoMessageNode(nodeItem)) return settings.messageText.trim() ? {} : { messageText: true };
   if (isContactFormNode(nodeItem)) return {};
   if (isMenuNode(nodeItem)) return validateMenuSettings(settings);
+  if (isScheduleNode(nodeItem)) return validateScheduleSettings(settings);
   const config = SIMPLE_TRANSFER_CONFIG[nodeItem.operationType];
   if (config?.requiredField === "employeeName" && !settings.employeeName) return { employeeName: config.requiredError };
   return {};
@@ -2151,6 +2305,7 @@ function closeDropdownPatchForNode(nodeItem) {
   if (isInfoMessageNode(nodeItem)) return {};
   if (isContactFormNode(nodeItem)) return {};
   if (isMenuNode(nodeItem)) return {};
+  if (isScheduleNode(nodeItem)) return {};
   return { employeeDropdownOpen: false };
 }
 
@@ -2163,6 +2318,14 @@ function validateMenuSettings(settings) {
   });
   if (Object.keys(buttonErrors).length) errors.buttons = buttonErrors;
   return errors;
+}
+
+function validateScheduleSettings(settings) {
+  const scheduleErrors = {};
+  settings.schedules.forEach((schedule) => {
+    if (!schedule.name) scheduleErrors[schedule.id] = true;
+  });
+  return Object.keys(scheduleErrors).length ? { schedules: scheduleErrors } : {};
 }
 
 function createGroupTransferSettings(overrides = {}) {
@@ -2251,9 +2414,44 @@ function createMenuButton(text = "") {
   };
 }
 
+function createScheduleSettings(overrides = {}) {
+  const defaultSchedules = [createScheduleItem(AVAILABLE_SCHEDULES[0])];
+  const settings = {
+    cycleLimit: 1,
+    technicalOpen: false,
+    schedules: defaultSchedules,
+    ...overrides,
+  };
+  const schedules = Array.isArray(settings.schedules) && settings.schedules.length ? settings.schedules : defaultSchedules;
+  return {
+    ...settings,
+    schedules: schedules.slice(0, SCHEDULE_MAX_COUNT).map((schedule, index) => ({
+      id: schedule.id || `schedule-${Date.now().toString(36)}-${index}`,
+      name: AVAILABLE_SCHEDULES.includes(schedule.name) ? schedule.name : schedule.name || (index === 0 ? AVAILABLE_SCHEDULES[0] : ""),
+      dropdownOpen: Boolean(schedule.dropdownOpen),
+    })),
+  };
+}
+
+function createScheduleItem(name = "") {
+  return {
+    id: `schedule-${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 6)}`,
+    name,
+    dropdownOpen: false,
+  };
+}
+
 function createEmployeesForGroup(groupName) {
   const names = GROUP_TRANSFER_EMPLOYEES_BY_GROUP[groupName] || GROUP_TRANSFER_EMPLOYEES_BY_GROUP["Отдел продаж"];
   return names.map((name, index) => ({ name, enabled: true, timeout: index === names.length - 1 && names.length > 2 ? 1500 : 15 }));
+}
+
+function formatScheduleCount(count) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return "график";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "графика";
+  return "графиков";
 }
 
 function formatEmployeeCount(count) {
@@ -2309,11 +2507,20 @@ function getMenuSettings(nodeItem) {
   });
 }
 
+function getScheduleSettings(nodeItem) {
+  const existing = nodeItem.settings?.schedule || {};
+  return createScheduleSettings({
+    ...existing,
+    technicalOpen: existing.technicalOpen ?? false,
+  });
+}
+
 function getNodeSettings(nodeItem) {
   if (isGroupTransferNode(nodeItem)) return getGroupTransferSettings(nodeItem);
   if (isInfoMessageNode(nodeItem)) return getInfoMessageSettings(nodeItem);
   if (isContactFormNode(nodeItem)) return getContactFormSettings(nodeItem);
   if (isMenuNode(nodeItem)) return getMenuSettings(nodeItem);
+  if (isScheduleNode(nodeItem)) return getScheduleSettings(nodeItem);
   return getSimpleTransferSettings(nodeItem);
 }
 
@@ -2340,10 +2547,18 @@ function updateNodeSettingsDraft(nodeItem, patch) {
     settingsDrafts[nodeItem.id] = createMenuSettings(next);
     return;
   }
+  if (isScheduleNode(nodeItem)) {
+    settingsDrafts[nodeItem.id] = createScheduleSettings(next);
+    return;
+  }
   settingsDrafts[nodeItem.id] = createSimpleTransferSettings(nodeItem.operationType, next);
 }
 
 function saveNodeSettings(nodeItem, settings) {
+  if (isScheduleNode(nodeItem)) {
+    saveScheduleSettings(nodeItem, settings);
+    return;
+  }
   if (isMenuNode(nodeItem)) {
     saveMenuSettings(nodeItem, settings);
     return;
@@ -2382,7 +2597,13 @@ function saveContactFormSettings(nodeItem, settings) {
 function saveMenuSettings(nodeItem, settings) {
   nodeItem.settings = { ...(nodeItem.settings || {}), menu: createMenuSettings(settings) };
   applyMenuTitle(nodeItem, nodeItem.settings.menu);
-  syncMenuEdges(nodeItem);
+  syncDynamicOutputEdges(nodeItem);
+}
+
+function saveScheduleSettings(nodeItem, settings) {
+  nodeItem.settings = { ...(nodeItem.settings || {}), schedule: createScheduleSettings(settings) };
+  applyScheduleTitle(nodeItem, nodeItem.settings.schedule);
+  syncDynamicOutputEdges(nodeItem);
 }
 
 function applyGroupTransferTitle(nodeItem, settings) {
@@ -2410,12 +2631,16 @@ function isMenuNode(nodeItem) {
   return nodeItem?.kind === "menuNode" && nodeItem.operationType === MENU_OPERATION;
 }
 
+function isScheduleNode(nodeItem) {
+  return nodeItem?.kind === "schedule" && nodeItem.operationType === SCHEDULE_OPERATION;
+}
+
 function isConfigurableTransferNode(nodeItem) {
   return isGroupTransferNode(nodeItem) || isSimpleTransferNode(nodeItem);
 }
 
 function isConfigurableNode(nodeItem) {
-  return isConfigurableTransferNode(nodeItem) || isInfoMessageNode(nodeItem) || isContactFormNode(nodeItem) || isMenuNode(nodeItem);
+  return isConfigurableTransferNode(nodeItem) || isInfoMessageNode(nodeItem) || isContactFormNode(nodeItem) || isMenuNode(nodeItem) || isScheduleNode(nodeItem);
 }
 
 function isTransferWithFallbackNode(nodeItem) {
@@ -2425,6 +2650,7 @@ function isTransferWithFallbackNode(nodeItem) {
 function settingsTitleForNode(nodeItem) {
   if (isContactFormNode(nodeItem)) return "Форма сбора контактов";
   if (isMenuNode(nodeItem)) return "Меню";
+  if (isScheduleNode(nodeItem)) return "Распределение по графику";
   if (isInfoMessageNode(nodeItem)) return "Информационное сообщение";
   if (isGroupTransferNode(nodeItem)) return "На группу";
   return SIMPLE_TRANSFER_CONFIG[nodeItem.operationType]?.title || nodeItem.title;
@@ -2454,6 +2680,12 @@ function applyContactFormTitle(nodeItem, settings) {
 function applyMenuTitle(nodeItem, settings) {
   nodeItem.title = "Меню";
   nodeItem.subtitle = `Ожидание нажатия кнопки: ${formatTimeout(settings.waitTime, settings.timeoutUnit)}`;
+}
+
+function applyScheduleTitle(nodeItem, settings) {
+  const count = settings.schedules.length;
+  nodeItem.title = "Распределение по графику";
+  nodeItem.subtitle = `${count} ${formatScheduleCount(count)}`;
 }
 
 function normalizeComparableSimpleTransferSettings(operationType, settings) {
@@ -2501,8 +2733,16 @@ function normalizeComparableMenuSettings(settings) {
   };
 }
 
-function syncMenuEdges(nodeItem) {
-  const outputs = menuOutputs(nodeItem);
+function normalizeComparableScheduleSettings(settings) {
+  const normalized = createScheduleSettings(settings);
+  return {
+    cycleLimit: sanitizePositiveInteger(normalized.cycleLimit, 1),
+    schedules: normalized.schedules.map((schedule) => ({ id: schedule.id, name: schedule.name || "" })),
+  };
+}
+
+function syncDynamicOutputEdges(nodeItem) {
+  const outputs = nodeOutputs(nodeItem).filter((output) => output.placeholder);
   const outputIds = new Set(outputs.map((output) => output.key));
   const removedPlaceholderTargets = state.edges
     .filter((edgeItem) => edgeItem.source === nodeItem.id && !outputIds.has(edgeItem.outputKey))
@@ -2799,6 +3039,14 @@ function normalizeLoadedState(loadedState) {
     if (normalizedNode.kind === "form" && !normalizedNode.operationType) {
       normalizedNode.operationType = CONTACT_FORM_OPERATION;
       normalizedNode.settings = { ...(normalizedNode.settings || {}), contactForm: createContactFormSettings(normalizedNode.settings?.contactForm) };
+    }
+    if (isScheduleNode(normalizedNode)) {
+      normalizedNode.settings = { ...(normalizedNode.settings || {}), schedule: createScheduleSettings(normalizedNode.settings?.schedule) };
+      applyScheduleTitle(normalizedNode, normalizedNode.settings.schedule);
+    }
+    if (isMenuNode(normalizedNode)) {
+      normalizedNode.settings = { ...(normalizedNode.settings || {}), menu: createMenuSettings(normalizedNode.settings?.menu) };
+      applyMenuTitle(normalizedNode, normalizedNode.settings.menu);
     }
     return normalizedNode;
   });
