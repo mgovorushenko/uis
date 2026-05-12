@@ -452,6 +452,10 @@ function renderNodes() {
         .filter((event) => event.button === 0)
         .on("start", function (event, d) {
           event.sourceEvent?.stopPropagation();
+          const transform = d3.zoomTransform(svg.node());
+          const [pointerX, pointerY] = transform.invert(d3.pointer(event, svg.node()));
+          d.dragOffsetX = pointerX - d.x;
+          d.dragOffsetY = pointerY - d.y;
           selectedId = d.id;
           pushHistory();
           renderProperties();
@@ -460,12 +464,15 @@ function renderNodes() {
         .on("drag", function (event, d) {
           event.sourceEvent?.stopPropagation();
           const transform = d3.zoomTransform(svg.node());
-          d.x += event.dx / transform.k;
-          d.y += event.dy / transform.k;
+          const [pointerX, pointerY] = transform.invert(d3.pointer(event, svg.node()));
+          d.x = pointerX - (d.dragOffsetX || 0);
+          d.y = pointerY - (d.dragOffsetY || 0);
           d3.select(this).attr("transform", `translate(${d.x},${d.y})`);
           renderEdges();
         })
         .on("end", function (event, d) {
+          delete d.dragOffsetX;
+          delete d.dragOffsetY;
           if (hoveredId === d.id) hoveredId = null;
           updateNodeText(this, d, d.id === selectedId);
           renderEdges();
