@@ -853,6 +853,10 @@ function cancelNodeSettings(clearSelection = true) {
 
 function requestNodeSettingsClose() {
   if (!settingsNodeId) return;
+  if (pendingSettingsNodeIds.has(settingsNodeId)) {
+    cancelNodeSettings(true);
+    return;
+  }
   if (hasUnsavedNodeSettings(settingsNodeId)) {
     openSettingsCloseConfirm();
     return;
