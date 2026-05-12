@@ -11,6 +11,7 @@ const NODE_PORT_RIGHT_X = NODE_W + 51;
 const NODE_PORT_RIGHT_COMPACT_X = NODE_W + 20;
 const NODE_PORT_R = 3;
 const NODE_PORT_EDGE_GAP = 8;
+const NODE_PORT_ARROW_GAP = 2;
 const NODE_CREATE_GAP_X = 80;
 const EDGE_LABEL_SIDE_GAP = 60;
 const EDGE_LABEL_PADDING_X = 10;
@@ -960,11 +961,12 @@ function edgeLabelPoint(d, labelWidth = EDGE_LABEL_MAX_WIDTH) {
 }
 
 function edgeRoute(sourceNode, targetNode, edgeItem = null) {
+  const sourcePortVisible = isNodePortVisible(sourceNode.id);
   const targetPortVisible = isNodePortVisible(targetNode.id) && canReceiveInput(targetNode);
-  const x1 = sourceNode.x + (isNodePortVisible(sourceNode.id) ? nodeRightPortX(sourceNode) + NODE_PORT_R : NODE_W + NODE_PORT_EDGE_GAP);
+  const x1 = sourceNode.x + (sourcePortVisible ? nodeRightPortX(sourceNode) : NODE_W + NODE_PORT_EDGE_GAP);
   const layoutX1 = sourceNode.x + NODE_W + NODE_PORT_EDGE_GAP;
   const y1 = sourceNode.y + NODE_H / 2;
-  const x2 = targetNode.x + (targetPortVisible ? NODE_PORT_LEFT_X - NODE_PORT_R : -NODE_PORT_EDGE_GAP);
+  const x2 = targetNode.x + (targetPortVisible ? NODE_PORT_LEFT_X - NODE_PORT_R - NODE_PORT_ARROW_GAP : -NODE_PORT_EDGE_GAP);
   const layoutX2 = targetPortVisible ? x2 : targetNode.x - NODE_PORT_EDGE_GAP;
   const y2 = targetNode.y + NODE_H / 2;
   if (layoutX2 <= layoutX1 + 48 && Math.abs(y2 - y1) > 1) {
