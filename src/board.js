@@ -705,31 +705,34 @@ function edgeRoute(sourceNode, targetNode, edgeItem = null) {
   const x1 = sourceNode.x + (isNodePortVisible(sourceNode.id) ? nodeRightPortX(sourceNode) + NODE_PORT_R + NODE_PORT_EDGE_GAP : NODE_W + NODE_PORT_EDGE_GAP);
   const y1 = sourceNode.y + NODE_H / 2;
   const x2 = targetNode.x + (isNodePortVisible(targetNode.id) && canReceiveInput(targetNode) ? NODE_PORT_LEFT_X - NODE_PORT_R - NODE_PORT_EDGE_GAP : -NODE_PORT_EDGE_GAP);
+  const layoutX2 = targetNode.x - NODE_PORT_EDGE_GAP;
   const y2 = targetNode.y + NODE_H / 2;
-  if (x2 <= x1 + 48 && Math.abs(y2 - y1) > 1) {
+  if (layoutX2 <= x1 + 48 && Math.abs(y2 - y1) > 1) {
     const labelWidth = edgeItem?.label ? estimateEdgeLabelWidth(edgeItem.label) : 0;
     const outwardX = x1 + 64;
     const labelLeftX = targetNode.x - EDGE_LABEL_SIDE_GAP * 2 - labelWidth;
-    const bridgeX = Math.min(x2 - 64, labelLeftX - 40);
+    const bridgeX = Math.min(layoutX2 - 64, labelLeftX - 40);
     const midY = y1 + (y2 - y1) / 2;
+    const points = [
+      { x: x1, y: y1 },
+      { x: outwardX, y: y1 },
+      { x: outwardX, y: midY },
+      { x: bridgeX, y: midY },
+      { x: bridgeX, y: y2 },
+      { x: layoutX2, y: y2 },
+    ];
+    if (Math.abs(layoutX2 - x2) > 0.5) points.push({ x: x2, y: y2 });
     return {
       x1,
       y1,
       x2,
       y2,
       radius: 18,
-      points: [
-        { x: x1, y: y1 },
-        { x: outwardX, y: y1 },
-        { x: outwardX, y: midY },
-        { x: bridgeX, y: midY },
-        { x: bridgeX, y: y2 },
-        { x: x2, y: y2 },
-      ],
+      points,
     };
   }
-  const midX = x2 > x1 ? x1 + (x2 - x1) / 2 : Math.max(x1 + 56, targetNode.x + NODE_W + 56);
-  const radius = Math.min(18, Math.abs(midX - x1) / 2, Math.abs(x2 - midX) / 2, Math.abs(y2 - y1) / 2);
+  const midX = layoutX2 > x1 ? x1 + (layoutX2 - x1) / 2 : Math.max(x1 + 56, targetNode.x + NODE_W + 56);
+  const radius = Math.min(18, Math.abs(midX - x1) / 2, Math.abs(layoutX2 - midX) / 2, Math.abs(y2 - y1) / 2);
   return { x1, y1, x2, y2, midX, radius };
 }
 
