@@ -43,6 +43,7 @@ const SIMPLE_TRANSFER_CONFIG = {
     icon: "last-manager",
   },
 };
+const INFO_MESSAGE_OPERATION = "info-message";
 const icons = {
   search: '<circle cx="9" cy="9" r="5"></circle><path d="m13 13 4 4"></path>',
   star: '<path d="m10 2 2.5 5.1 5.6.8-4 3.9.9 5.5-5-2.6-5 2.6.9-5.5-4-3.9 5.6-.8L10 2Z"></path>',
@@ -123,6 +124,7 @@ const catalog = {
   form: { title: "Форма сбора контактов", subtitle: "Ожидание контактов: 1 мин.", color: "var(--cmgui-color-special-15)", icon: "form" },
   transfer: { title: "На группу: Отдел продаж", subtitle: "Ожидание ответа: 1 мин.", color: "var(--cmgui-color-special-2)", icon: "last-manager" },
   success: { title: "Чат взят в работу", subtitle: "", color: "var(--cmgui-color-special-1)", icon: "success" },
+  message: { title: "Информационное сообщение", subtitle: "Следующая операция через: 1 сек.", color: "var(--cmgui-color-special-15)", icon: "info-message" },
   empty: { title: "Добавить операцию", subtitle: "", color: "var(--cmgui-color-bg-main-gray-dark)", icon: "attention", muted: true },
   finish: { title: "Завершить сценарий через 72 ч", subtitle: "После отправить чат: Всем сотрудникам", color: "var(--cmgui-color-special-21)", icon: "node-connection-line" },
 };
@@ -317,7 +319,7 @@ function wireControls() {
       closeOperationModal();
       const nodeId = replaceId ? replacePlaceholderNode(replaceId, card.dataset.kind || "empty", operationType) : addNode(card.dataset.kind || "empty", sourceId, operationType, outputKey);
       const nodeItem = getNode(nodeId);
-      if (nodeItem && isConfigurableTransferNode(nodeItem)) {
+      if (nodeItem && isConfigurableNode(nodeItem)) {
         pendingSettingsNodeIds.add(nodeId);
         openNodeSettings(nodeId);
       }
@@ -511,7 +513,7 @@ function renderNodes() {
       }
       selectedId = d.id;
       render();
-      if (isConfigurableTransferNode(d)) {
+      if (isConfigurableNode(d)) {
         openNodeSettings(d.id);
       }
     });
@@ -778,6 +780,13 @@ function configureNodeForOperation(nodeItem, operationType) {
     nodeItem.icon = config.icon;
     nodeItem.settings = { simpleTransfer: createSimpleTransferSettings(operationType) };
   }
+  if (operationType === INFO_MESSAGE_OPERATION) {
+    nodeItem.title = "Информационное сообщение";
+    nodeItem.subtitle = "Следующая операция через: 1 сек.";
+    nodeItem.color = "var(--cmgui-color-special-15)";
+    nodeItem.icon = "info-message";
+    nodeItem.settings = { infoMessage: createInfoMessageSettings() };
+  }
 }
 
 function createFallbackPlaceholderFor(sourceNode) {
@@ -814,6 +823,7 @@ function nodeOutputs(nodeItem) {
   if (!nodeItem) return [];
   if (isPlaceholderNode(nodeItem)) return [];
   if (nodeItem.kind === "start") return [{ key: "main", label: "" }];
+  if (isInfoMessageNode(nodeItem)) return [{ key: "delivered", label: "Сообщение доставлено", tone: "success" }];
   if (isTransferWithFallbackNode(nodeItem)) return [{ key: "failed", label: "Никто не ответил", tone: "plain" }];
   return [{ key: "main", label: "" }];
 }
@@ -972,7 +982,7 @@ function closeSettingsCloseConfirm() {
 
 function hasUnsavedNodeSettings(nodeId) {
   const nodeItem = getNode(nodeId);
-  if (!nodeItem || !isConfigurableTransferNode(nodeItem)) return false;
+  if (!nodeItem || !isConfigurableNode(nodeItem)) return false;
   if (pendingSettingsNodeIds.has(nodeId)) return true;
   const draft = settingsDrafts[nodeId];
   if (!draft) return false;
@@ -981,6 +991,7 @@ function hasUnsavedNodeSettings(nodeId) {
 
 function stableStringifySettings(nodeItem, settings) {
   if (isGroupTransferNode(nodeItem)) return JSON.stringify(normalizeComparableGroupTransferSettings(settings));
+  if (isInfoMessageNode(nodeItem)) return JSON.stringify(normalizeComparableInfoMessageSettings(settings));
   return JSON.stringify(normalizeComparableSimpleTransferSettings(nodeItem.operationType, settings));
 }
 
@@ -1004,7 +1015,7 @@ function renderNodeSettingsSidebar() {
   const sidebar = document.querySelector("#nodeSettingsSidebar");
   if (!sidebar) return;
   const nodeItem = getNode(settingsNodeId);
-  if (!nodeItem || !isConfigurableTransferNode(nodeItem)) {
+  if (!nodeItem || !isConfigurableNode(nodeItem)) {
     sidebar.innerHTML = "";
     return;
   }
@@ -1021,7 +1032,7 @@ function renderNodeSettingsSidebar() {
       </button>
     </header>
     <div class="node-settings-body">
-      ${isGroupTransferNode(nodeItem) ? (settings.groupName ? renderGroupTransferCard(settings) : renderEmptyGroupTransferCard(errors)) : renderSimpleTransferCard(nodeItem, settings, errors)}
+      ${renderPrimarySettingsCard(nodeItem, settings, errors)}
       <section class="node-settings-card technical-settings-card ${settings.technicalOpen ? "is-open" : ""}">
         <button class="node-settings-card-head" type="button" id="technicalToggle">
           <span>Технические настройки</span>
@@ -1064,6 +1075,12 @@ function renderCounter(id, value, { min = 0, max = 9999999 } = {}) {
       ${iconSvg("math-plus-20", 20)}
     </button>
   </div>`;
+}
+
+function renderPrimarySettingsCard(nodeItem, settings, errors) {
+  if (isGroupTransferNode(nodeItem)) return settings.groupName ? renderGroupTransferCard(settings) : renderEmptyGroupTransferCard(errors);
+  if (isInfoMessageNode(nodeItem)) return renderInfoMessageCard(settings, errors);
+  return renderSimpleTransferCard(nodeItem, settings, errors);
 }
 
 function renderEmptyGroupTransferCard(errors = {}) {
@@ -1120,6 +1137,21 @@ function renderSimpleTransferCard(nodeItem, settings, errors = {}) {
         : ""
     }
     ${renderResponseTimeout(settings)}
+  </section>`;
+}
+
+function renderInfoMessageCard(settings, errors = {}) {
+  return `<section class="node-settings-card info-message-card">
+    <div class="node-settings-card-head is-static">
+      <span>Основные параметры</span>
+    </div>
+    ${renderSettingsAlert("Клиент получит сообщение, а затем сценарий перейдет к следующей операции (через указанное ниже время)")}
+    <label class="cmgui-text-field info-message-textarea">
+      <span class="cmgui-text-field-wrapper is-textarea ${errors.messageText ? "is-error" : ""}">
+        <textarea class="cmgui-text-field-input" id="messageTextInput" placeholder="Текст сообщения*">${escapeHtml(settings.messageText || "")}</textarea>
+      </span>
+    </label>
+    ${renderTransitionDelay(settings)}
   </section>`;
 }
 
@@ -1180,6 +1212,17 @@ function renderResponseTimeout(settings) {
     <span class="response-label">Ожидание ответа</span>
     <input class="response-input" id="responseTimeoutInput" value="${settings.responseTimeout}" inputmode="numeric" />
     <div class="segment-control" role="group" aria-label="Единица времени ожидания">
+      <button class="${settings.timeoutUnit === "seconds" ? "is-active" : ""}" type="button" data-time-unit="seconds">Секунд</button>
+      <button class="${settings.timeoutUnit === "minutes" ? "is-active" : ""}" type="button" data-time-unit="minutes">Минут</button>
+    </div>
+  </div>`;
+}
+
+function renderTransitionDelay(settings) {
+  return `<div class="response-row transition-delay-row">
+    <span class="response-label">Переход к следующему шагу через</span>
+    <input class="response-input" id="transitionDelayInput" value="${settings.transitionDelay}" inputmode="numeric" />
+    <div class="segment-control" role="group" aria-label="Единица времени перехода">
       <button class="${settings.timeoutUnit === "seconds" ? "is-active" : ""}" type="button" data-time-unit="seconds">Секунд</button>
       <button class="${settings.timeoutUnit === "minutes" ? "is-active" : ""}" type="button" data-time-unit="minutes">Минут</button>
     </div>
@@ -1343,6 +1386,24 @@ function wireNodeSettingsSidebar(sidebar, nodeItem, settings) {
     const responseTimeout = sanitizePositiveInteger(event.target.value, settings.responseTimeout);
     updateNodeSettingsDraft(nodeItem, { responseTimeout });
   });
+  sidebar.querySelector("#transitionDelayInput")?.addEventListener("input", (event) => {
+    const transitionDelay = sanitizePositiveInteger(event.target.value, settings.transitionDelay);
+    updateNodeSettingsDraft(nodeItem, { transitionDelay });
+  });
+  sidebar.querySelector("#messageTextInput")?.addEventListener("input", (event) => {
+    const errors = { ...(settingsErrors[nodeItem.id] || {}) };
+    if (event.target.value.trim()) {
+      delete errors.messageText;
+      settingsErrors[nodeItem.id] = errors;
+      event.target.closest(".cmgui-text-field-wrapper")?.classList.remove("is-error");
+    }
+    updateNodeSettingsDraft(nodeItem, { messageText: event.target.value });
+  });
+  sidebar.querySelector("#messageTextInput")?.addEventListener("blur", (event) => {
+    if (event.target.value.trim()) return;
+    settingsErrors[nodeItem.id] = { ...(settingsErrors[nodeItem.id] || {}), messageText: true };
+    event.target.closest(".cmgui-text-field-wrapper")?.classList.add("is-error");
+  });
   sidebar.querySelector("#cycleLimitInput")?.addEventListener("input", (event) => {
     if (/^\d*(?:\.\d*)?$/.test(event.target.value)) {
       const cycleLimit = sanitizePositiveInteger(event.target.value, settings.cycleLimit);
@@ -1441,6 +1502,7 @@ function collectGroupTransferSettings(sidebar, settings) {
 
 function collectNodeSettings(sidebar, nodeItem, settings) {
   if (isGroupTransferNode(nodeItem)) return collectGroupTransferSettings(sidebar, settings);
+  if (isInfoMessageNode(nodeItem)) return collectInfoMessageSettings(sidebar, settings);
   return collectSimpleTransferSettings(sidebar, nodeItem, settings);
 }
 
@@ -1452,8 +1514,18 @@ function collectSimpleTransferSettings(sidebar, nodeItem, settings) {
   });
 }
 
+function collectInfoMessageSettings(sidebar, settings) {
+  return createInfoMessageSettings({
+    ...settings,
+    messageText: sidebar.querySelector("#messageTextInput")?.value || "",
+    transitionDelay: sanitizePositiveInteger(sidebar.querySelector("#transitionDelayInput")?.value, settings.transitionDelay),
+    cycleLimit: sanitizePositiveInteger(sidebar.querySelector("#cycleLimitInput")?.value, settings.cycleLimit),
+  });
+}
+
 function validateNodeSettings(nodeItem, settings) {
   if (isGroupTransferNode(nodeItem)) return settings.groupName ? {} : { groupName: "Выберите отдел" };
+  if (isInfoMessageNode(nodeItem)) return settings.messageText.trim() ? {} : { messageText: true };
   const config = SIMPLE_TRANSFER_CONFIG[nodeItem.operationType];
   if (config?.requiredField === "employeeName" && !settings.employeeName) return { employeeName: config.requiredError };
   return {};
@@ -1461,6 +1533,7 @@ function validateNodeSettings(nodeItem, settings) {
 
 function closeDropdownPatchForNode(nodeItem) {
   if (isGroupTransferNode(nodeItem)) return { groupDropdownOpen: false, distributionDropdownOpen: false };
+  if (isInfoMessageNode(nodeItem)) return {};
   return { employeeDropdownOpen: false };
 }
 
@@ -1497,6 +1570,17 @@ function createSimpleTransferSettings(operationType, overrides = {}) {
   return { ...defaults, ...overrides, operationType };
 }
 
+function createInfoMessageSettings(overrides = {}) {
+  const defaults = {
+    messageText: "",
+    transitionDelay: 1,
+    timeoutUnit: "seconds",
+    cycleLimit: 1,
+    technicalOpen: false,
+  };
+  return { ...defaults, ...overrides };
+}
+
 function createEmployeesForGroup(groupName) {
   const names = GROUP_TRANSFER_EMPLOYEES_BY_GROUP[groupName] || GROUP_TRANSFER_EMPLOYEES_BY_GROUP["Отдел продаж"];
   return names.map((name, index) => ({ name, enabled: true, timeout: index === names.length - 1 && names.length > 2 ? 1500 : 15 }));
@@ -1531,8 +1615,17 @@ function getSimpleTransferSettings(nodeItem) {
   });
 }
 
+function getInfoMessageSettings(nodeItem) {
+  const existing = nodeItem.settings?.infoMessage || {};
+  return createInfoMessageSettings({
+    ...existing,
+    technicalOpen: existing.technicalOpen ?? false,
+  });
+}
+
 function getNodeSettings(nodeItem) {
   if (isGroupTransferNode(nodeItem)) return getGroupTransferSettings(nodeItem);
+  if (isInfoMessageNode(nodeItem)) return getInfoMessageSettings(nodeItem);
   return getSimpleTransferSettings(nodeItem);
 }
 
@@ -1543,10 +1636,22 @@ function getNodeSettingsDraft(nodeItem) {
 
 function updateNodeSettingsDraft(nodeItem, patch) {
   const next = { ...getNodeSettingsDraft(nodeItem), ...patch };
-  settingsDrafts[nodeItem.id] = isGroupTransferNode(nodeItem) ? createGroupTransferSettings(next) : createSimpleTransferSettings(nodeItem.operationType, next);
+  if (isGroupTransferNode(nodeItem)) {
+    settingsDrafts[nodeItem.id] = createGroupTransferSettings(next);
+    return;
+  }
+  if (isInfoMessageNode(nodeItem)) {
+    settingsDrafts[nodeItem.id] = createInfoMessageSettings(next);
+    return;
+  }
+  settingsDrafts[nodeItem.id] = createSimpleTransferSettings(nodeItem.operationType, next);
 }
 
 function saveNodeSettings(nodeItem, settings) {
+  if (isInfoMessageNode(nodeItem)) {
+    saveInfoMessageSettings(nodeItem, settings);
+    return;
+  }
   if (!isGroupTransferNode(nodeItem)) {
     saveSimpleTransferSettings(nodeItem, settings);
     return;
@@ -1558,6 +1663,11 @@ function saveNodeSettings(nodeItem, settings) {
 function saveSimpleTransferSettings(nodeItem, settings) {
   nodeItem.settings = { ...(nodeItem.settings || {}), simpleTransfer: createSimpleTransferSettings(nodeItem.operationType, settings) };
   applySimpleTransferTitle(nodeItem, nodeItem.settings.simpleTransfer);
+}
+
+function saveInfoMessageSettings(nodeItem, settings) {
+  nodeItem.settings = { ...(nodeItem.settings || {}), infoMessage: createInfoMessageSettings(settings) };
+  applyInfoMessageTitle(nodeItem, nodeItem.settings.infoMessage);
 }
 
 function applyGroupTransferTitle(nodeItem, settings) {
@@ -1573,8 +1683,16 @@ function isSimpleTransferNode(nodeItem) {
   return Boolean(nodeItem?.kind === "transfer" && SIMPLE_TRANSFER_CONFIG[nodeItem.operationType]);
 }
 
+function isInfoMessageNode(nodeItem) {
+  return nodeItem?.kind === "message" && nodeItem.operationType === INFO_MESSAGE_OPERATION;
+}
+
 function isConfigurableTransferNode(nodeItem) {
   return isGroupTransferNode(nodeItem) || isSimpleTransferNode(nodeItem);
+}
+
+function isConfigurableNode(nodeItem) {
+  return isConfigurableTransferNode(nodeItem) || isInfoMessageNode(nodeItem);
 }
 
 function isTransferWithFallbackNode(nodeItem) {
@@ -1582,6 +1700,7 @@ function isTransferWithFallbackNode(nodeItem) {
 }
 
 function settingsTitleForNode(nodeItem) {
+  if (isInfoMessageNode(nodeItem)) return "Информационное сообщение";
   if (isGroupTransferNode(nodeItem)) return "На группу";
   return SIMPLE_TRANSFER_CONFIG[nodeItem.operationType]?.title || nodeItem.title;
 }
@@ -1597,12 +1716,27 @@ function applySimpleTransferTitle(nodeItem, settings) {
   nodeItem.subtitle = `Ожидание ответа: ${formatTimeout(settings.responseTimeout, settings.timeoutUnit)}`;
 }
 
+function applyInfoMessageTitle(nodeItem, settings) {
+  nodeItem.title = "Информационное сообщение";
+  nodeItem.subtitle = `Следующая операция через: ${formatTimeout(settings.transitionDelay, settings.timeoutUnit)}`;
+}
+
 function normalizeComparableSimpleTransferSettings(operationType, settings) {
   const normalized = createSimpleTransferSettings(operationType, settings);
   return {
     operationType,
     employeeName: normalized.employeeName || "",
     responseTimeout: sanitizePositiveInteger(normalized.responseTimeout, 60),
+    timeoutUnit: normalized.timeoutUnit,
+    cycleLimit: sanitizePositiveInteger(normalized.cycleLimit, 1),
+  };
+}
+
+function normalizeComparableInfoMessageSettings(settings) {
+  const normalized = createInfoMessageSettings(settings);
+  return {
+    messageText: normalized.messageText || "",
+    transitionDelay: sanitizePositiveInteger(normalized.transitionDelay, 1),
     timeoutUnit: normalized.timeoutUnit,
     cycleLimit: sanitizePositiveInteger(normalized.cycleLimit, 1),
   };

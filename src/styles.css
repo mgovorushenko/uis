@@ -251,6 +251,12 @@ select {
   border-color: var(--cmgui-color-border-focus);
 }
 
+.cmgui-text-field-wrapper.is-error,
+.cmgui-text-field-wrapper.is-error:hover,
+.cmgui-text-field-wrapper.is-error:focus-within {
+  border-color: var(--cmgui-color-border-error);
+}
+
 .cmgui-text-field-input,
 .cmgui-select-native {
   width: 100%;
@@ -1340,6 +1346,24 @@ body.is-node-settings-open .node-settings-sidebar {
 .employee-picker {
   display: grid;
   gap: var(--cmgui-spacing-2);
+}
+
+.info-message-card .settings-alert {
+  text-align: left;
+}
+
+.info-message-textarea .cmgui-text-field-wrapper {
+  height: 140px;
+  min-height: 140px;
+}
+
+.info-message-textarea textarea.cmgui-text-field-input {
+  min-height: 114px;
+  resize: none;
+}
+
+.transition-delay-row {
+  flex-wrap: wrap;
 }
 
 .cmgui-select-container {
