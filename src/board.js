@@ -846,10 +846,13 @@ function openOutcomeMenu(sourceId) {
   const menu = document.querySelector("#outcomeMenu");
   menu.innerHTML = outputs.map(renderOutcomeMenuItem).join("");
   const transform = d3.zoomTransform(svg.node());
-  const screen = transform.apply([sourceNode.x + NODE_W + 48, sourceNode.y + 14]);
-  menu.style.left = `${Math.round(screen[0] + 56)}px`;
-  menu.style.top = `${Math.round(screen[1])}px`;
+  const screen = transform.apply([sourceNode.x + NODE_W + 8, sourceNode.y + NODE_H / 2]);
+  menu.style.visibility = "hidden";
   menu.classList.add("is-open");
+  const menuHeight = menu.offsetHeight;
+  menu.style.left = `${Math.round(screen[0] + 56)}px`;
+  menu.style.top = `${Math.round(screen[1] - menuHeight / 2)}px`;
+  menu.style.visibility = "";
   menu.setAttribute("aria-hidden", "false");
 }
 
