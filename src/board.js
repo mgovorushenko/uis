@@ -135,6 +135,7 @@ let settingsNodeId = null;
 let settingsDrafts = {};
 let settingsErrors = {};
 let pendingSettingsNodeIds = new Set();
+let isSettingsCloseConfirmOpen = false;
 let history = [];
 let future = [];
 let persistTimer = null;
@@ -235,6 +236,15 @@ function renderMenu() {
 }
 
 function wireControls() {
+  document.addEventListener(
+    "click",
+    (event) => {
+      if (!document.body.classList.contains("is-node-settings-open") || isSettingsCloseConfirmOpen) return;
+      if (event.target.closest("#nodeSettingsSidebar") || event.target.closest("#nodeSettingsCloseConfirm")) return;
+      requestNodeSettingsClose();
+    },
+    true,
+  );
   document.querySelector(".top-back-button").addEventListener("click", showScenarioList);
   document.querySelector("#createScenarioButton").addEventListener("click", openScenarioCreateModal);
   document.querySelector("#createScenarioEmptyButton").addEventListener("click", openScenarioCreateModal);
@@ -255,6 +265,16 @@ function wireControls() {
     if (event.target.id === "operationModal") closeOperationModal();
   });
   document.querySelector("#operationModalClose").addEventListener("click", closeOperationModal);
+  document.querySelector("#nodeSettingsBackdrop").addEventListener("click", handleNodeSettingsBackdropClick);
+  document.querySelector("#nodeSettingsCloseConfirmMask").addEventListener("click", (event) => {
+    if (event.target.id === "nodeSettingsCloseConfirmMask") closeSettingsCloseConfirm();
+  });
+  document.querySelector("#nodeSettingsCloseConfirmX").addEventListener("click", closeSettingsCloseConfirm);
+  document.querySelector("#nodeSettingsCloseConfirmCancel").addEventListener("click", closeSettingsCloseConfirm);
+  document.querySelector("#nodeSettingsCloseConfirmOk").addEventListener("click", () => {
+    closeSettingsCloseConfirm();
+    cancelNodeSettings(true);
+  });
   document.querySelectorAll(".operation-card").forEach((card) => {
     card.addEventListener("click", () => {
       const sourceId = operationSourceId;
@@ -270,8 +290,12 @@ function wireControls() {
     });
   });
   window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && isSettingsCloseConfirmOpen) {
+      closeSettingsCloseConfirm();
+      return;
+    }
     if (event.key === "Escape" && document.body.classList.contains("is-node-settings-open")) {
-      cancelNodeSettings(true);
+      requestNodeSettingsClose();
       return;
     }
     if (event.key === "Escape" && document.body.classList.contains("is-operation-modal-open")) {
@@ -446,7 +470,7 @@ function renderNodes() {
         return;
       }
       if (settingsNodeId === d.id) {
-        cancelNodeSettings(true);
+        requestNodeSettingsClose();
         hoveredId = d.id;
         render();
         return;
@@ -783,6 +807,7 @@ function closeOperationModal() {
 }
 
 function openNodeSettings(nodeId) {
+  closeSettingsCloseConfirm();
   settingsNodeId = nodeId;
   selectedId = nodeId;
   const nodeItem = getNode(nodeId);
@@ -794,6 +819,7 @@ function openNodeSettings(nodeId) {
 }
 
 function closeNodeSettings(clearSelection = true) {
+  closeSettingsCloseConfirm();
   if (settingsNodeId) delete settingsDrafts[settingsNodeId];
   if (settingsNodeId) delete settingsErrors[settingsNodeId];
   settingsNodeId = null;
@@ -809,6 +835,7 @@ function closeNodeSettings(clearSelection = true) {
 }
 
 function cancelNodeSettings(clearSelection = true) {
+  closeSettingsCloseConfirm();
   const nodeId = settingsNodeId;
   if (!nodeId || !pendingSettingsNodeIds.has(nodeId)) {
     closeNodeSettings(clearSelection);
@@ -822,6 +849,60 @@ function cancelNodeSettings(clearSelection = true) {
   document.body.classList.remove("is-node-settings-open");
   document.querySelector("#nodeSettingsSidebar").setAttribute("aria-hidden", "true");
   removeNodeById(nodeId);
+}
+
+function requestNodeSettingsClose() {
+  if (!settingsNodeId) return;
+  if (hasUnsavedNodeSettings(settingsNodeId)) {
+    openSettingsCloseConfirm();
+    return;
+  }
+  cancelNodeSettings(true);
+}
+
+function handleNodeSettingsBackdropClick() {
+  requestNodeSettingsClose();
+}
+
+function openSettingsCloseConfirm() {
+  isSettingsCloseConfirmOpen = true;
+  document.body.classList.add("is-settings-close-confirm-open");
+  document.querySelector("#nodeSettingsCloseConfirm").setAttribute("aria-hidden", "false");
+}
+
+function closeSettingsCloseConfirm() {
+  isSettingsCloseConfirmOpen = false;
+  document.body.classList.remove("is-settings-close-confirm-open");
+  document.querySelector("#nodeSettingsCloseConfirm")?.setAttribute("aria-hidden", "true");
+}
+
+function hasUnsavedNodeSettings(nodeId) {
+  const nodeItem = getNode(nodeId);
+  if (!nodeItem || !isGroupTransferNode(nodeItem)) return false;
+  if (pendingSettingsNodeIds.has(nodeId)) return true;
+  const draft = settingsDrafts[nodeId];
+  if (!draft) return false;
+  return stableStringifySettings(draft) !== stableStringifySettings(getGroupTransferSettings(nodeItem));
+}
+
+function stableStringifySettings(settings) {
+  return JSON.stringify(normalizeComparableGroupTransferSettings(settings));
+}
+
+function normalizeComparableGroupTransferSettings(settings) {
+  const normalized = createGroupTransferSettings(settings);
+  return {
+    groupName: normalized.groupName || "",
+    distribution: normalized.distribution,
+    responseTimeout: sanitizePositiveInteger(normalized.responseTimeout, 60),
+    timeoutUnit: normalized.timeoutUnit,
+    cycleLimit: sanitizePositiveInteger(normalized.cycleLimit, 1),
+    employees: normalized.employees.map((employee) => ({
+      name: employee.name,
+      enabled: Boolean(employee.enabled),
+      timeout: sanitizePositiveInteger(employee.timeout, 1),
+    })),
+  };
 }
 
 function renderNodeSettingsSidebar() {

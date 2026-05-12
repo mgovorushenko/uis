@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Сценарии обработки чатов</title>
-    <link rel="stylesheet" href="./src/styles.css?v=2026-05-12-20" />
+    <link rel="stylesheet" href="./src/styles.css?v=2026-05-12-21" />
   </head>
   <body>
     <main class="app-shell">
@@ -181,7 +181,28 @@
         </section>
       </div>
 
+      <div class="node-settings-backdrop" id="nodeSettingsBackdrop" aria-hidden="true" onclick="handleNodeSettingsBackdropClick()"></div>
       <aside class="node-settings-sidebar" id="nodeSettingsSidebar" aria-hidden="true"></aside>
+
+      <div class="cmgui-modal node-settings-confirm-modal" id="nodeSettingsCloseConfirm" aria-hidden="true">
+        <div class="cmgui-modal-mask" id="nodeSettingsCloseConfirmMask">
+          <section class="cmgui-modal-content" role="dialog" aria-modal="true" aria-labelledby="nodeSettingsCloseConfirmTitle">
+            <header class="cmgui-modal-header">
+              <h2 class="cmgui-modal-header-title" id="nodeSettingsCloseConfirmTitle">Закрыть настройки</h2>
+              <button class="cmgui-modal-header-close-x" type="button" id="nodeSettingsCloseConfirmX" title="Закрыть" aria-label="Закрыть">
+                <span class="cmgui-icon" data-icon="cancel"></span>
+              </button>
+            </header>
+            <main class="cmgui-modal-main">
+              <p>Внесенные изменения не будут сохранены. Вы уверены что хотите закрыть настройки?</p>
+            </main>
+            <footer class="cmgui-modal-footer">
+              <button class="cmgui-button cmgui-button-size-medium cmgui-button-error cmgui-button-fill" type="button" id="nodeSettingsCloseConfirmOk">Закрыть</button>
+              <button class="cmgui-button cmgui-button-size-medium cmgui-button-secondary cmgui-button-outline" type="button" id="nodeSettingsCloseConfirmCancel">Отменить</button>
+            </footer>
+          </section>
+        </div>
+      </div>
 
       <div class="scenario-create-overlay" id="scenarioCreateModal" aria-hidden="true">
         <form class="scenario-create-modal" id="scenarioCreateForm" role="dialog" aria-modal="true" aria-labelledby="scenarioCreateTitle">
@@ -213,6 +234,6 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
-    <script src="./src/board.js?v=2026-05-12-45"></script>
+    <script src="./src/board.js?v=2026-05-12-48"></script>
   </body>
 </html>

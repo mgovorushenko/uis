@@ -340,6 +340,7 @@ body.is-scenario-list .board-shell,
 body.is-scenario-list .top-bar,
 body.is-scenario-list .top-actions,
 body.is-scenario-list .bottom-bar,
+body.is-scenario-list .node-settings-backdrop,
 body.is-scenario-list .node-settings-sidebar {
   display: none;
 }
@@ -958,6 +959,18 @@ body.is-operation-modal-open .operation-modal-overlay {
 
 body.is-scenario-create-open .scenario-create-overlay {
   display: flex;
+}
+
+.node-settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 44;
+  display: none;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+body.is-node-settings-open .node-settings-backdrop {
+  display: block;
 }
 
 .node-settings-sidebar {
@@ -1628,6 +1641,99 @@ body.is-node-settings-open .node-settings-sidebar {
   border-radius: var(--cmgui-border-radius-large);
   background: var(--cmgui-color-bg-main-white);
   box-shadow: var(--cmgui-shadow-large);
+}
+
+.cmgui-modal {
+  box-sizing: border-box;
+}
+
+.cmgui-modal * {
+  box-sizing: border-box;
+}
+
+.cmgui-modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  padding: 20px;
+  background-color: rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  transition: opacity 100ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body.is-settings-close-confirm-open .node-settings-confirm-modal .cmgui-modal-mask {
+  display: flex;
+  opacity: 1;
+}
+
+.cmgui-modal-content {
+  position: relative;
+  width: 420px;
+  min-width: 260px;
+  max-width: calc(100vw - 40px);
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--cmgui-border-radius-large);
+  background-color: var(--cmgui-color-bg-main-white);
+  filter: drop-shadow(var(--cmgui-shadow-large));
+  transform: translateY(0);
+}
+
+.cmgui-modal-header {
+  position: relative;
+  min-height: 40px;
+  flex-shrink: 0;
+  padding: var(--cmgui-spacing-5);
+  color: var(--cmgui-color-icon-primary);
+}
+
+.cmgui-modal-header-title {
+  margin: 0;
+  color: var(--cmgui-color-text-primary);
+  font: var(--cmgui-font-title-overlay);
+}
+
+.cmgui-modal-header-close-x {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--cmgui-color-icon-primary);
+  cursor: pointer;
+}
+
+.cmgui-modal-header-close-x:hover {
+  color: var(--cmgui-color-icon-secondary);
+}
+
+.cmgui-modal-main {
+  flex: 1;
+  margin: 0 var(--cmgui-spacing-5);
+}
+
+.cmgui-modal-main p {
+  margin: 0;
+  color: var(--cmgui-color-text-primary);
+  font: var(--cmgui-font-body);
+}
+
+.cmgui-modal-footer {
+  min-height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  column-gap: var(--cmgui-spacing-2);
+  padding: var(--cmgui-spacing-5);
+  text-align: end;
 }
 
 .scenario-create-modal {
