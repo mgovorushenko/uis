@@ -48,9 +48,11 @@ const INFO_MESSAGE_OPERATION = "info-message";
 const CONTACT_FORM_OPERATION = "contact-form";
 const MENU_OPERATION = "menu-operation";
 const SCHEDULE_OPERATION = "schedule-distribution";
+const SEGMENT_OPERATION = "segment-distribution";
 const MENU_BUTTON_MAX_LENGTH = 128;
 const MENU_BUTTON_MAX_COUNT = 15;
 const SCHEDULE_MAX_COUNT = 20;
+const SEGMENT_MAX_COUNT = 20;
 const EDGE_LABEL_MAX_WIDTH = 160;
 const AVAILABLE_SCHEDULES = [
   "Будние дни",
@@ -75,6 +77,28 @@ const AVAILABLE_SCHEDULES = [
   "Вечерний график",
   "Федеральная поддержка",
   "Экстренные обращения",
+];
+const AVAILABLE_SEGMENT_GROUPS = [
+  "Сегмент 1, Сегмент 2",
+  "Сегмент 3, Сегмент 4",
+  "Составляющая сегмента 1, Составляющая сегмента 2, Составляющая сегмента 3",
+  "Новые посетители",
+  "Повторные обращения",
+  "VIP-клиенты",
+  "Клиенты с активной сделкой",
+  "Клиенты без сделки",
+  "Пользователи из рекламы",
+  "Пользователи из органики",
+  "Москва и область",
+  "Санкт-Петербург",
+  "Высокий чек",
+  "Не отвечали более 7 дней",
+  "Потенциальный отток",
+  "Партнерский трафик",
+  "Мобильные пользователи",
+  "Десктопные пользователи",
+  "Тестовая группа A",
+  "Тестовая группа B",
 ];
 const icons = {
   search: '<circle cx="9" cy="9" r="5"></circle><path d="m13 13 4 4"></path>',
@@ -163,6 +187,7 @@ const catalog = {
   message: { title: "Информационное сообщение", subtitle: "Следующая операция через: 1 сек.", color: "var(--cmgui-color-special-15)", icon: "info-message" },
   menuNode: { title: "Меню", subtitle: "Ожидание нажатия кнопки: 20 сек.", color: "var(--cmgui-color-special-13)", icon: "menu" },
   schedule: { title: "Распределение по графику", subtitle: "График: Будние дни", color: "var(--cmgui-color-special-13)", icon: "time-20" },
+  segment: { title: "Распределение по сегментам", subtitle: "Группа сегментов: Сегмент 1, Сегмент 2", color: "var(--cmgui-color-special-13)", icon: "distribution" },
   empty: { title: "Добавить операцию", subtitle: "", color: "var(--cmgui-color-bg-main-gray-dark)", icon: "attention", muted: true },
   finish: { title: "Завершить сценарий через 72 ч", subtitle: "После отправить чат: Всем сотрудникам", color: "var(--cmgui-color-special-21)", icon: "node-connection-line" },
 };
@@ -599,8 +624,8 @@ function renderNodes() {
   merged.select(".node-icon-svg").html((d) => iconSvg(isPlaceholderNode(d) ? "add-20" : d.icon, 20));
   merged.select(".node-icon-svg").attr("transform", (d) => (isPlaceholderNode(d) ? "translate(22,20)" : "translate(22,20)"));
   merged.select(".node-add-icon").html(() => iconSvg("add", 16));
-  merged.select(".node-more-graphic").html((d) => iconSvg(isPlaceholderNode(d) ? "delete" : isScheduleNode(d) ? "fullscreen-20" : "more", 20));
-  merged.select(".node-status-badge").html((d) => (isScheduleNode(d) ? iconSvg("warning-message-filled-20", 20) : ""));
+  merged.select(".node-more-graphic").html((d) => iconSvg(isPlaceholderNode(d) ? "delete" : isFullscreenActionNode(d) ? "fullscreen-20" : "more", 20));
+  merged.select(".node-status-badge").html((d) => (isFullscreenActionNode(d) ? iconSvg("warning-message-filled-20", 20) : ""));
   merged.select(".node-more-icon").attr("transform", (d) => (isPlaceholderNode(d) ? `translate(${NODE_W - 36},20)` : `translate(${NODE_W - 48},8)`));
   merged.select(".node-more-hitarea").attr("width", (d) => (isPlaceholderNode(d) ? 20 : 44)).attr("height", (d) => (isPlaceholderNode(d) ? 20 : 44)).attr("rx", (d) => (isPlaceholderNode(d) ? 10 : 22));
   merged.select(".node-more-graphic").attr("transform", (d) => (isPlaceholderNode(d) ? "translate(0,0)" : "translate(12,12)"));
@@ -628,7 +653,7 @@ function renderNodes() {
       removeNodeById(d.id);
       return;
     }
-    if (isScheduleNode(d)) {
+    if (isFullscreenActionNode(d)) {
       selectedId = d.id;
       openNodeSettings(d.id);
       return;
@@ -788,6 +813,7 @@ function defaultTitleForNode(nodeItem) {
   if (nodeItem.operationType === CONTACT_FORM_OPERATION) return "Форма сбора контактов";
   if (nodeItem.operationType === MENU_OPERATION) return "Меню";
   if (nodeItem.operationType === SCHEDULE_OPERATION) return "Распределение по графику";
+  if (nodeItem.operationType === SEGMENT_OPERATION) return "Распределение по сегментам";
   return catalog[nodeItem.kind]?.title || "Операция";
 }
 
@@ -1165,6 +1191,14 @@ function configureNodeForOperation(nodeItem, operationType) {
     nodeItem.settings = { schedule: settings };
     applyScheduleTitle(nodeItem, settings);
   }
+  if (operationType === SEGMENT_OPERATION) {
+    const settings = createSegmentSettings();
+    nodeItem.title = "Распределение по сегментам";
+    nodeItem.color = "var(--cmgui-color-special-13)";
+    nodeItem.icon = "distribution";
+    nodeItem.settings = { segment: settings };
+    applySegmentTitle(nodeItem, settings);
+  }
 }
 
 function createOutputPlaceholdersFor(sourceNode) {
@@ -1256,6 +1290,7 @@ function nodeOutputs(nodeItem) {
   }
   if (isMenuNode(nodeItem)) return menuOutputs(nodeItem);
   if (isScheduleNode(nodeItem)) return scheduleOutputs(nodeItem);
+  if (isSegmentNode(nodeItem)) return segmentOutputs(nodeItem);
   if (isTransferWithFallbackNode(nodeItem)) return [{ key: "failed", label: "Никто не ответил", tone: "plain", placeholder: true }];
   return [{ key: "main", label: "" }];
 }
@@ -1280,6 +1315,19 @@ function scheduleOutputs(nodeItem) {
   return settings.schedules.map((schedule, index) => ({
     key: schedule.id,
     label: schedule.name || `График ${index + 1}`,
+    tone: "plain",
+    placeholder: true,
+    offsetY: Math.round((index - center) * 92),
+  }));
+}
+
+function segmentOutputs(nodeItem) {
+  const settings = getSegmentSettings(nodeItem);
+  const count = Math.max(1, settings.groups.length);
+  const center = (count - 1) / 2;
+  return settings.groups.map((group, index) => ({
+    key: group.id,
+    label: group.name || `Группа сегментов ${index + 1}`,
     tone: "plain",
     placeholder: true,
     offsetY: Math.round((index - center) * 92),
@@ -1459,6 +1507,7 @@ function stableStringifySettings(nodeItem, settings) {
   if (isContactFormNode(nodeItem)) return JSON.stringify(normalizeComparableContactFormSettings(settings));
   if (isMenuNode(nodeItem)) return JSON.stringify(normalizeComparableMenuSettings(settings));
   if (isScheduleNode(nodeItem)) return JSON.stringify(normalizeComparableScheduleSettings(settings));
+  if (isSegmentNode(nodeItem)) return JSON.stringify(normalizeComparableSegmentSettings(settings));
   return JSON.stringify(normalizeComparableSimpleTransferSettings(nodeItem.operationType, settings));
 }
 
@@ -1550,6 +1599,7 @@ function renderPrimarySettingsCard(nodeItem, settings, errors) {
   if (isContactFormNode(nodeItem)) return renderContactFormCard(settings);
   if (isMenuNode(nodeItem)) return renderMenuCard(settings, errors);
   if (isScheduleNode(nodeItem)) return renderScheduleCard(settings, errors);
+  if (isSegmentNode(nodeItem)) return renderSegmentCard(settings, errors);
   return renderSimpleTransferCard(nodeItem, settings, errors);
 }
 
@@ -1725,6 +1775,37 @@ function renderScheduleRow(schedule, index, total, errors = {}) {
       ${renderSimpleSelect(selectId, "График*", schedule.name || "", AVAILABLE_SCHEDULES.map((name) => [name, name]), schedule.dropdownOpen)}
     </div>
     <button class="menu-button-remove" type="button" data-schedule-remove="${escapeAttr(schedule.id)}" title="Удалить" aria-label="Удалить" ${total <= 1 ? "disabled" : ""}>${iconSvg("cancel", 20)}</button>
+  </div>`;
+}
+
+function renderSegmentCard(settings, errors = {}) {
+  return `<section class="node-settings-card segment-settings-card">
+    <div class="node-settings-card-head is-static">
+      <span>Группы сегментов</span>
+    </div>
+    ${renderSettingsAlert("Чат будет обработан в зависимости от сегмента посетителя, написавшего сообщение. Если посетитель попадет в несколько групп сегментов одновременно, то приоритетным будет тот, который находится выше")}
+    <div class="menu-buttons-list segment-list">
+      ${settings.groups.map((group, index) => renderSegmentRow(group, index, settings.groups.length, errors)).join("")}
+    </div>
+    <button class="cmgui-button cmgui-button-size-medium cmgui-button-secondary cmgui-button-outline menu-add-button" type="button" id="addSegmentButton" ${settings.groups.length >= SEGMENT_MAX_COUNT ? "disabled" : ""}>
+      <span class="cmgui-icon">${iconSvg("add-20", 20)}</span>
+      <span>Добавить группу сегментов</span>
+    </button>
+  </section>`;
+}
+
+function renderSegmentRow(group, index, total, errors = {}) {
+  const selectId = `segmentSelect-${group.id}`;
+  const hasError = errors.groups?.[group.id];
+  return `<div class="menu-button-row segment-row" data-segment-row="${escapeAttr(group.id)}" draggable="true">
+    <div class="menu-button-order">
+      <button class="drag-icon" type="button" data-segment-drag-handle="${escapeAttr(group.id)}" title="Перетащить" aria-label="Перетащить">${iconSvg("drag-and-drop", 20)}</button>
+      <span class="order-badge">${index + 1}</span>
+    </div>
+    <div class="segment-select ${hasError ? "is-error" : ""}">
+      ${renderSimpleSelect(selectId, "Группа сегментов*", group.name || "", AVAILABLE_SEGMENT_GROUPS.map((name) => [name, name]), group.dropdownOpen)}
+    </div>
+    <button class="menu-button-remove" type="button" data-segment-remove="${escapeAttr(group.id)}" title="Удалить" aria-label="Удалить" ${total <= 1 ? "disabled" : ""}>${iconSvg("cancel", 20)}</button>
   </div>`;
 }
 
@@ -2140,6 +2221,74 @@ function wireNodeSettingsSidebar(sidebar, nodeItem, settings) {
       renderNodeSettingsSidebar();
     });
   });
+  sidebar.querySelectorAll("[id^='segmentSelect-']").forEach((button) => {
+    button.addEventListener("click", () => {
+      const groupId = button.id.replace("segmentSelect-", "");
+      const draft = getNodeSettingsDraft(nodeItem);
+      updateNodeSettingsDraft(nodeItem, {
+        groups: draft.groups.map((group) => (group.id === groupId ? { ...group, dropdownOpen: !group.dropdownOpen } : { ...group, dropdownOpen: false })),
+      });
+      renderNodeSettingsSidebar();
+    });
+  });
+  sidebar.querySelectorAll("[data-dropdown-id^='segmentSelect-']").forEach((button) => {
+    button.addEventListener("click", () => {
+      const groupId = button.dataset.dropdownId.replace("segmentSelect-", "");
+      const value = button.dataset.dropdownValue;
+      const errors = { ...(settingsErrors[nodeItem.id] || {}) };
+      if (errors.groups) {
+        delete errors.groups[groupId];
+        settingsErrors[nodeItem.id] = errors;
+      }
+      const draft = getNodeSettingsDraft(nodeItem);
+      updateNodeSettingsDraft(nodeItem, {
+        groups: draft.groups.map((group) => (group.id === groupId ? { ...group, name: value, dropdownOpen: false } : { ...group, dropdownOpen: false })),
+      });
+      renderNodeSettingsSidebar();
+    });
+  });
+  sidebar.querySelector("#addSegmentButton")?.addEventListener("click", () => {
+    const draft = getNodeSettingsDraft(nodeItem);
+    if (draft.groups.length >= SEGMENT_MAX_COUNT) return;
+    const nextGroupName = AVAILABLE_SEGMENT_GROUPS.find((name) => !draft.groups.some((group) => group.name === name)) || AVAILABLE_SEGMENT_GROUPS[0];
+    updateNodeSettingsDraft(nodeItem, { groups: [...draft.groups, createSegmentGroup(nextGroupName)] });
+    renderNodeSettingsSidebar();
+  });
+  sidebar.querySelectorAll("[data-segment-remove]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const draft = getNodeSettingsDraft(nodeItem);
+      if (draft.groups.length <= 1) return;
+      updateNodeSettingsDraft(nodeItem, { groups: draft.groups.filter((item) => item.id !== button.dataset.segmentRemove) });
+      renderNodeSettingsSidebar();
+    });
+  });
+  sidebar.querySelectorAll("[data-segment-row]").forEach((row) => {
+    row.addEventListener("dragstart", (event) => {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", row.dataset.segmentRow);
+      row.classList.add("is-dragging");
+    });
+    row.addEventListener("dragend", () => row.classList.remove("is-dragging"));
+    row.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      row.classList.add("is-drop-target");
+    });
+    row.addEventListener("dragleave", () => row.classList.remove("is-drop-target"));
+    row.addEventListener("drop", (event) => {
+      event.preventDefault();
+      row.classList.remove("is-drop-target");
+      const fromId = event.dataTransfer.getData("text/plain");
+      const toId = row.dataset.segmentRow;
+      if (!fromId || !toId || fromId === toId) return;
+      const draft = getNodeSettingsDraft(nodeItem);
+      const fromIndex = draft.groups.findIndex((group) => group.id === fromId);
+      const toIndex = draft.groups.findIndex((group) => group.id === toId);
+      if (fromIndex < 0 || toIndex < 0) return;
+      updateNodeSettingsDraft(nodeItem, { groups: moveArrayItem(draft.groups, fromIndex, toIndex) });
+      renderNodeSettingsSidebar();
+    });
+  });
   sidebar.querySelector("#messageTextInput")?.addEventListener("input", (event) => {
     const errors = { ...(settingsErrors[nodeItem.id] || {}) };
     if (event.target.value.trim()) {
@@ -2256,6 +2405,7 @@ function collectNodeSettings(sidebar, nodeItem, settings) {
   if (isContactFormNode(nodeItem)) return collectContactFormSettings(sidebar, settings);
   if (isMenuNode(nodeItem)) return collectMenuSettings(sidebar, settings);
   if (isScheduleNode(nodeItem)) return collectScheduleSettings(settings);
+  if (isSegmentNode(nodeItem)) return collectSegmentSettings(settings);
   return collectSimpleTransferSettings(sidebar, nodeItem, settings);
 }
 
@@ -2301,12 +2451,17 @@ function collectScheduleSettings(settings) {
   return createScheduleSettings(settings);
 }
 
+function collectSegmentSettings(settings) {
+  return createSegmentSettings(settings);
+}
+
 function validateNodeSettings(nodeItem, settings) {
   if (isGroupTransferNode(nodeItem)) return settings.groupName ? {} : { groupName: "Выберите отдел" };
   if (isInfoMessageNode(nodeItem)) return settings.messageText.trim() ? {} : { messageText: true };
   if (isContactFormNode(nodeItem)) return {};
   if (isMenuNode(nodeItem)) return validateMenuSettings(settings);
   if (isScheduleNode(nodeItem)) return validateScheduleSettings(settings);
+  if (isSegmentNode(nodeItem)) return validateSegmentSettings(settings);
   const config = SIMPLE_TRANSFER_CONFIG[nodeItem.operationType];
   if (config?.requiredField === "employeeName" && !settings.employeeName) return { employeeName: config.requiredError };
   return {};
@@ -2318,6 +2473,7 @@ function closeDropdownPatchForNode(nodeItem) {
   if (isContactFormNode(nodeItem)) return {};
   if (isMenuNode(nodeItem)) return {};
   if (isScheduleNode(nodeItem)) return {};
+  if (isSegmentNode(nodeItem)) return {};
   return { employeeDropdownOpen: false };
 }
 
@@ -2338,6 +2494,14 @@ function validateScheduleSettings(settings) {
     if (!schedule.name) scheduleErrors[schedule.id] = true;
   });
   return Object.keys(scheduleErrors).length ? { schedules: scheduleErrors } : {};
+}
+
+function validateSegmentSettings(settings) {
+  const groupErrors = {};
+  settings.groups.forEach((group) => {
+    if (!group.name) groupErrors[group.id] = true;
+  });
+  return Object.keys(groupErrors).length ? { groups: groupErrors } : {};
 }
 
 function createGroupTransferSettings(overrides = {}) {
@@ -2453,6 +2617,33 @@ function createScheduleItem(name = "") {
   };
 }
 
+function createSegmentSettings(overrides = {}) {
+  const defaultGroups = [createSegmentGroup(AVAILABLE_SEGMENT_GROUPS[0])];
+  const settings = {
+    cycleLimit: 1,
+    technicalOpen: false,
+    groups: defaultGroups,
+    ...overrides,
+  };
+  const groups = Array.isArray(settings.groups) && settings.groups.length ? settings.groups : defaultGroups;
+  return {
+    ...settings,
+    groups: groups.slice(0, SEGMENT_MAX_COUNT).map((group, index) => ({
+      id: group.id || `segment-group-${Date.now().toString(36)}-${index}`,
+      name: AVAILABLE_SEGMENT_GROUPS.includes(group.name) ? group.name : group.name || (index === 0 ? AVAILABLE_SEGMENT_GROUPS[0] : ""),
+      dropdownOpen: Boolean(group.dropdownOpen),
+    })),
+  };
+}
+
+function createSegmentGroup(name = "") {
+  return {
+    id: `segment-group-${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 6)}`,
+    name,
+    dropdownOpen: false,
+  };
+}
+
 function createEmployeesForGroup(groupName) {
   const names = GROUP_TRANSFER_EMPLOYEES_BY_GROUP[groupName] || GROUP_TRANSFER_EMPLOYEES_BY_GROUP["Отдел продаж"];
   return names.map((name, index) => ({ name, enabled: true, timeout: index === names.length - 1 && names.length > 2 ? 1500 : 15 }));
@@ -2519,12 +2710,21 @@ function getScheduleSettings(nodeItem) {
   });
 }
 
+function getSegmentSettings(nodeItem) {
+  const existing = nodeItem.settings?.segment || {};
+  return createSegmentSettings({
+    ...existing,
+    technicalOpen: existing.technicalOpen ?? false,
+  });
+}
+
 function getNodeSettings(nodeItem) {
   if (isGroupTransferNode(nodeItem)) return getGroupTransferSettings(nodeItem);
   if (isInfoMessageNode(nodeItem)) return getInfoMessageSettings(nodeItem);
   if (isContactFormNode(nodeItem)) return getContactFormSettings(nodeItem);
   if (isMenuNode(nodeItem)) return getMenuSettings(nodeItem);
   if (isScheduleNode(nodeItem)) return getScheduleSettings(nodeItem);
+  if (isSegmentNode(nodeItem)) return getSegmentSettings(nodeItem);
   return getSimpleTransferSettings(nodeItem);
 }
 
@@ -2555,10 +2755,18 @@ function updateNodeSettingsDraft(nodeItem, patch) {
     settingsDrafts[nodeItem.id] = createScheduleSettings(next);
     return;
   }
+  if (isSegmentNode(nodeItem)) {
+    settingsDrafts[nodeItem.id] = createSegmentSettings(next);
+    return;
+  }
   settingsDrafts[nodeItem.id] = createSimpleTransferSettings(nodeItem.operationType, next);
 }
 
 function saveNodeSettings(nodeItem, settings) {
+  if (isSegmentNode(nodeItem)) {
+    saveSegmentSettings(nodeItem, settings);
+    return;
+  }
   if (isScheduleNode(nodeItem)) {
     saveScheduleSettings(nodeItem, settings);
     return;
@@ -2610,6 +2818,12 @@ function saveScheduleSettings(nodeItem, settings) {
   syncDynamicOutputEdges(nodeItem);
 }
 
+function saveSegmentSettings(nodeItem, settings) {
+  nodeItem.settings = { ...(nodeItem.settings || {}), segment: createSegmentSettings(settings) };
+  applySegmentTitle(nodeItem, nodeItem.settings.segment);
+  syncDynamicOutputEdges(nodeItem);
+}
+
 function applyGroupTransferTitle(nodeItem, settings) {
   nodeItem.title = settings.groupName ? `На группу: ${settings.groupName}` : "На группу";
   nodeItem.subtitle = settings.groupName ? `Ожидание ответа: ${formatTimeout(settings.responseTimeout, settings.timeoutUnit)}` : "Группа не выбрана";
@@ -2639,12 +2853,20 @@ function isScheduleNode(nodeItem) {
   return nodeItem?.kind === "schedule" && nodeItem.operationType === SCHEDULE_OPERATION;
 }
 
+function isSegmentNode(nodeItem) {
+  return nodeItem?.kind === "segment" && nodeItem.operationType === SEGMENT_OPERATION;
+}
+
+function isFullscreenActionNode(nodeItem) {
+  return isScheduleNode(nodeItem) || isSegmentNode(nodeItem);
+}
+
 function isConfigurableTransferNode(nodeItem) {
   return isGroupTransferNode(nodeItem) || isSimpleTransferNode(nodeItem);
 }
 
 function isConfigurableNode(nodeItem) {
-  return isConfigurableTransferNode(nodeItem) || isInfoMessageNode(nodeItem) || isContactFormNode(nodeItem) || isMenuNode(nodeItem) || isScheduleNode(nodeItem);
+  return isConfigurableTransferNode(nodeItem) || isInfoMessageNode(nodeItem) || isContactFormNode(nodeItem) || isMenuNode(nodeItem) || isScheduleNode(nodeItem) || isSegmentNode(nodeItem);
 }
 
 function isTransferWithFallbackNode(nodeItem) {
@@ -2655,6 +2877,7 @@ function settingsTitleForNode(nodeItem) {
   if (isContactFormNode(nodeItem)) return "Форма сбора контактов";
   if (isMenuNode(nodeItem)) return "Меню";
   if (isScheduleNode(nodeItem)) return "Распределение по графику";
+  if (isSegmentNode(nodeItem)) return "Распределение по сегментам";
   if (isInfoMessageNode(nodeItem)) return "Информационное сообщение";
   if (isGroupTransferNode(nodeItem)) return "На группу";
   return SIMPLE_TRANSFER_CONFIG[nodeItem.operationType]?.title || nodeItem.title;
@@ -2690,6 +2913,12 @@ function applyScheduleTitle(nodeItem, settings) {
   const names = settings.schedules.map((schedule) => schedule.name).filter(Boolean);
   nodeItem.title = "Распределение по графику";
   nodeItem.subtitle = names.length ? `График: ${names.join(", ")}` : "График не выбран";
+}
+
+function applySegmentTitle(nodeItem, settings) {
+  const names = settings.groups.map((group) => group.name).filter(Boolean);
+  nodeItem.title = "Распределение по сегментам";
+  nodeItem.subtitle = names.length ? `Группа сегментов: ${names.join(", ")}` : "Группа сегментов не выбрана";
 }
 
 function normalizeComparableSimpleTransferSettings(operationType, settings) {
@@ -2742,6 +2971,14 @@ function normalizeComparableScheduleSettings(settings) {
   return {
     cycleLimit: sanitizePositiveInteger(normalized.cycleLimit, 1),
     schedules: normalized.schedules.map((schedule) => ({ id: schedule.id, name: schedule.name || "" })),
+  };
+}
+
+function normalizeComparableSegmentSettings(settings) {
+  const normalized = createSegmentSettings(settings);
+  return {
+    cycleLimit: sanitizePositiveInteger(normalized.cycleLimit, 1),
+    groups: normalized.groups.map((group) => ({ id: group.id, name: group.name || "" })),
   };
 }
 
@@ -3047,6 +3284,10 @@ function normalizeLoadedState(loadedState) {
     if (isScheduleNode(normalizedNode)) {
       normalizedNode.settings = { ...(normalizedNode.settings || {}), schedule: createScheduleSettings(normalizedNode.settings?.schedule) };
       applyScheduleTitle(normalizedNode, normalizedNode.settings.schedule);
+    }
+    if (isSegmentNode(normalizedNode)) {
+      normalizedNode.settings = { ...(normalizedNode.settings || {}), segment: createSegmentSettings(normalizedNode.settings?.segment) };
+      applySegmentTitle(normalizedNode, normalizedNode.settings.segment);
     }
     if (isMenuNode(normalizedNode)) {
       normalizedNode.settings = { ...(normalizedNode.settings || {}), menu: createMenuSettings(normalizedNode.settings?.menu) };

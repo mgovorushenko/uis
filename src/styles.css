@@ -1553,7 +1553,8 @@ body.is-node-settings-open .node-settings-sidebar {
   border-color: var(--cmgui-color-border-hover);
 }
 
-.schedule-select.is-error .cmgui-select-field {
+.schedule-select.is-error .cmgui-select-field,
+.segment-select.is-error .cmgui-select-field {
   border-color: var(--cmgui-color-border-error);
 }
 
@@ -1567,7 +1568,8 @@ body.is-node-settings-open .node-settings-sidebar {
   min-width: 0;
 }
 
-.schedule-select {
+.schedule-select,
+.segment-select {
   min-width: 0;
 }
 
