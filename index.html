@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Сценарии обработки чатов</title>
+    <link rel="stylesheet" href="./src/styles.css?v=2026-05-12-20" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="side-menu" aria-label="Навигация">
+        <div class="menu-top">
+          <div class="logo-mark">∿</div>
+          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button is-compact is-subtle" title="Поиск" aria-label="Поиск" data-icon="search"></button>
+          <div class="menu-stack" id="menuTop"></div>
+        </div>
+        <div class="menu-stack" id="menuBottom"></div>
+      </aside>
+
+      <section class="board-shell" id="boardShell">
+        <svg id="scenarioSvg" role="application" aria-label="Доска сценария обработки чатов">
+          <defs>
+            <marker id="arrowPlain" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z"></path>
+            </marker>
+            <marker id="arrowSuccess" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z"></path>
+            </marker>
+            <marker id="arrowDanger" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z"></path>
+            </marker>
+          </defs>
+          <g id="viewport">
+            <g id="gridLayer"></g>
+            <g id="edgeLayer"></g>
+            <g id="labelLayer"></g>
+            <g id="nodeLayer"></g>
+          </g>
+        </svg>
+      </section>
+
+      <section class="scenario-list-view" id="scenarioListView" aria-label="Список сценариев">
+        <div class="scenario-list-inner">
+          <header class="scenario-list-header">
+            <div>
+              <h1>Сценарии обработки чатов</h1>
+              <p>Создавайте сценарии и настраивайте операции обработки обращений.</p>
+            </div>
+            <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-primary cmgui-button-fill" id="createScenarioButton">Создать сценарий</button>
+          </header>
+          <div class="scenario-empty-state" id="scenarioEmptyState">
+            <h2>Пока нет сценариев</h2>
+            <p>Создайте первый сценарий, выберите каналы и перейдите к настройке операций.</p>
+            <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-primary cmgui-button-fill" id="createScenarioEmptyButton">Создать сценарий</button>
+          </div>
+          <div class="scenario-list-grid" id="scenarioListGrid"></div>
+        </div>
+      </section>
+
+      <div class="top-bar">
+        <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button top-back-button" title="Назад" aria-label="Назад" data-icon="arrow-left"></button>
+        <div class="top-title-row">
+          <div class="top-title-wrap">
+            <strong>Сценарий обработки чатов №1</strong>
+            <span class="top-title-edit" data-icon="edit"></span>
+          </div>
+          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-fill save-button" id="saveButton">Сохранить</button>
+        </div>
+      </div>
+
+      <div class="top-actions">
+        <div class="top-action-shell">
+          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost top-action-button top-action-timer" title="Время ожидания">
+            <span data-icon="clock"></span>
+            <span>2</span>
+          </button>
+        </div>
+        <div class="top-action-shell">
+          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button top-action-button" title="Помощь" aria-label="Помощь" data-icon="help"></button>
+        </div>
+      </div>
+
+      <div class="bottom-bar">
+        <div class="floating-group">
+          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button" id="undoButton" title="Отменить" aria-label="Отменить" data-icon="undo"></button>
+          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button" id="redoButton" title="Повторить" aria-label="Повторить" data-icon="redo"></button>
+        </div>
+        <div class="floating-group">
+          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button" id="fitButton" title="Показать целиком" aria-label="Показать целиком" data-icon="fullscreen"></button>
+        </div>
+        <div class="floating-group zoom-group">
+          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button" id="zoomOutButton" title="Уменьшить" aria-label="Уменьшить" data-icon="minus"></button>
+          <span id="zoomLabel">100%</span>
+          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button" id="zoomInButton" title="Увеличить" aria-label="Увеличить" data-icon="plus"></button>
+        </div>
+      </div>
+
+      <div class="operation-modal-overlay" id="operationModal" aria-hidden="true">
+        <section class="operation-modal" role="dialog" aria-modal="true" aria-labelledby="operationModalTitle">
+          <header class="operation-modal-header">
+            <h2 id="operationModalTitle">Выберите операцию</h2>
+            <button class="operation-modal-close" id="operationModalClose" type="button" title="Закрыть" aria-label="Закрыть">
+              <span data-icon="cancel"></span>
+            </button>
+          </header>
+          <div class="operation-modal-body">
+            <section class="operation-section">
+              <h3>Переадресация</h3>
+              <div class="operation-card-grid">
+                <button class="operation-card" type="button" data-kind="transfer" data-operation="group-transfer">
+                  <span class="operation-card-icon is-purple"><span data-icon="employees"></span></span>
+                  <span class="operation-card-content"><span class="operation-card-title">Переадресация на группу</span><span class="operation-card-description">Чат будет направлен на заданную группу сотрудников</span></span>
+                </button>
+                <button class="operation-card" type="button" data-kind="transfer" data-operation="employee-transfer">
+                  <span class="operation-card-icon is-purple"><span data-icon="user-20"></span></span>
+                  <span class="operation-card-content"><span class="operation-card-title">Переадресация на сотрудника</span><span class="operation-card-description">Чат будет направлен сразу на выбранного сотрудника</span></span>
+                </button>
+                <button class="operation-card" type="button" data-kind="transfer" data-operation="last-manager-transfer">
+                  <span class="operation-card-icon is-purple"><span data-icon="last-manager"></span></span>
+                  <span class="operation-card-content"><span class="operation-card-title">Переадресация на последнего менеджера</span><span class="operation-card-description">Чат будет направлен на&nbsp;менеджера, с&nbsp;которым клиент общался последним</span></span>
+                </button>
+                <button class="operation-card" type="button" data-kind="transfer" data-operation="personal-manager-transfer">
+                  <span class="operation-card-icon is-purple"><span data-icon="last-manager"></span></span>
+                  <span class="operation-card-content"><span class="operation-card-title">Переадресация на персонального менеджера</span><span class="operation-card-description">Чат будет направлен на менеджера, закреплённого за этим клиентом</span></span>
+                </button>
+              </div>
+            </section>
+
+            <section class="operation-section">
+              <h3>Инструменты</h3>
+              <div class="operation-card-grid">
+                <button class="operation-card" type="button" data-kind="form">
+                  <span class="operation-card-icon is-pink"><span data-icon="form-modal"></span></span>
+                  <span class="operation-card-content"><span class="operation-card-title">Форма сбора контактов</span><span class="operation-card-description">Контакты сохраняться в информации о клиенте (только для онлайн-чата UIS)</span></span>
+                </button>
+                <button class="operation-card" type="button" data-kind="empty">
+                  <span class="operation-card-icon is-pink"><span data-icon="info-message"></span></span>
+                  <span class="operation-card-content"><span class="operation-card-title">Информационное сообщение</span><span class="operation-card-description">Текстовое сообщение с информацией для клиента</span></span>
+                </button>
+                <button class="operation-card" type="button" data-kind="empty">
+                  <span class="operation-card-icon is-pink"><span data-icon="interactions-paths"></span></span>
+                  <span class="operation-card-content"><span class="operation-card-title">Связать с операцией</span><span class="operation-card-description">Перевод чата в определенную точку сценария</span></span>
+                </button>
+                <button class="operation-card" type="button" data-kind="finish">
+                  <span class="operation-card-icon is-pink"><span data-icon="fail"></span></span>
+                  <span class="operation-card-content"><span class="operation-card-title">Закрытие обращения</span><span class="operation-card-description">Завершение чата. Чат будет закрыт и отобразится только в отчетах.</span></span>
+                </button>
+              </div>
+            </section>
+
+            <section class="operation-section">
+              <h3>Распределение</h3>
+              <div class="operation-card-grid">
+                <button class="operation-card" type="button" data-kind="empty">
+                  <span class="operation-card-icon is-blue"><span data-icon="menu"></span></span>
+                  <span class="operation-card-content"><span class="operation-card-title">Меню</span><span class="operation-card-description">Чат обрабатывается в зависимости от того, какую опцию выберет клиент</span></span>
+                </button>
+                <button class="operation-card" type="button" data-kind="empty">
+                  <span class="operation-card-icon is-blue"><span data-icon="time-20"></span></span>
+                  <span class="operation-card-content"><span class="operation-card-title">Распределение по графику</span><span class="operation-card-description">Чат обрабатывается в зависимости от текущего графика работы</span></span>
+                </button>
+                <button class="operation-card" type="button" data-kind="empty">
+                  <span class="operation-card-icon is-blue"><span data-icon="distribution"></span></span>
+                  <span class="operation-card-content"><span class="operation-card-title">Распределение по сегментам</span><span class="operation-card-description">Чат обрабатывается в зависимости от сегмента пользователя</span></span>
+                </button>
+                <button class="operation-card" type="button" data-kind="empty">
+                  <span class="operation-card-icon is-blue"><span data-icon="robot"></span></span>
+                  <span class="operation-card-content"><span class="operation-card-title">AI-распределение</span><span class="operation-card-description">Чат обрабатывается с помощью искусственного интеллекта</span></span>
+                </button>
+                <button class="operation-card" type="button" data-kind="empty">
+                  <span class="operation-card-icon is-blue"><span data-icon="row-data"></span></span>
+                  <span class="operation-card-content"><span class="operation-card-title">Распределение по данным клиента</span><span class="operation-card-description">Чат обрабатывается по набору параметров клиента</span></span>
+                </button>
+                <button class="operation-card" type="button" data-kind="empty">
+                  <span class="operation-card-icon is-blue"><span data-icon="row-data"></span></span>
+                  <span class="operation-card-content"><span class="operation-card-title">Распределение по данным клиента из CRM</span><span class="operation-card-description">Чат обрабатывается по набору параметров клиента из CRM</span></span>
+                </button>
+              </div>
+            </section>
+          </div>
+        </section>
+      </div>
+
+      <aside class="node-settings-sidebar" id="nodeSettingsSidebar" aria-hidden="true"></aside>
+
+      <div class="scenario-create-overlay" id="scenarioCreateModal" aria-hidden="true">
+        <form class="scenario-create-modal" id="scenarioCreateForm" role="dialog" aria-modal="true" aria-labelledby="scenarioCreateTitle">
+          <header class="operation-modal-header">
+            <h2 id="scenarioCreateTitle">Создать сценарий</h2>
+            <button class="operation-modal-close" id="scenarioCreateClose" type="button" title="Закрыть" aria-label="Закрыть">
+              <span data-icon="cancel"></span>
+            </button>
+          </header>
+          <div class="scenario-create-body">
+            <label class="cmgui-text-field">
+              <span class="cmgui-text-field-label">Название</span>
+              <span class="cmgui-text-field-wrapper"><input class="cmgui-text-field-input" id="scenarioNameInput" value="Сценарий обработки чатов №1" required /></span>
+            </label>
+            <fieldset class="scenario-channel-fieldset">
+              <legend>Каналы</legend>
+              <label><input type="checkbox" name="channels" value="Telegram" checked /> Telegram</label>
+              <label><input type="checkbox" name="channels" value="Email" checked /> Email</label>
+              <label><input type="checkbox" name="channels" value="Онлайн-чат" /> Онлайн-чат</label>
+            </fieldset>
+          </div>
+          <footer class="scenario-create-footer">
+            <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-fill" type="button" id="scenarioCreateCancel">Отмена</button>
+            <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-primary cmgui-button-fill" type="submit">Создать</button>
+          </footer>
+        </form>
+      </div>
+
+    </main>
+
+    <script src="./vendor/d3.min.js"></script>
+    <script src="./src/board.js?v=2026-05-12-45"></script>
+  </body>
+</html>
