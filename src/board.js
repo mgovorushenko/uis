@@ -216,6 +216,7 @@ const designSystemIconFiles = {
   "menu-notification-20": "./assets/icons/notification_20.svg",
   "menu-info-20": "./assets/icons/menu-info_20.svg",
   "menu-user-20": "./assets/icons/menu-user_20.svg",
+  "message-16": "./assets/icons/message_20.svg",
   "source-email-20": "./assets/icons/source-email_20.svg",
   "source-max-20": "./assets/icons/source-max_20.svg",
   "source-telegram-20": "./assets/icons/source-telegram_20.svg",
@@ -224,7 +225,7 @@ const designSystemIconFiles = {
 const designSystemIcons = {};
 
 const catalog = {
-  start: { title: "Начало сценария", subtitle: "Каналы: Email, Telegram", color: "var(--cmgui-color-special-1)", icon: "start" },
+  start: { title: "Входящее сообщение", subtitle: "Каналы: Email, Telegram", color: "var(--cmgui-color-special-1)", icon: "start" },
   form: { title: "Форма сбора контактов", subtitle: "Ожидание контактов: 1 мин.", color: "var(--cmgui-color-special-15)", icon: "form" },
   transfer: { title: "На группу: Отдел продаж", subtitle: "Ожидание ответа: 1 мин.", color: "var(--cmgui-color-special-2)", icon: "last-manager" },
   success: { title: "Чат взят в работу", subtitle: "", color: "var(--cmgui-color-special-1)", icon: "success" },
@@ -285,6 +286,10 @@ let isSettingsCloseConfirmOpen = false;
 let isScenarioTitleEditing = false;
 let scenarioTitleBeforeEdit = "";
 let scenarioSearchQuery = "";
+let scenarioCreateSettings = createStartSettings({ channels: [] });
+let holdingSettingsDraft = null;
+let holdingSettingsErrors = {};
+let holdingMessageDragId = null;
 let history = [];
 let future = [];
 let persistTimer = null;
@@ -303,13 +308,13 @@ const zoom = d3
   .scaleExtent([0.25, 1])
   .filter((event) => {
     if (event.type === "wheel") return false;
-    if (event.type === "mousedown") return event.button === 2;
+    if (event.type === "mousedown") return event.button === 1 || event.button === 2;
     if (event.type === "touchstart" || event.type === "touchmove") return event.touches?.length === 2;
     return false;
   })
   .on("start", (event) => {
     closeOutcomeMenu();
-    if (event.sourceEvent?.button === 2 || event.sourceEvent?.touches?.length === 2) {
+    if (event.sourceEvent?.button === 1 || event.sourceEvent?.button === 2 || event.sourceEvent?.touches?.length === 2) {
       document.body.classList.add("is-board-panning");
     }
   })
@@ -318,6 +323,7 @@ const zoom = d3
     document.querySelector("#zoomLabel").textContent = `${Math.round(event.transform.k * 100)}%`;
     state.viewport = { x: event.transform.x, y: event.transform.y, k: event.transform.k };
     updateNodeTitleEditorPosition(event.transform);
+    updateZoomControls(event.transform.k);
     schedulePersistState({ markDirty: false });
   })
   .on("end", () => {
@@ -399,7 +405,12 @@ function wireControls() {
       if (outcomeMenuSourceId && !event.target.closest("#outcomeMenu") && !event.target.closest(".node-add-button")) closeOutcomeMenu();
       if (contextMenuNodeId && !event.target.closest("#nodeContextMenu") && !event.target.closest(".node-more-icon")) closeNodeContextMenu();
       if (isScenarioTitleEditing && !event.target.closest(".top-title-wrap")) commitScenarioTitleEdit();
-      if (document.body.classList.contains("is-scenario-create-open") && !event.target.closest(".scenario-create-channel-select")) closeScenarioCreateChannelsDropdown();
+      if (
+        document.body.classList.contains("is-scenario-create-open") &&
+        !event.target.closest(".scenario-create-channel-select, #scenarioCreateFinishToggle, .scenario-create-finish-settings")
+      ) {
+        closeScenarioCreateDropdowns();
+      }
       if (titleEditingNodeId && !event.target.closest("#nodeTitleEditor")) commitNodeTitleEdit();
       if (!document.body.classList.contains("is-node-settings-open") || isSettingsCloseConfirmOpen) return;
       if (event.target.closest("#nodeSettingsSidebar") || event.target.closest("#nodeSettingsCloseConfirm")) return;
@@ -428,7 +439,16 @@ function wireControls() {
   document.querySelector("#createScenarioEmptyButton").addEventListener("click", openScenarioCreateModal);
   document.querySelector("#scenarioSearchInput").addEventListener("input", (event) => {
     scenarioSearchQuery = event.target.value;
+    updateScenarioSearchClear();
     renderScenarioList();
+  });
+  document.querySelector("#scenarioSearchClear").addEventListener("click", () => {
+    const input = document.querySelector("#scenarioSearchInput");
+    scenarioSearchQuery = "";
+    input.value = "";
+    updateScenarioSearchClear();
+    renderScenarioList();
+    input.focus();
   });
   document.querySelector("#scenarioCreateModal").addEventListener("click", (event) => {
     if (event.target.id === "scenarioCreateModal") closeScenarioCreateModal();
@@ -439,10 +459,24 @@ function wireControls() {
   document.querySelector("#scenarioNameInput").addEventListener("input", updateScenarioCreateNameState);
   document.querySelector("#scenarioNameInput").addEventListener("blur", () => updateScenarioCreateNameState({ showError: true }));
   document.querySelector("#scenarioCreateChannelsSelect").addEventListener("click", toggleScenarioCreateChannelsDropdown);
+  document.querySelector("#scenarioCreateFinishToggle").addEventListener("click", () => {
+    closeScenarioCreateChannelsDropdown();
+    scenarioCreateSettings = createStartSettings({
+      ...collectScenarioCreateFinishSettings(),
+      finishOpen: !scenarioCreateSettings.finishOpen,
+    });
+    renderScenarioCreateFinishSettings();
+  });
   document.querySelectorAll("#scenarioCreateChannelsDropdown input[name='channels']").forEach((input) => {
     input.addEventListener("change", updateScenarioCreateChannelsValue);
   });
   document.querySelector("#saveButton").addEventListener("click", saveState);
+  document.querySelector("#holdingMessagesButton").addEventListener("click", () => {
+    if (!transferOperationOptions().length) return;
+    openHoldingSettings();
+  });
+  document.querySelector("#scenarioSettingsButton").addEventListener("click", openScenarioSettings);
+  document.querySelector("#holdingSettingsBackdrop").addEventListener("click", closeHoldingSettings);
   document.querySelector("#undoButton").addEventListener("click", undo);
   document.querySelector("#redoButton").addEventListener("click", redo);
   document.querySelector("#zoomInButton").addEventListener("click", () => stepZoom(1));
@@ -508,6 +542,10 @@ function wireControls() {
       closeSettingsCloseConfirm();
       return;
     }
+    if (event.key === "Escape" && document.body.classList.contains("is-holding-settings-open")) {
+      closeHoldingSettings();
+      return;
+    }
     if (event.key === "Escape" && document.body.classList.contains("is-node-settings-open")) {
       requestNodeSettingsClose();
       return;
@@ -547,8 +585,8 @@ function handleTrackpadWheel(event) {
   const delta = normalizeWheel(event);
   const pointer = d3.pointer(event, svg.node());
 
-  if (event.ctrlKey) {
-    const factor = Math.pow(2, -delta.y * 0.012);
+  if (event.ctrlKey || isMouseWheelZoom(event)) {
+    const factor = Math.pow(2, -delta.y * (event.ctrlKey ? 0.012 : 0.0025));
     svg.call(zoom.scaleBy, factor, pointer);
     return;
   }
@@ -556,6 +594,10 @@ function handleTrackpadWheel(event) {
   const current = d3.zoomTransform(svg.node());
   const next = current.translate(-delta.x / current.k, -delta.y / current.k);
   svg.call(zoom.transform, next);
+}
+
+function isMouseWheelZoom(event) {
+  return Math.abs(event.deltaX) < 1 && (event.deltaMode !== 0 || Math.abs(event.deltaY) >= 40);
 }
 
 function startBoardSelection(event) {
@@ -749,11 +791,14 @@ function normalizeWheel(event) {
 }
 
 function drawGrid() {
-  const width = 2600;
-  const height = 1400;
+  const minX = -2600;
+  const minY = -1800;
+  const maxX = 4200;
+  const maxY = 2600;
+  const step = 32;
   const dots = [];
-  for (let x = 0; x <= width; x += 16) {
-    for (let y = 0; y <= height; y += 16) dots.push({ x, y });
+  for (let x = minX; x <= maxX; x += step) {
+    for (let y = minY; y <= maxY; y += step) dots.push({ x, y });
   }
   gridLayer
     .selectAll("circle")
@@ -761,9 +806,9 @@ function drawGrid() {
     .join("circle")
     .attr("cx", (d) => d.x)
     .attr("cy", (d) => d.y)
-    .attr("r", 1.15)
-    .attr("fill", "#D8D8D8")
-    .attr("opacity", 0.55);
+    .attr("r", 1.2)
+    .attr("fill", "#8F8F8F")
+    .attr("opacity", 0.78);
 }
 
 function render() {
@@ -772,6 +817,8 @@ function render() {
   renderSelectionOverlay();
   renderProperties();
   renderNodeSettingsSidebar();
+  renderHoldingSettingsSidebar();
+  updateHoldingMessagesCount();
   updateHistoryButtons();
 }
 
@@ -788,12 +835,15 @@ function renderAppShell() {
     document.querySelector("#scenarioTitleText").textContent = currentScenario.name;
     if (!isScenarioTitleEditing) document.querySelector("#scenarioTitleInput").value = currentScenario.name;
   }
+  updateHoldingMessagesCount();
   updateSaveButton();
+  updateZoomControls(d3.zoomTransform(svg.node()).k);
 }
 
 function renderScenarioList() {
   const table = document.querySelector("#scenarioListTable");
   const footer = document.querySelector("#scenarioTableFooter");
+  updateScenarioSearchClear();
   const search = scenarioSearchQuery.trim().toLowerCase();
   const scenarios = search ? appState.scenarios.filter((scenarioItem) => scenarioItem.name.toLowerCase().includes(search)) : appState.scenarios;
   table.innerHTML = `<thead>
@@ -821,6 +871,13 @@ function renderScenarioList() {
       handleScenarioTableAction(button.dataset.scenarioAction, button.dataset.scenarioId);
     });
   });
+}
+
+function updateScenarioSearchClear() {
+  const clearButton = document.querySelector("#scenarioSearchClear");
+  const input = document.querySelector("#scenarioSearchInput");
+  if (!clearButton || !input) return;
+  clearButton.hidden = !input.value;
 }
 
 function renderScenarioTableRow(scenarioItem) {
@@ -941,6 +998,7 @@ function renderNodes() {
   enter.append("rect").attr("class", "node-card").attr("width", NODE_W).attr("height", NODE_H).attr("rx", 12);
   enter.append("rect").attr("class", "node-icon-bg").attr("x", 16).attr("y", 14).attr("width", 32).attr("height", 32).attr("rx", 8);
   enter.append("g").attr("class", "node-icon-svg").attr("transform", "translate(22,20)");
+  enter.append("g").attr("class", "node-holding-indicator").attr("transform", `translate(${NODE_W - 14},-8)`);
   const textGroup = enter.append("g").attr("class", "node-text-group");
   textGroup.append("text").attr("class", "node-title-svg").attr("x", 60).attr("y", 27);
   textGroup.append("text").attr("class", "node-subtitle-svg").attr("x", 60).attr("y", 44);
@@ -1011,6 +1069,8 @@ function renderNodes() {
   merged.select(".node-icon-bg").attr("x", (d) => (isPlaceholderNode(d) ? 16 : 16)).attr("y", (d) => (isPlaceholderNode(d) ? 14 : 14));
   merged.select(".node-icon-svg").html((d) => iconSvg(isPlaceholderNode(d) ? "add-20" : d.icon, 20));
   merged.select(".node-icon-svg").attr("transform", (d) => (isPlaceholderNode(d) ? "translate(22,20)" : "translate(22,20)"));
+  merged.select(".node-holding-indicator").html(() => iconSvg("warning-message-filled-20", 20));
+  merged.select(".node-holding-indicator").style("display", (d) => (isHoldingEnabledForTransfer(d.id) ? null : "none"));
   merged.select(".node-add-icon").html(() => iconSvg("add", 16));
   merged.select(".node-more-graphic").html((d) => iconSvg(isPlaceholderNode(d) ? "delete" : "more", 20));
   merged.select(".node-more-icon").attr("transform", (d) => (isPlaceholderNode(d) ? `translate(${NODE_W - 36},20)` : `translate(${NODE_W - 48},8)`));
@@ -2108,7 +2168,8 @@ function edgeRoute(sourceNode, targetNode, edgeItem = null) {
   const y2 = targetNode.y + NODE_H / 2;
   if (targetNode.x < sourceNode.x) {
     const backIndex = backEdgeIndex(sourceNode.id, targetNode.id, edgeItem);
-    const direction = backIndex % 2 === 0 ? -1 : 1;
+    const startsFromBottom = isInfoMessageNode(sourceNode);
+    const direction = backIndex % 2 === 0 ? (startsFromBottom ? 1 : -1) : startsFromBottom ? -1 : 1;
     const ring = Math.floor(backIndex / 2);
     const outerY =
       direction < 0
@@ -2732,7 +2793,7 @@ function renderOutcomeMenuItem(output, sourceNode) {
 }
 
 function outcomeIconName(output, sourceNode) {
-  if (isMenuNode(sourceNode)) return "menu";
+  if (isDistributionOperationNode(sourceNode)) return sourceNode.icon || "menu";
   if (output.tone === "danger" || output.key === "failed" || output.key === "expired" || /(^|\s)не\s/i.test(output.label || "")) return "fail";
   if (output.tone === "success" || output.key === "completed" || output.key === "delivered") return "success";
   return "menu";
@@ -2770,6 +2831,12 @@ function openNodeSettings(nodeId) {
   document.querySelector("#nodeSettingsSidebar").setAttribute("aria-hidden", "false");
   renderNodeSettingsSidebar();
   render();
+}
+
+function openScenarioSettings() {
+  const startNode = state.nodes.find((nodeItem) => isStartNode(nodeItem));
+  if (!startNode) return;
+  openNodeSettings(startNode.id);
 }
 
 function closeNodeSettings(clearSelection = true) {
@@ -2947,7 +3014,7 @@ function renderNodeSettingsSidebar() {
             <span>Число циклов, если операция будет зациклена</span>
             ${renderCounter("cycleLimitInput", settings.cycleLimit, { min: 1, max: 9999999 })}
           </div>
-          ${renderSettingsAlert("После прохождения максимального количества циклов, сценарий остановится и будет завершен спустя время, установленное в операции «Начало сценария»")}
+          ${renderSettingsAlert("После прохождения максимального количества циклов, сценарий остановится и будет завершен спустя время, установленное в операции «Входящее сообщение»")}
         </div>
       </section>`
       }
@@ -2977,6 +3044,363 @@ function renderCounter(id, value, { min = 0, max = 9999999 } = {}) {
       ${iconSvg("math-plus-20", 20)}
     </button>
   </div>`;
+}
+
+function renderHoldingSettingsSidebar() {
+  const sidebar = document.querySelector("#holdingSettingsSidebar");
+  if (!sidebar || !document.body.classList.contains("is-holding-settings-open")) {
+    if (sidebar) sidebar.innerHTML = "";
+    return;
+  }
+  const settings = createHoldingSettings(holdingSettingsDraft || getScenarioHoldingSettings());
+  const transferOptions = transferOperationOptions();
+  const selectedTitles = settings.transferNodeIds
+    .map((id) => transferOptions.find((option) => option.id === id)?.title)
+    .filter(Boolean);
+  const transferOutput = selectedTitles.length ? selectedTitles.join(", ") : "Операции переадресации";
+
+  sidebar.innerHTML = `<form class="node-settings-form holding-settings-form" id="holdingSettingsForm">
+    <header class="node-settings-header">
+      <h2>Удерживающие сообщения</h2>
+      <button class="node-settings-close" type="button" id="holdingSettingsClose" title="Закрыть" aria-label="Закрыть">
+        <span class="cmgui-icon">${iconSvg("cancel", 20)}</span>
+      </button>
+    </header>
+    <div class="node-settings-body holding-settings-body">
+      <section class="node-settings-card holding-settings-card">
+        <div class="node-settings-card-head is-static">
+          <span>Основные параметры</span>
+        </div>
+        ${renderSettingsAlert("Удерживающие сообщения будут отправляться клиенту, пока он ждет переадресацию чата. Сообщения идут по порядку, друг за другом через выбранное время.")}
+        <div class="cmgui-select-container holding-transfer-select ${holdingSettingsErrors.transferNodeIds ? "is-error" : ""}">
+          <div class="cmgui-select cmgui-select-size-medium">
+            <button class="cmgui-select-field ${settings.transferDropdownOpen ? "cmgui-select-field-active" : ""} ${selectedTitles.length ? "" : "is-empty"}" type="button" id="holdingTransferSelect" aria-expanded="${settings.transferDropdownOpen}">
+              ${selectedTitles.length ? `<span class="cmgui-select-label cmgui-select-label-active"><span class="cmgui-select-label-text-active">Операции переадресации</span></span>` : ""}
+              <span class="cmgui-select-field-output ${selectedTitles.length ? "" : "is-placeholder"}">${escapeHtml(transferOutput)}</span>
+              <span class="cmgui-select-field-suffix">${iconSvg("arrow-list-down", 20)}</span>
+            </button>
+          </div>
+          ${settings.transferDropdownOpen ? renderHoldingTransferDropdown(settings, transferOptions) : ""}
+        </div>
+      </section>
+      ${settings.messages.map((message, index) => renderHoldingMessageCard(message, index, settings.messages.length)).join("")}
+      <button class="cmgui-button cmgui-button-size-medium cmgui-button-secondary cmgui-button-outline holding-add-message" type="button" id="holdingAddMessage">
+        <span class="cmgui-icon">${iconSvg("add-20", 20)}</span>
+        <span>Добавить сообщения</span>
+      </button>
+    </div>
+    <footer class="node-settings-footer">
+      <button class="cmgui-button cmgui-button-size-medium cmgui-button-primary cmgui-button-fill" type="submit">Сохранить</button>
+      <button class="cmgui-button cmgui-button-size-medium cmgui-button-secondary cmgui-button-outline" type="button" id="holdingSettingsCancel">Отменить</button>
+    </footer>
+  </form>`;
+
+  wireHoldingSettingsSidebar(sidebar, settings);
+}
+
+function renderHoldingTransferDropdown(settings, options) {
+  return `<div class="cmgui-dropdown cmgui-dropdown-placement-bottomLeft node-dropdown holding-transfer-dropdown" role="listbox" aria-label="Операции переадресации">
+    <div class="cmgui-dropdown-content">
+      <div class="cmgui-dropdown-inner">
+        <ul class="cmgui-list cmgui-list-borderless cmgui-dropdown-list">
+          ${
+            options.length
+              ? options
+                  .map(
+                    (option) => `<li class="cmgui-list-li" role="option">
+              <label class="start-channel-option">
+                <input type="checkbox" value="${escapeAttr(option.id)}" data-holding-transfer="${escapeAttr(option.id)}" ${settings.transferNodeIds.includes(option.id) ? "checked" : ""} />
+                <span class="start-channel-checkmark" aria-hidden="true"></span>
+                <span>${escapeHtml(option.title)}</span>
+              </label>
+            </li>`,
+                  )
+                  .join("")
+              : `<li class="cmgui-list-li"><span class="holding-empty-option">На доске нет операций переадресации</span></li>`
+          }
+        </ul>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderHoldingMessageCard(message, index, count) {
+  const error = holdingSettingsErrors.messages?.[message.id] || {};
+  return `<section class="node-settings-card holding-message-card" draggable="true" data-holding-message-id="${escapeAttr(message.id)}">
+    <div class="holding-message-head">
+      <span class="holding-message-drag">${iconSvg("drag-and-drop", 20)}</span>
+      <span class="order-badge">${index + 1}</span>
+      <strong>Сообщение ${index + 1}</strong>
+      <button class="holding-message-delete" type="button" data-holding-delete="${escapeAttr(message.id)}" title="Удалить" aria-label="Удалить">${iconSvg("delete", 20)}</button>
+    </div>
+    <label class="cmgui-text-field holding-message-textarea">
+      <span class="cmgui-text-field-wrapper is-textarea ${error.text ? "is-error" : ""}">
+        <textarea class="cmgui-text-field-input" data-holding-text="${escapeAttr(message.id)}" placeholder="Текст сообщения*">${escapeHtml(message.text || "")}</textarea>
+      </span>
+    </label>
+    <div class="response-row holding-delay-row">
+      <span class="response-label">Отправить через</span>
+      <input class="response-input" data-holding-delay="${escapeAttr(message.id)}" value="${escapeAttr(message.delay)}" inputmode="numeric" />
+      <div class="segment-control" role="group" aria-label="Единица времени отправки">
+        <button class="${message.unit === "seconds" ? "is-active" : ""}" type="button" data-holding-unit="${escapeAttr(message.id)}" data-holding-unit-value="seconds">Секунд</button>
+        <button class="${message.unit === "minutes" ? "is-active" : ""}" type="button" data-holding-unit="${escapeAttr(message.id)}" data-holding-unit-value="minutes">Минут</button>
+      </div>
+    </div>
+  </section>`;
+}
+
+function wireHoldingSettingsSidebar(sidebar, settings) {
+  sidebar.onclick = (event) => {
+    if (!settings.transferDropdownOpen) return;
+    if (event.target.closest("#holdingTransferSelect, .holding-transfer-dropdown")) return;
+    window.setTimeout(() => {
+      const current = createHoldingSettings(holdingSettingsDraft || getScenarioHoldingSettings());
+      if (!current.transferDropdownOpen) return;
+      holdingSettingsDraft = createHoldingSettings({ ...collectHoldingSettingsDraft(), transferDropdownOpen: false });
+      renderHoldingSettingsSidebar();
+    }, 0);
+  };
+  sidebar.querySelector("#holdingSettingsClose")?.addEventListener("click", closeHoldingSettings);
+  sidebar.querySelector("#holdingSettingsCancel")?.addEventListener("click", closeHoldingSettings);
+  sidebar.querySelector("#holdingSettingsForm")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveHoldingSettingsFromSidebar();
+  });
+  sidebar.querySelector("#holdingTransferSelect")?.addEventListener("click", () => {
+    holdingSettingsDraft = createHoldingSettings({ ...collectHoldingSettingsDraft(), transferDropdownOpen: !settings.transferDropdownOpen });
+    renderHoldingSettingsSidebar();
+  });
+  sidebar.querySelectorAll("[data-holding-transfer]").forEach((checkbox) => {
+    checkbox.addEventListener("change", () => {
+      const draft = collectHoldingSettingsDraft();
+      const id = checkbox.value;
+      const transferNodeIds = checkbox.checked ? [...new Set([...draft.transferNodeIds, id])] : draft.transferNodeIds.filter((item) => item !== id);
+      holdingSettingsDraft = createHoldingSettings({ ...draft, transferNodeIds, transferDropdownOpen: true });
+      if (transferNodeIds.length) delete holdingSettingsErrors.transferNodeIds;
+      renderHoldingSettingsSidebar();
+    });
+  });
+  sidebar.querySelectorAll("[data-holding-text]").forEach((textarea) => {
+    textarea.addEventListener("input", () => {
+      holdingSettingsDraft = createHoldingSettings(collectHoldingSettingsDraft());
+      delete holdingSettingsErrors.messages?.[textarea.dataset.holdingText]?.text;
+    });
+  });
+  sidebar.querySelectorAll("[data-holding-delay]").forEach((input) => {
+    input.addEventListener("input", () => {
+      holdingSettingsDraft = createHoldingSettings(collectHoldingSettingsDraft());
+    });
+    input.addEventListener("blur", () => {
+      holdingSettingsDraft = createHoldingSettings(collectHoldingSettingsDraft());
+      renderHoldingSettingsSidebar();
+    });
+  });
+  sidebar.querySelectorAll("[data-holding-unit]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const draft = collectHoldingSettingsDraft();
+      holdingSettingsDraft = createHoldingSettings({
+        ...draft,
+        messages: draft.messages.map((message) => (message.id === button.dataset.holdingUnit ? { ...message, unit: button.dataset.holdingUnitValue } : message)),
+      });
+      renderHoldingSettingsSidebar();
+    });
+  });
+  sidebar.querySelectorAll("[data-holding-delete]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const draft = collectHoldingSettingsDraft();
+      holdingSettingsDraft = createHoldingSettings({ ...draft, messages: draft.messages.filter((message) => message.id !== button.dataset.holdingDelete) });
+      renderHoldingSettingsSidebar();
+    });
+  });
+  sidebar.querySelector("#holdingAddMessage")?.addEventListener("click", () => {
+    const draft = collectHoldingSettingsDraft();
+    holdingSettingsDraft = createHoldingSettings({ ...draft, messages: [...draft.messages, createHoldingMessage(draft.messages.length + 1)] });
+    renderHoldingSettingsSidebar();
+  });
+  sidebar.querySelectorAll("[data-holding-message-id]").forEach((card) => {
+    card.addEventListener("dragstart", () => {
+      holdingMessageDragId = card.dataset.holdingMessageId;
+    });
+    card.addEventListener("dragover", (event) => {
+      event.preventDefault();
+    });
+    card.addEventListener("drop", (event) => {
+      event.preventDefault();
+      reorderHoldingMessage(card.dataset.holdingMessageId);
+    });
+    card.addEventListener("dragend", () => {
+      holdingMessageDragId = null;
+    });
+  });
+}
+
+function openHoldingSettings() {
+  if (!transferOperationOptions().length) return;
+  cancelNodeSettings(false);
+  if (document.body.classList.contains("is-operation-modal-open")) closeOperationModal();
+  closeOutcomeMenu();
+  holdingSettingsDraft = createHoldingSettings(getScenarioHoldingSettings());
+  holdingSettingsErrors = {};
+  document.body.classList.add("is-holding-settings-open");
+  document.querySelector("#holdingSettingsSidebar")?.setAttribute("aria-hidden", "false");
+  document.querySelector("#holdingSettingsBackdrop")?.setAttribute("aria-hidden", "false");
+  renderHoldingSettingsSidebar();
+}
+
+function closeHoldingSettings() {
+  holdingSettingsDraft = null;
+  holdingSettingsErrors = {};
+  holdingMessageDragId = null;
+  document.body.classList.remove("is-holding-settings-open");
+  document.querySelector("#holdingSettingsSidebar")?.setAttribute("aria-hidden", "true");
+  document.querySelector("#holdingSettingsBackdrop")?.setAttribute("aria-hidden", "true");
+  renderHoldingSettingsSidebar();
+}
+
+function collectHoldingSettingsDraft() {
+  const sidebar = document.querySelector("#holdingSettingsSidebar");
+  const base = createHoldingSettings(holdingSettingsDraft || getScenarioHoldingSettings());
+  if (!sidebar) return base;
+  const messages = base.messages.map((message) => ({
+    ...message,
+    text: getHoldingMessageField(sidebar, "text", message.id)?.value ?? message.text,
+    delay: sanitizePositiveInteger(getHoldingMessageField(sidebar, "delay", message.id)?.value, message.delay || 15),
+  }));
+  return createHoldingSettings({ ...base, messages });
+}
+
+function getHoldingMessageField(sidebar, type, id) {
+  const selector = type === "delay" ? "[data-holding-delay]" : "[data-holding-text]";
+  const datasetKey = type === "delay" ? "holdingDelay" : "holdingText";
+  return [...sidebar.querySelectorAll(selector)].find((field) => field.dataset[datasetKey] === id) || null;
+}
+
+function saveHoldingSettingsFromSidebar() {
+  const settings = createHoldingSettings(collectHoldingSettingsDraft());
+  const errors = validateHoldingSettings(settings);
+  if (Object.keys(errors).length) {
+    holdingSettingsErrors = errors;
+    holdingSettingsDraft = settings;
+    renderHoldingSettingsSidebar();
+    return;
+  }
+  const currentScenario = getCurrentScenario();
+  if (currentScenario) {
+    currentScenario.settings = {
+      ...(currentScenario.settings || {}),
+      holding: normalizeComparableHoldingSettings(settings),
+    };
+    currentScenario.updatedAt = Date.now();
+  }
+  hasUnsavedScenarioChanges = true;
+  updateSaveButton();
+  schedulePersistState();
+  closeHoldingSettings();
+  updateHoldingMessagesCount();
+  renderNodes();
+}
+
+function validateHoldingSettings(settings) {
+  const errors = {};
+  if (settings.messages.length && !settings.transferNodeIds.length) errors.transferNodeIds = true;
+  const messageErrors = {};
+  settings.messages.forEach((message) => {
+    if (!message.text.trim()) messageErrors[message.id] = { text: true };
+  });
+  if (Object.keys(messageErrors).length) errors.messages = messageErrors;
+  return errors;
+}
+
+function reorderHoldingMessage(targetId) {
+  if (!holdingMessageDragId || holdingMessageDragId === targetId) return;
+  const draft = collectHoldingSettingsDraft();
+  const messages = [...draft.messages];
+  const fromIndex = messages.findIndex((message) => message.id === holdingMessageDragId);
+  const toIndex = messages.findIndex((message) => message.id === targetId);
+  if (fromIndex < 0 || toIndex < 0) return;
+  const [moved] = messages.splice(fromIndex, 1);
+  messages.splice(toIndex, 0, moved);
+  holdingSettingsDraft = createHoldingSettings({ ...draft, messages });
+  holdingMessageDragId = null;
+  renderHoldingSettingsSidebar();
+}
+
+function getScenarioHoldingSettings() {
+  return createHoldingSettings(normalizeLoadedHoldingSettings(getCurrentScenario()?.settings?.holding || {}));
+}
+
+function updateHoldingMessagesCount() {
+  const count = document.querySelector("#holdingMessagesCount");
+  const button = document.querySelector("#holdingMessagesButton");
+  const transferCount = transferOperationOptions().length;
+  const messageCount = getScenarioHoldingSettings().messages.length;
+  if (count) {
+    count.textContent = String(messageCount);
+    count.hidden = messageCount === 0;
+  }
+  if (!button) return;
+  button.disabled = transferCount === 0;
+  button.classList.toggle("is-disabled", transferCount === 0);
+  button.classList.toggle("is-empty", messageCount === 0);
+  button.setAttribute("aria-disabled", String(transferCount === 0));
+  if (transferCount === 0 && document.body.classList.contains("is-holding-settings-open")) closeHoldingSettings();
+}
+
+function transferOperationOptions() {
+  return state.nodes
+    .filter((nodeItem) => isTransferOperationNode(nodeItem))
+    .map((nodeItem) => ({ id: nodeItem.id, title: nodeItem.title || settingsTitleForNode(nodeItem) }));
+}
+
+function createHoldingSettings(overrides = {}) {
+  const messages = Array.isArray(overrides.messages) ? overrides.messages : [];
+  return {
+    transferNodeIds: Array.isArray(overrides.transferNodeIds) ? [...new Set(overrides.transferNodeIds)] : [],
+    transferDropdownOpen: Boolean(overrides.transferDropdownOpen),
+    messages: messages.map((message, index) => createHoldingMessage(index + 1, message)),
+  };
+}
+
+function createHoldingMessage(index = 1, overrides = {}) {
+  const unit = ["seconds", "minutes"].includes(overrides.unit) ? overrides.unit : "seconds";
+  return {
+    id: overrides.id || `holding-${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 6)}-${index}`,
+    text: overrides.text || "",
+    delay: sanitizePositiveInteger(overrides.delay ?? 15, 15),
+    unit,
+  };
+}
+
+function normalizeLoadedHoldingSettings(settings = {}) {
+  const normalized = createHoldingSettings(settings);
+  return {
+    ...normalized,
+    messages: normalized.messages.filter((message) => message.text.trim()),
+  };
+}
+
+function normalizeComparableHoldingSettings(settings) {
+  const normalized = createHoldingSettings(settings);
+  const availableIds = new Set(transferOperationOptions().map((option) => option.id));
+  return {
+    transferNodeIds: normalized.transferNodeIds.filter((id) => availableIds.has(id)),
+    messages: normalized.messages.map((message) => ({
+      id: message.id,
+      text: message.text.trim(),
+      delay: sanitizePositiveInteger(message.delay, 15),
+      unit: message.unit,
+    })),
+  };
+}
+
+function isHoldingEnabledForTransfer(nodeId) {
+  const settings = getScenarioHoldingSettings();
+  return settings.messages.length > 0 && settings.transferNodeIds.includes(nodeId);
+}
+
+function cssEscape(value) {
+  if (window.CSS?.escape) return window.CSS.escape(value);
+  return String(value).replace(/["\\]/g, "\\$&");
 }
 
 function renderPrimarySettingsCard(nodeItem, settings, errors, showHeader = true) {
@@ -3032,6 +3456,7 @@ function renderStartSettingsCards(settings, errors = {}) {
       <span>Правило завершения сценария</span>
     </div>
     <div class="node-settings-card-content">
+      ${renderSettingsAlert("Сценарий завершится, если чат не возьмут в работу в\u00A0течение выбранного времени после окончания всех операций.")}
       <div class="start-finish-time-row">
         <span>Завершать сценарий через</span>
         <span class="cmgui-text-field-wrapper start-hours-field ${errors.finishAfterHours ? "is-error" : ""}">
@@ -3050,7 +3475,6 @@ function renderStartSettingsCards(settings, errors = {}) {
       </div>
       ${settings.completionTarget === "employee" ? renderSimpleSelect("startEmployeeSelect", "Сотрудник*", settings.employeeName, TRANSFER_EMPLOYEES.map((name) => [name, name]), settings.employeeDropdownOpen) : ""}
       ${settings.completionTarget === "group" ? renderSimpleSelect("startGroupSelect", "Отдел*", settings.groupName, GROUP_TRANSFER_GROUPS.map((name) => [name, name]), settings.groupDropdownOpen) : ""}
-      ${renderSettingsAlert("Сценарий завершится, если чат не возьмут в работу в\u00A0течение выбранного времени после завершения всех операций и настроенных циклов.")}
     </div>
   </section>`;
 }
@@ -4797,7 +5221,7 @@ function applyGroupTransferTitle(nodeItem, settings) {
 }
 
 function applyStartTitle(nodeItem, settings = createStartSettings()) {
-  setAutoNodeTitle(nodeItem, "Начало сценария");
+  setAutoNodeTitle(nodeItem, "Входящее сообщение");
   nodeItem.subtitle = settings.channels.length ? `Каналы: ${settings.channels.join(", ")}` : "Каналы не выбраны";
 }
 
@@ -4837,6 +5261,10 @@ function isConditionNode(nodeItem) {
   return nodeItem?.kind === "condition" && nodeItem.operationType === CONDITION_OPERATION;
 }
 
+function isDistributionOperationNode(nodeItem) {
+  return isMenuNode(nodeItem) || isScheduleNode(nodeItem) || isSegmentNode(nodeItem) || isConditionNode(nodeItem);
+}
+
 function isFullscreenActionNode(nodeItem) {
   return isScheduleNode(nodeItem) || isSegmentNode(nodeItem) || isConditionNode(nodeItem);
 }
@@ -4854,7 +5282,7 @@ function isTransferWithFallbackNode(nodeItem) {
 }
 
 function settingsTitleForNode(nodeItem) {
-  if (isStartNode(nodeItem)) return "Начало сценария";
+  if (isStartNode(nodeItem)) return "Настройки сценария";
   if (isFinishNode(nodeItem)) return "Закрытие чата";
   if (isContactFormNode(nodeItem)) return "Форма сбора контактов";
   if (isMenuNode(nodeItem)) return "Меню";
@@ -5071,17 +5499,22 @@ function openScenarioCreateModal() {
   nameInput.value = `Сценарий обработки чатов №${appState.scenarios.length + 1}`;
   updateScenarioCreateNameState();
   document.querySelectorAll("#scenarioCreateChannelsDropdown input[name='channels']").forEach((input) => {
-    input.checked = input.value === "Email" || input.value === "Telegram";
+    input.checked = false;
   });
   updateScenarioCreateChannelsValue();
-  closeScenarioCreateChannelsDropdown();
+  scenarioCreateSettings = createStartSettings({
+    channels: getScenarioCreateSelectedChannels(),
+    finishOpen: false,
+  });
+  closeScenarioCreateDropdowns();
+  renderScenarioCreateFinishSettings();
   document.body.classList.add("is-scenario-create-open");
   document.querySelector("#scenarioCreateModal").setAttribute("aria-hidden", "false");
   nameInput.focus();
 }
 
 function closeScenarioCreateModal() {
-  closeScenarioCreateChannelsDropdown();
+  closeScenarioCreateDropdowns();
   document.body.classList.remove("is-scenario-create-open");
   document.querySelector("#scenarioCreateModal").setAttribute("aria-hidden", "true");
 }
@@ -5100,13 +5533,28 @@ function closeScenarioCreateChannelsDropdown() {
   document.querySelector("#scenarioCreateChannelsSelect")?.setAttribute("aria-expanded", "false");
 }
 
+function closeScenarioCreateDropdowns() {
+  closeScenarioCreateChannelsDropdown();
+  scenarioCreateSettings = createStartSettings({
+    ...scenarioCreateSettings,
+    employeeDropdownOpen: false,
+    groupDropdownOpen: false,
+  });
+  renderScenarioCreateFinishSettings();
+}
+
+function getScenarioCreateSelectedChannels() {
+  return [...document.querySelectorAll("#scenarioCreateChannelsDropdown input[name='channels']:checked")].map((input) => input.value);
+}
+
 function updateScenarioCreateChannelsValue() {
-  const channels = [...document.querySelectorAll("#scenarioCreateChannelsDropdown input[name='channels']:checked")].map((input) => input.value);
+  const channels = getScenarioCreateSelectedChannels();
   const output = document.querySelector("#scenarioCreateChannelsValue");
   const button = document.querySelector("#scenarioCreateChannelsSelect");
   output.textContent = channels.length ? channels.join(", ") : "Каналы для приема сообщений";
   output.classList.toggle("is-placeholder", !channels.length);
   button.classList.toggle("is-empty", !channels.length);
+  scenarioCreateSettings = createStartSettings({ ...scenarioCreateSettings, channels });
 }
 
 function updateScenarioCreateNameState(options = {}) {
@@ -5121,6 +5569,127 @@ function updateScenarioCreateNameState(options = {}) {
   else if (options.showError) wrapper.classList.add("is-error");
 }
 
+function renderScenarioCreateFinishSettings() {
+  const toggle = document.querySelector("#scenarioCreateFinishToggle");
+  const toggleText = document.querySelector("#scenarioCreateFinishToggleText");
+  const container = document.querySelector("#scenarioCreateFinishSettings");
+  if (!toggle || !container) return;
+  const settings = createStartSettings(scenarioCreateSettings);
+  toggle.classList.toggle("is-open", settings.finishOpen);
+  toggle.setAttribute("aria-expanded", String(settings.finishOpen));
+  if (toggleText) toggleText.textContent = settings.finishOpen ? "Скрыть настройки завершения сценария" : "Настройки завершения сценария";
+  container.hidden = !settings.finishOpen;
+  if (!settings.finishOpen) {
+    container.innerHTML = "";
+    return;
+  }
+  container.innerHTML = `${renderSettingsAlert("Сценарий завершится, если чат не возьмут в работу в\u00A0течение выбранного времени после окончания всех операций.")}
+    <div class="start-finish-time-row scenario-create-finish-time-row">
+      <span>Завершать через</span>
+      <span class="cmgui-text-field-wrapper start-hours-field">
+        <input class="cmgui-text-field-input" id="scenarioCreateFinishHoursInput" value="${escapeAttr(settings.finishAfterHours)}" inputmode="numeric" />
+      </span>
+      <div class="segment-control start-finish-unit-control" role="group" aria-label="Единица времени завершения сценария">
+        <button class="${settings.finishAfterUnit === "hours" ? "is-active" : ""}" type="button" data-scenario-create-finish-unit="hours">Часов</button>
+        <button class="${settings.finishAfterUnit === "days" ? "is-active" : ""}" type="button" data-scenario-create-finish-unit="days">Дней</button>
+      </div>
+    </div>
+    <div class="start-finish-label">После завершения отправить чат</div>
+    <div class="start-radio-group" role="radiogroup" aria-label="После завершения отправить чат">
+      ${renderScenarioCreateRadio("all", "Всем сотрудникам в новые сообщения", settings.completionTarget)}
+      ${renderScenarioCreateRadio("employee", "Сотруднику в новые сообщения", settings.completionTarget)}
+      ${renderScenarioCreateRadio("group", "Группе в новые сообщения", settings.completionTarget)}
+    </div>
+    ${settings.completionTarget === "employee" ? renderSimpleSelect("scenarioCreateEmployeeSelect", "Сотрудник*", settings.employeeName, TRANSFER_EMPLOYEES.map((name) => [name, name]), settings.employeeDropdownOpen) : ""}
+    ${settings.completionTarget === "group" ? renderSimpleSelect("scenarioCreateGroupSelect", "Группа*", settings.groupName, GROUP_TRANSFER_GROUPS.map((name) => [name, name]), settings.groupDropdownOpen) : ""}`;
+  wireScenarioCreateFinishSettings();
+}
+
+function renderScenarioCreateRadio(value, label, selectedValue) {
+  return `<label class="cmgui-radio">
+    <input type="radio" name="scenarioCreateCompletionTarget" value="${escapeAttr(value)}" ${selectedValue === value ? "checked" : ""} />
+    <span class="cmgui-radio-mark"></span>
+    <span>${escapeHtml(label)}</span>
+  </label>`;
+}
+
+function wireScenarioCreateFinishSettings() {
+  const container = document.querySelector("#scenarioCreateFinishSettings");
+  if (!container || container.hidden) return;
+  container.querySelector("#scenarioCreateFinishHoursInput")?.addEventListener("input", (event) => {
+    scenarioCreateSettings = createStartSettings({ ...scenarioCreateSettings, finishAfterHours: event.target.value });
+  });
+  container.querySelector("#scenarioCreateFinishHoursInput")?.addEventListener("blur", (event) => {
+    const value = sanitizeStartFinishValue(event.target.value, scenarioCreateSettings.finishAfterHours, scenarioCreateSettings.finishAfterUnit);
+    event.target.value = value;
+    scenarioCreateSettings = createStartSettings({ ...scenarioCreateSettings, finishAfterHours: value });
+  });
+  container.querySelectorAll("[data-scenario-create-finish-unit]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const unit = button.dataset.scenarioCreateFinishUnit;
+      scenarioCreateSettings = createStartSettings({
+        ...collectScenarioCreateFinishSettings(),
+        finishAfterUnit: unit,
+        finishAfterHours: sanitizeStartFinishValue(scenarioCreateSettings.finishAfterHours, scenarioCreateSettings.finishAfterHours, unit),
+      });
+      renderScenarioCreateFinishSettings();
+    });
+  });
+  container.querySelectorAll('input[name="scenarioCreateCompletionTarget"]').forEach((radio) => {
+    radio.addEventListener("change", () => {
+      scenarioCreateSettings = createStartSettings({
+        ...collectScenarioCreateFinishSettings(),
+        completionTarget: radio.value,
+        employeeDropdownOpen: false,
+        groupDropdownOpen: false,
+      });
+      renderScenarioCreateFinishSettings();
+    });
+  });
+  container.querySelector("#scenarioCreateEmployeeSelect")?.addEventListener("click", () => {
+    scenarioCreateSettings = createStartSettings({
+      ...collectScenarioCreateFinishSettings(),
+      employeeDropdownOpen: !scenarioCreateSettings.employeeDropdownOpen,
+      groupDropdownOpen: false,
+    });
+    renderScenarioCreateFinishSettings();
+  });
+  container.querySelectorAll("[data-dropdown-id='scenarioCreateEmployeeSelect']").forEach((button) => {
+    button.addEventListener("click", () => {
+      scenarioCreateSettings = createStartSettings({ ...collectScenarioCreateFinishSettings(), employeeName: button.dataset.dropdownValue, employeeDropdownOpen: false });
+      renderScenarioCreateFinishSettings();
+    });
+  });
+  container.querySelector("#scenarioCreateGroupSelect")?.addEventListener("click", () => {
+    scenarioCreateSettings = createStartSettings({
+      ...collectScenarioCreateFinishSettings(),
+      groupDropdownOpen: !scenarioCreateSettings.groupDropdownOpen,
+      employeeDropdownOpen: false,
+    });
+    renderScenarioCreateFinishSettings();
+  });
+  container.querySelectorAll("[data-dropdown-id='scenarioCreateGroupSelect']").forEach((button) => {
+    button.addEventListener("click", () => {
+      scenarioCreateSettings = createStartSettings({ ...collectScenarioCreateFinishSettings(), groupName: button.dataset.dropdownValue, groupDropdownOpen: false });
+      renderScenarioCreateFinishSettings();
+    });
+  });
+}
+
+function collectScenarioCreateFinishSettings() {
+  const container = document.querySelector("#scenarioCreateFinishSettings");
+  const finishAfterHours = container?.querySelector("#scenarioCreateFinishHoursInput")?.value ?? scenarioCreateSettings.finishAfterHours;
+  const completionTarget = container?.querySelector('input[name="scenarioCreateCompletionTarget"]:checked')?.value ?? scenarioCreateSettings.completionTarget;
+  return createStartSettings({
+    ...scenarioCreateSettings,
+    channels: getScenarioCreateSelectedChannels(),
+    finishAfterHours,
+    completionTarget,
+    employeeDropdownOpen: false,
+    groupDropdownOpen: false,
+  });
+}
+
 function createScenarioFromForm(event) {
   event.preventDefault();
   const form = event.currentTarget;
@@ -5132,7 +5701,12 @@ function createScenarioFromForm(event) {
     return;
   }
   const channels = [...form.querySelectorAll('input[name="channels"]:checked')].map((input) => input.value);
-  const scenarioItem = createScenario({ name, channels });
+  const startSettings = createStartSettings({
+    ...collectScenarioCreateFinishSettings(),
+    name,
+    channels,
+  });
+  const scenarioItem = createScenario({ name, channels, startSettings });
   appState.scenarios.unshift(scenarioItem);
   appState.currentScenarioId = scenarioItem.id;
   state = scenarioItem.board;
@@ -5440,6 +6014,7 @@ function normalizeAppState(value) {
                 name: scenarioItem.name || "Сценарий обработки чатов №1",
                 channels: Array.isArray(scenarioItem.channels) ? scenarioItem.channels : [],
               }),
+              holding: normalizeLoadedHoldingSettings(scenarioItem.settings?.holding || {}),
             },
             board: normalizeLoadedState(scenarioItem.board || createInitialBoard([])),
           };
@@ -5455,13 +6030,13 @@ function getCurrentScenario() {
   return appState.scenarios.find((scenarioItem) => scenarioItem.id === appState.currentScenarioId) || null;
 }
 
-function createScenario({ name, channels, board }) {
-  const startSettings = createStartSettings({ name, channels });
+function createScenario({ name, channels, board, startSettings: providedStartSettings }) {
+  const startSettings = createStartSettings({ ...(providedStartSettings || {}), name, channels });
   const scenarioItem = {
     id: `scenario-${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 6)}`,
     name,
     channels,
-    settings: { start: startSettings },
+    settings: { start: startSettings, holding: createHoldingSettings() },
     board: board ? normalizeLoadedState(board) : createInitialBoard(channels),
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -5607,11 +6182,20 @@ function setZoom100() {
 }
 
 function stepZoom(direction) {
+  const currentScale = d3.zoomTransform(svg.node()).k;
+  if ((direction > 0 && currentScale >= 0.999) || (direction < 0 && currentScale <= 0.251)) return;
   const rect = svg.node().getBoundingClientRect();
   const transform = d3.zoomTransform(svg.node());
   const nextScale = direction > 0 ? transform.k * 1.18 : transform.k * 0.84;
   const targetScale = crossesZoom100(transform.k, nextScale) ? 1 : nextScale;
   svg.transition().duration(180).call(zoom.scaleTo, targetScale, [rect.width / 2, rect.height / 2]);
+}
+
+function updateZoomControls(scale = d3.zoomTransform(svg.node()).k) {
+  const zoomInButton = document.querySelector("#zoomInButton");
+  const zoomOutButton = document.querySelector("#zoomOutButton");
+  if (zoomInButton) zoomInButton.disabled = scale >= 0.999;
+  if (zoomOutButton) zoomOutButton.disabled = scale <= 0.251;
 }
 
 function crossesZoom100(currentScale, nextScale) {

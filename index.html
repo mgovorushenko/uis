@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Сценарии обработки чатов</title>
-    <link rel="stylesheet" href="./src/styles.css?v=2026-05-13-021" />
+    <link rel="stylesheet" href="./src/styles.css?v=2026-05-13-031" />
   </head>
   <body>
     <main class="app-shell">
@@ -53,6 +53,7 @@
             <label class="scenario-search-field">
               <span class="cmgui-icon" data-icon="search-20"></span>
               <input id="scenarioSearchInput" type="search" placeholder="Найти сценарий" />
+              <button class="scenario-search-clear" id="scenarioSearchClear" type="button" title="Очистить" aria-label="Очистить" data-icon="cancel" hidden></button>
             </label>
             <button class="cmgui-button cmgui-button-size-medium cmgui-button-primary cmgui-button-fill scenario-add-button" id="createScenarioButton">
               <span class="cmgui-icon" data-icon="add-20"></span>
@@ -61,7 +62,7 @@
           </div>
           <div class="scenario-empty-state" id="scenarioEmptyState">
             <img class="scenario-empty-illustration" src="./assets/icons/chat-distribution-scenarios_200.svg" alt="" aria-hidden="true" />
-            <p>Набор правил, по которым обрабатывается чат до момента взятия в работу:<br />кому направить, по какому графику работы, условиям</p>
+            <p>Набор правил, по которым сервис направляет входящий чат<br />сотрудникам до того, как кто-то возьмет его в работу</p>
             <button class="cmgui-button cmgui-button-size-medium cmgui-button-primary cmgui-button-fill scenario-add-button" id="createScenarioEmptyButton">
               <span class="cmgui-icon" data-icon="add-20"></span>
               <span>Добавить сценарий</span>
@@ -88,10 +89,13 @@
 
       <div class="top-actions">
         <div class="top-action-shell">
-          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost top-action-button top-action-timer" title="Время ожидания">
-            <span data-icon="clock"></span>
-            <span>2</span>
+          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost top-action-button top-action-timer" id="holdingMessagesButton" title="Удерживающие сообщения" aria-label="Удерживающие сообщения">
+            <span data-icon="message-16"></span>
+            <span id="holdingMessagesCount">2</span>
           </button>
+        </div>
+        <div class="top-action-shell">
+          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button top-action-button" id="scenarioSettingsButton" title="Настройки сценария" aria-label="Настройки сценария" data-icon="settings-20"></button>
         </div>
         <div class="top-action-shell">
           <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button top-action-button" title="Помощь" aria-label="Помощь" data-icon="help"></button>
@@ -198,6 +202,8 @@
 
       <div class="node-settings-backdrop" id="nodeSettingsBackdrop" aria-hidden="true" onclick="handleNodeSettingsBackdropClick()"></div>
       <aside class="node-settings-sidebar" id="nodeSettingsSidebar" aria-hidden="true"></aside>
+      <div class="holding-settings-backdrop" id="holdingSettingsBackdrop" aria-hidden="true"></div>
+      <aside class="holding-settings-sidebar" id="holdingSettingsSidebar" aria-hidden="true"></aside>
 
       <div class="cmgui-modal node-settings-confirm-modal" id="nodeSettingsCloseConfirm" aria-hidden="true">
         <div class="cmgui-modal-mask" id="nodeSettingsCloseConfirmMask">
@@ -236,9 +242,8 @@
             </label>
             <div class="cmgui-select-container start-channel-select scenario-create-channel-select">
               <div class="cmgui-select cmgui-select-size-medium">
-                <button class="cmgui-select-field" type="button" id="scenarioCreateChannelsSelect" aria-expanded="false">
-                  <span class="cmgui-select-label cmgui-select-label-active"><span class="cmgui-select-label-text-active">Каналы для приема сообщений</span></span>
-                  <span class="cmgui-select-field-output" id="scenarioCreateChannelsValue">Email, Telegram</span>
+                <button class="cmgui-select-field is-empty" type="button" id="scenarioCreateChannelsSelect" aria-expanded="false">
+                  <span class="cmgui-select-field-output is-placeholder" id="scenarioCreateChannelsValue">Каналы для приема сообщений</span>
                   <span class="cmgui-select-field-suffix" data-icon="arrow-list-down"></span>
                 </button>
               </div>
@@ -246,15 +251,19 @@
                 <div class="cmgui-dropdown-content">
                   <div class="cmgui-dropdown-inner">
                     <ul class="cmgui-list cmgui-list-borderless cmgui-dropdown-list">
-                      <li class="cmgui-list-li"><label class="start-channel-option"><input type="checkbox" name="channels" value="Email" checked /><span class="start-channel-checkmark" aria-hidden="true"></span><span class="start-channel-source-icon cmgui-icon" data-icon="source-email-20"></span><span>Email</span></label></li>
+                      <li class="cmgui-list-li"><label class="start-channel-option"><input type="checkbox" name="channels" value="Email" /><span class="start-channel-checkmark" aria-hidden="true"></span><span class="start-channel-source-icon cmgui-icon" data-icon="source-email-20"></span><span>Email</span></label></li>
                       <li class="cmgui-list-li"><label class="start-channel-option"><input type="checkbox" name="channels" value="Max" /><span class="start-channel-checkmark" aria-hidden="true"></span><span class="start-channel-source-icon cmgui-icon" data-icon="source-max-20"></span><span>Max</span></label></li>
-                      <li class="cmgui-list-li"><label class="start-channel-option"><input type="checkbox" name="channels" value="Telegram" checked /><span class="start-channel-checkmark" aria-hidden="true"></span><span class="start-channel-source-icon cmgui-icon" data-icon="source-telegram-20"></span><span>Telegram</span></label></li>
+                      <li class="cmgui-list-li"><label class="start-channel-option"><input type="checkbox" name="channels" value="Telegram" /><span class="start-channel-checkmark" aria-hidden="true"></span><span class="start-channel-source-icon cmgui-icon" data-icon="source-telegram-20"></span><span>Telegram</span></label></li>
                       <li class="cmgui-list-li"><label class="start-channel-option"><input type="checkbox" name="channels" value="WhatsApp" /><span class="start-channel-checkmark" aria-hidden="true"></span><span class="start-channel-source-icon cmgui-icon" data-icon="source-whatsapp-20"></span><span>WhatsApp</span></label></li>
                     </ul>
                   </div>
                 </div>
               </div>
             </div>
+            <button class="scenario-create-finish-toggle" id="scenarioCreateFinishToggle" type="button" aria-expanded="false">
+              <span id="scenarioCreateFinishToggleText">Настройки завершения сценария</span>
+            </button>
+            <div class="scenario-create-finish-settings" id="scenarioCreateFinishSettings" hidden></div>
           </div>
           <footer class="scenario-create-footer">
             <button class="cmgui-button cmgui-button-size-medium cmgui-button-primary cmgui-button-fill" type="submit">Создать</button>
@@ -266,6 +275,6 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
-    <script src="./src/board.js?v=2026-05-13-081"></script>
+    <script src="./src/board.js?v=2026-05-13-096"></script>
   </body>
 </html>

@@ -402,7 +402,9 @@ body.is-scenario-list .top-bar,
 body.is-scenario-list .top-actions,
 body.is-scenario-list .bottom-bar,
 body.is-scenario-list .node-settings-backdrop,
-body.is-scenario-list .node-settings-sidebar {
+body.is-scenario-list .node-settings-sidebar,
+body.is-scenario-list .holding-settings-backdrop,
+body.is-scenario-list .holding-settings-sidebar {
   display: none;
 }
 
@@ -479,8 +481,41 @@ body.is-scenario-list .node-settings-sidebar {
   font: var(--cmgui-font-body);
 }
 
+.scenario-search-field input::-webkit-search-cancel-button {
+  display: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 .scenario-search-field input::placeholder {
   color: var(--cmgui-color-text-secondary);
+}
+
+.scenario-search-clear {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--cmgui-color-icon-primary);
+  cursor: pointer;
+}
+
+.scenario-search-clear:hover {
+  color: var(--cmgui-color-icon-secondary);
+}
+
+.scenario-search-clear[hidden] {
+  display: none;
+}
+
+.scenario-search-clear .cmgui-icon,
+.scenario-search-clear .cmgui-icon svg {
+  width: 20px;
+  height: 20px;
 }
 
 .scenario-add-button {
@@ -765,9 +800,15 @@ body.is-board-panning #scenarioSvg {
 
 .node-icon-svg .ds-icon,
 .node-add-icon .ds-icon,
-.node-more-icon .ds-icon {
+.node-more-icon .ds-icon,
+.node-holding-indicator .ds-icon {
   display: block;
   color: currentColor;
+}
+
+.node-holding-indicator {
+  color: var(--cmgui-color-icon-accent);
+  pointer-events: none;
 }
 
 .node-title-svg {
@@ -925,9 +966,14 @@ body.is-board-panning #scenarioSvg {
   color: var(--cmgui-color-icon-error);
 }
 
-.scenario-node-svg.is-bulk-selected .node-card,
+.scenario-node-svg.is-bulk-selected .node-card {
+  opacity: 0;
+}
+
 .scenario-node-svg.is-bulk-selected .node-hover-card {
   stroke: var(--cmgui-color-special-13);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
   opacity: 1;
 }
 
@@ -1272,12 +1318,39 @@ body.is-board-panning #scenarioSvg {
   color: var(--cmgui-color-icon-secondary);
 }
 
+.top-action-button:disabled,
+.top-action-button:disabled:hover {
+  border-color: transparent;
+  background: transparent;
+  color: var(--cmgui-color-icon-disabled);
+  cursor: default;
+}
+
+.top-action-button:disabled span {
+  color: var(--cmgui-color-text-disabled);
+}
+
 .top-action-timer {
   gap: var(--cmgui-spacing-1);
   padding-right: var(--cmgui-spacing-2);
   padding-left: var(--cmgui-spacing-2);
   font: var(--cmgui-font-body-button-extrasmall);
   color: var(--cmgui-color-text-primary);
+}
+
+.top-action-timer > span:first-child {
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 16px;
+  line-height: 0;
+}
+
+.top-action-timer.is-empty {
+  width: 32px;
+  padding-right: var(--cmgui-spacing-2);
+  padding-left: var(--cmgui-spacing-2);
 }
 
 .top-actions .cmgui-icon,
@@ -1587,6 +1660,39 @@ body.is-node-settings-open .node-settings-sidebar {
   opacity: 1;
 }
 
+.holding-settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 46;
+  display: none;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+body.is-holding-settings-open .holding-settings-backdrop {
+  display: block;
+}
+
+.holding-settings-sidebar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 47;
+  width: 596px;
+  max-width: calc(100vw - 56px);
+  display: flex;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  background: var(--cmgui-color-bg-main-white);
+  box-shadow: var(--cmgui-shadow-large);
+}
+
+body.is-holding-settings-open .holding-settings-sidebar {
+  pointer-events: auto;
+  opacity: 1;
+}
+
 .node-settings-form {
   width: 100%;
   min-height: 100%;
@@ -1657,6 +1763,123 @@ body.is-node-settings-open .node-settings-sidebar {
   border-radius: var(--cmgui-border-radius-large);
   background: var(--cmgui-color-bg-main-white);
   transition: border-color 120ms ease;
+}
+
+.holding-settings-body {
+  gap: 16px;
+}
+
+.holding-settings-card,
+.holding-message-card {
+  gap: 16px;
+}
+
+.holding-transfer-select {
+  position: relative;
+}
+
+.holding-transfer-select.is-error .cmgui-select-field,
+.holding-transfer-select.is-error .cmgui-select-field:hover,
+.holding-transfer-select.is-error .cmgui-select-field:focus-within {
+  border-color: var(--cmgui-color-border-error);
+}
+
+.holding-transfer-dropdown {
+  width: 100%;
+  z-index: 1000;
+}
+
+.holding-empty-option {
+  width: 100%;
+  display: block;
+  padding: 0 16px;
+  color: var(--cmgui-color-text-secondary);
+  font: var(--cmgui-font-body);
+}
+
+.holding-message-card {
+  padding-bottom: 20px;
+}
+
+.holding-message-head {
+  display: grid;
+  grid-template-columns: 20px 20px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.holding-message-drag {
+  display: grid;
+  place-items: center;
+  color: var(--cmgui-color-icon-secondary);
+  line-height: 0;
+  cursor: grab;
+}
+
+.holding-message-card:active .holding-message-drag {
+  cursor: grabbing;
+}
+
+.holding-message-head strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--cmgui-color-text-primary);
+  font: var(--cmgui-font-body-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.holding-message-delete {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  justify-self: end;
+  padding: 0;
+  border: 0;
+  border-radius: var(--cmgui-border-radius-button);
+  background: transparent;
+  color: var(--cmgui-color-icon-primary);
+  cursor: pointer;
+}
+
+.holding-message-delete:hover {
+  color: var(--cmgui-color-icon-error);
+}
+
+.holding-message-delete:disabled,
+.holding-message-delete:disabled:hover {
+  color: var(--cmgui-color-icon-disabled);
+  cursor: default;
+}
+
+.holding-message-textarea {
+  display: block;
+}
+
+.holding-message-textarea .cmgui-text-field-wrapper {
+  min-height: 84px;
+  align-items: flex-start;
+  padding: 12px 16px;
+}
+
+.holding-message-textarea .cmgui-text-field-input {
+  min-height: 58px;
+  padding: 0;
+  resize: none;
+}
+
+.holding-delay-row {
+  justify-content: flex-start;
+}
+
+.holding-delay-row .response-label {
+  color: var(--cmgui-color-text-primary);
+}
+
+.holding-add-message {
+  align-self: flex-start;
 }
 
 .node-settings-card-head {
@@ -2626,8 +2849,8 @@ body.is-node-settings-open .node-settings-sidebar {
 }
 
 .operation-modal {
-  width: 640px;
-  max-width: min(640px, calc(100vw - 48px));
+  width: 672px;
+  max-width: min(672px, calc(100vw - 48px));
   max-height: calc(100vh - 48px);
   display: flex;
   flex-direction: column;
@@ -2809,7 +3032,50 @@ body.is-settings-close-confirm-open .node-settings-confirm-modal .cmgui-modal-ma
   display: block;
 }
 
+.scenario-create-finish-toggle {
+  width: max-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--cmgui-color-text-accent);
+  font: var(--cmgui-font-body);
+  cursor: pointer;
+}
+
+.scenario-create-finish-toggle:hover {
+  color: var(--cmgui-color-text-accent-hover);
+}
+
+.scenario-create-finish-settings {
+  position: relative;
+  z-index: 30;
+  display: grid;
+  gap: 16px;
+}
+
+.scenario-create-finish-settings[hidden] {
+  display: none;
+}
+
+.scenario-create-finish-settings .simple-select {
+  width: 100%;
+}
+
+.scenario-create-finish-settings .node-dropdown {
+  z-index: 80;
+}
+
+.scenario-create-finish-time-row {
+  grid-template-columns: max-content 72px max-content;
+}
+
 .scenario-create-footer {
+  position: relative;
+  z-index: 1;
   display: flex;
   gap: 8px;
   padding: 20px;
