@@ -1479,6 +1479,14 @@ body.is-board-panning #scenarioSvg {
   color: var(--cmgui-color-icon-secondary);
 }
 
+.bottom-bar .icon-button:disabled,
+.bottom-bar .icon-button:disabled:hover {
+  border-color: transparent;
+  background: transparent;
+  color: var(--cmgui-color-icon-disabled);
+  cursor: default;
+}
+
 .outcome-menu {
   position: fixed;
   z-index: 110;

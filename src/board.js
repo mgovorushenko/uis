@@ -1994,9 +1994,10 @@ function closeScenarioTitleEdit() {
 
 function updateNodeText(groupElement, nodeData, compact) {
   const group = d3.select(groupElement);
-  const titleWidth = isPlaceholderNode(nodeData) ? 176 : compact ? NODE_TEXT_COMPACT_WIDTH : NODE_TEXT_DEFAULT_WIDTH;
+  const shouldCompactText = compact && !isStartNode(nodeData);
+  const titleWidth = isPlaceholderNode(nodeData) ? 176 : shouldCompactText ? NODE_TEXT_COMPACT_WIDTH : NODE_TEXT_DEFAULT_WIDTH;
   fitSvgText(group.select(".node-title-svg"), nodeData.title, titleWidth);
-  fitNodeSubtitle(group.select(".node-subtitle-svg"), isPlaceholderNode(nodeData) ? "" : nodeData.subtitle, compact ? NODE_TEXT_COMPACT_WIDTH : NODE_TEXT_DEFAULT_WIDTH);
+  fitNodeSubtitle(group.select(".node-subtitle-svg"), isPlaceholderNode(nodeData) ? "" : nodeData.subtitle, shouldCompactText ? NODE_TEXT_COMPACT_WIDTH : NODE_TEXT_DEFAULT_WIDTH);
 }
 
 function fitNodeSubtitle(textSelection, value, maxWidth) {
@@ -3028,7 +3029,7 @@ function renderNodeSettingsSidebar() {
   wireNodeSettingsSidebar(sidebar, nodeItem, settings);
   const body = sidebar.querySelector(".node-settings-body");
   if (body) body.scrollTop = bodyScrollTop;
-  positionOpenNodeSettingsDropdowns();
+  positionOpenDropdowns(sidebar);
 }
 
 function renderCounter(id, value, { min = 0, max = 9999999 } = {}) {
@@ -3096,10 +3097,11 @@ function renderHoldingSettingsSidebar() {
   </form>`;
 
   wireHoldingSettingsSidebar(sidebar, settings);
+  positionOpenDropdowns(sidebar);
 }
 
 function renderHoldingTransferDropdown(settings, options) {
-  return `<div class="cmgui-dropdown cmgui-dropdown-placement-bottomLeft node-dropdown holding-transfer-dropdown" role="listbox" aria-label="Операции переадресации">
+  return `<div class="cmgui-dropdown cmgui-dropdown-placement-bottomLeft node-dropdown holding-transfer-dropdown" data-dropdown-popup-for="holdingTransferSelect" data-dropdown-width="100%" role="listbox" aria-label="Операции переадресации">
     <div class="cmgui-dropdown-content">
       <div class="cmgui-dropdown-inner">
         <ul class="cmgui-list cmgui-list-borderless cmgui-dropdown-list">
@@ -3456,7 +3458,7 @@ function renderStartSettingsCards(settings, errors = {}) {
       <span>Правило завершения сценария</span>
     </div>
     <div class="node-settings-card-content">
-      ${renderSettingsAlert("Сценарий завершится, если чат не возьмут в работу в\u00A0течение выбранного времени после окончания всех операций.")}
+      ${renderSettingsAlert(startFinishAlertText(settings))}
       <div class="start-finish-time-row">
         <span>Завершать сценарий через</span>
         <span class="cmgui-text-field-wrapper start-hours-field ${errors.finishAfterHours ? "is-error" : ""}">
@@ -3480,7 +3482,7 @@ function renderStartSettingsCards(settings, errors = {}) {
 }
 
 function renderStartChannelsDropdown(settings) {
-  return `<div class="cmgui-dropdown cmgui-dropdown-placement-bottomLeft node-dropdown start-channel-dropdown" role="listbox" aria-label="Каналы">
+  return `<div class="cmgui-dropdown cmgui-dropdown-placement-bottomLeft node-dropdown start-channel-dropdown" data-dropdown-popup-for="startChannelsSelect" data-dropdown-width="100%" role="listbox" aria-label="Каналы">
     <div class="cmgui-dropdown-content">
       <div class="cmgui-dropdown-inner">
         <ul class="cmgui-list cmgui-list-borderless cmgui-dropdown-list">
@@ -3917,21 +3919,39 @@ function renderSettingsAlert(text) {
   </div>`;
 }
 
-function positionOpenNodeSettingsDropdowns() {
-  const sidebar = document.querySelector("#nodeSettingsSidebar");
-  if (!sidebar) return;
-  sidebar.querySelectorAll(".node-dropdown[data-dropdown-popup-for]").forEach((dropdown) => {
-    const trigger = sidebar.querySelector(`#${cssEscape(dropdown.dataset.dropdownPopupFor)}`);
+function startFinishAlertText(settings) {
+  return `Сценарий завершится, если чат не возьмут в работу в\u00A0течение ${formatStartFinishDuration(settings.finishAfterHours, settings.finishAfterUnit)} после окончания всех операций`;
+}
+
+function formatStartFinishDuration(value, unit) {
+  const normalized = sanitizeStartFinishValue(value, 72, unit);
+  const word = unit === "days" ? (normalized === 1 ? "дня" : "дней") : normalized === 1 ? "часа" : "часов";
+  return `${normalized} ${word}`;
+}
+
+function positionOpenDropdowns(root = document) {
+  if (!root) return;
+  const rootRect = root.getBoundingClientRect?.() || { top: 0, bottom: window.innerHeight, left: 0 };
+  const footerRect = root.querySelector?.(".node-settings-footer, .scenario-create-footer")?.getBoundingClientRect();
+  const boundaryTop = Math.max(8, rootRect.top || 0);
+  const boundaryBottom = Math.min(window.innerHeight - 8, footerRect?.top ?? rootRect.bottom ?? window.innerHeight);
+  root.querySelectorAll(".node-dropdown[data-dropdown-popup-for]").forEach((dropdown) => {
+    const trigger = root.querySelector(`#${cssEscape(dropdown.dataset.dropdownPopupFor)}`) || document.querySelector(`#${cssEscape(dropdown.dataset.dropdownPopupFor)}`);
     if (!trigger) return;
     const triggerRect = trigger.getBoundingClientRect();
-    const sidebarRect = sidebar.getBoundingClientRect();
     const widthValue = dropdown.dataset.dropdownWidth || "100%";
     const width = widthValue.endsWith("%") ? triggerRect.width : Number.parseFloat(widthValue) || triggerRect.width;
     dropdown.style.position = "fixed";
-    dropdown.style.left = `${Math.max(sidebarRect.left, Math.min(triggerRect.left, window.innerWidth - width - 8))}px`;
-    dropdown.style.top = `${triggerRect.bottom + 4}px`;
+    dropdown.style.left = `${Math.max(rootRect.left || 0, Math.min(triggerRect.left, window.innerWidth - width - 8))}px`;
     dropdown.style.width = `${width}px`;
     dropdown.style.zIndex = "1000";
+    dropdown.style.top = `${triggerRect.bottom + 4}px`;
+    const dropdownHeight = dropdown.getBoundingClientRect().height;
+    const belowSpace = boundaryBottom - triggerRect.bottom - 4;
+    const aboveSpace = triggerRect.top - boundaryTop - 4;
+    const shouldOpenUp = dropdownHeight > belowSpace && aboveSpace > belowSpace;
+    dropdown.classList.toggle("is-open-up", shouldOpenUp);
+    dropdown.style.top = shouldOpenUp ? `${Math.max(boundaryTop, triggerRect.top - dropdownHeight - 4)}px` : `${triggerRect.bottom + 4}px`;
   });
 }
 
@@ -5525,6 +5545,7 @@ function toggleScenarioCreateChannelsDropdown() {
   const isOpen = dropdown.classList.toggle("is-open");
   button.classList.toggle("cmgui-select-field-active", isOpen);
   button.setAttribute("aria-expanded", String(isOpen));
+  if (isOpen) positionOpenDropdowns(document.querySelector("#scenarioCreateModal"));
 }
 
 function closeScenarioCreateChannelsDropdown() {
@@ -5583,7 +5604,7 @@ function renderScenarioCreateFinishSettings() {
     container.innerHTML = "";
     return;
   }
-  container.innerHTML = `${renderSettingsAlert("Сценарий завершится, если чат не возьмут в работу в\u00A0течение выбранного времени после окончания всех операций.")}
+  container.innerHTML = `${renderSettingsAlert(startFinishAlertText(settings))}
     <div class="start-finish-time-row scenario-create-finish-time-row">
       <span>Завершать через</span>
       <span class="cmgui-text-field-wrapper start-hours-field">
@@ -5603,6 +5624,7 @@ function renderScenarioCreateFinishSettings() {
     ${settings.completionTarget === "employee" ? renderSimpleSelect("scenarioCreateEmployeeSelect", "Сотрудник*", settings.employeeName, TRANSFER_EMPLOYEES.map((name) => [name, name]), settings.employeeDropdownOpen) : ""}
     ${settings.completionTarget === "group" ? renderSimpleSelect("scenarioCreateGroupSelect", "Группа*", settings.groupName, GROUP_TRANSFER_GROUPS.map((name) => [name, name]), settings.groupDropdownOpen) : ""}`;
   wireScenarioCreateFinishSettings();
+  positionOpenDropdowns(document.querySelector("#scenarioCreateModal"));
 }
 
 function renderScenarioCreateRadio(value, label, selectedValue) {
