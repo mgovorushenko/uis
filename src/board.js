@@ -1,6 +1,6 @@
 const APP_STORAGE_KEY = "chat-scenarios-app-v1";
 const LEGACY_STORAGE_KEY = "chat-scenario-board-d3-v1";
-const ICON_ASSET_VERSION = "2026-05-12-3";
+const ICON_ASSET_VERSION = "2026-05-12-4";
 const NODE_W = 300;
 const NODE_H = 60;
 const NODE_HOVER_H = 62;
@@ -8,13 +8,23 @@ const NODE_TEXT_DEFAULT_WIDTH = 216;
 const NODE_TEXT_COMPACT_WIDTH = 192;
 const NODE_PORT_LEFT_X = -14;
 const NODE_PORT_RIGHT_X = NODE_W + 51;
-const NODE_PORT_RIGHT_COMPACT_X = NODE_W + 20;
+const NODE_PORT_RIGHT_COMPACT_X = NODE_W + 11;
 const NODE_PORT_R = 3;
 const NODE_PORT_EDGE_GAP = 8;
 const NODE_PORT_ARROW_GAP = 2;
 const NODE_CREATE_GAP_X = 80;
+const NODE_DRAG_GRID_STEP = 4;
 const EDGE_LABEL_SIDE_GAP = 60;
 const EDGE_LABEL_PADDING_X = 10;
+const EDGE_LABEL_HOVER_RESERVE_X = 64;
+const OUTPUT_STACK_GAP_Y = 112;
+const CHANNEL_OPTIONS = ["Email", "Max", "Telegram", "WhatsApp"];
+const CHANNEL_ICON_BY_CHANNEL = {
+  Email: "source-email-20",
+  Max: "source-max-20",
+  Telegram: "source-telegram-20",
+  WhatsApp: "source-whatsapp-20",
+};
 const GROUP_TRANSFER_EMPLOYEES_BY_GROUP = {
   "Отдел продаж": ["Лемаева Юлия", "Васнецов Николай", "Смирнова Алина", "Орлов Денис"],
   "Служба поддержки": ["Кузнецова Мария", "Павлов Игорь", "Романова Елена", "Фомин Артем", "Громова Дарья", "Соколов Кирилл"],
@@ -31,17 +41,17 @@ const SIMPLE_TRANSFER_CONFIG = {
     requiredField: "employeeName",
     requiredError: "Выберите сотрудника",
     emptySubtitle: "Сотрудник не выбран",
-    alert: "Чат будет направлен сразу на выбранного сотрудника",
+    alert: "Чат будет направлен сразу на выбранного сотрудника. Если за время ожидания он не возьмет чат в работу, сценарий перейдет к следующей операции. Если ее нет, сработает общее правило завершения сценария.",
     icon: "user-20",
   },
   "personal-manager-transfer": {
     title: "На персонального менеджера",
-    alert: "Чат будет направлен на персонального менеджера клиента",
+    alert: "Сообщение будет направлено на менеджера, закрепленного за клиентом в разделе Контакты. Если за время ожидания он не возьмет чат в работу, сценарий перейдет к следующей операции. Если ее нет, сработает общее правило завершения сценария.",
     icon: "last-manager",
   },
   "last-manager-transfer": {
     title: "На последнего менеджера",
-    alert: "Чат будет направлен на менеджера, с которым клиент общался последним",
+    alert: "Сообщение будет направлено на последнего менеджера, который общался с клиентом. Если за время ожидания он не возьмет чат в работу, сценарий перейдет к следующей операции. Если ее нет, сработает общее правило завершения сценария.",
     icon: "last-manager",
   },
 };
@@ -50,10 +60,12 @@ const CONTACT_FORM_OPERATION = "contact-form";
 const MENU_OPERATION = "menu-operation";
 const SCHEDULE_OPERATION = "schedule-distribution";
 const SEGMENT_OPERATION = "segment-distribution";
+const CONDITION_OPERATION = "condition-distribution";
 const MENU_BUTTON_MAX_LENGTH = 128;
 const MENU_BUTTON_MAX_COUNT = 15;
 const SCHEDULE_MAX_COUNT = 20;
 const SEGMENT_MAX_COUNT = 20;
+const CONDITION_MAX_COUNT = 20;
 const EDGE_LABEL_MAX_WIDTH = 160;
 const AVAILABLE_SCHEDULES = [
   "Будние дни",
@@ -80,27 +92,42 @@ const AVAILABLE_SCHEDULES = [
   "Экстренные обращения",
 ];
 const AVAILABLE_SEGMENT_GROUPS = [
-  "Сегмент 1, Сегмент 2",
-  "Сегмент 3, Сегмент 4",
-  "Составляющая сегмента 1, Составляющая сегмента 2, Составляющая сегмента 3",
-  "Новые посетители",
-  "Повторные обращения",
-  "VIP-клиенты",
-  "Клиенты с активной сделкой",
-  "Клиенты без сделки",
-  "Пользователи из рекламы",
-  "Пользователи из органики",
-  "Москва и область",
-  "Санкт-Петербург",
-  "Высокий чек",
-  "Не отвечали более 7 дней",
-  "Потенциальный отток",
-  "Партнерский трафик",
-  "Мобильные пользователи",
-  "Десктопные пользователи",
-  "Тестовая группа A",
-  "Тестовая группа B",
+  "Сегмент 1",
+  "Сегмент 2",
+  "Сегмент 3",
+  "Сегмент 4",
+  "Сегмент 5",
+  "Сегмент 6",
+  "Сегмент 7",
+  "Сегмент 8",
+  "Сегмент 9",
+  "Сегмент 10",
+  "Сегмент 11",
+  "Сегмент 12",
+  "Сегмент 13",
+  "Сегмент 14",
+  "Сегмент 15",
+  "Сегмент 16",
+  "Сегмент 17",
+  "Сегмент 18",
+  "Сегмент 19",
+  "Сегмент 20",
 ];
+const CONDITION_PARAMETERS = ["Город", "Канал", "Статус клиента", "Источник", "Тип клиента", "Тариф", "Регион", "Язык"];
+const CONDITION_OPERATORS = [
+  ["equals", "равно"],
+  ["notEquals", "не равно"],
+];
+const CONDITION_VALUES_BY_PARAMETER = {
+  Город: ["Москва", "Санкт-Петербург", "Казань", "Новосибирск", "Екатеринбург"],
+  Канал: CHANNEL_OPTIONS,
+  "Статус клиента": ["Новый", "Постоянный", "VIP", "Спящий", "Проблемный"],
+  Источник: ["Сайт", "Реклама", "Рассылка", "Маркетплейс", "Партнер"],
+  "Тип клиента": ["Физическое лицо", "Компания", "Партнер", "Дилер"],
+  Тариф: ["Старт", "Бизнес", "Профи", "Enterprise"],
+  Регион: ["Центр", "Северо-Запад", "Юг", "Урал", "Сибирь"],
+  Язык: ["Русский", "Английский", "Казахский", "Узбекский"],
+};
 const icons = {
   search: '<circle cx="9" cy="9" r="5"></circle><path d="m13 13 4 4"></path>',
   star: '<path d="m10 2 2.5 5.1 5.6.8-4 3.9.9 5.5-5-2.6-5 2.6.9-5.5-4-3.9 5.6-.8L10 2Z"></path>',
@@ -175,13 +202,29 @@ const designSystemIconFiles = {
   "drag-and-drop": "./assets/icons/drag-and-drop_20.svg",
   "arrows-both-ways": "./assets/icons/arrows-both-ways_20.svg",
   "copy-20": "./assets/icons/copy_20.svg",
+  "settings-20": "./assets/icons/settings_20.svg",
   delete: "./assets/icons/delete_20.svg",
+  "delete-20": "./assets/icons/delete_20.svg",
   "warning-message-filled-20": "./assets/icons/warning-message-filled_20.svg",
+  "menu-search-16": "./assets/icons/search_16.svg",
+  "menu-star-20": "./assets/icons/star_20.svg",
+  "menu-analytic-report-20": "./assets/icons/analytic-report_20.svg",
+  "menu-dashboard-20": "./assets/icons/dashboard_20.svg",
+  "menu-message-20": "./assets/icons/message_20.svg",
+  "menu-settings-20": "./assets/icons/settings_20.svg",
+  "menu-integrations-20": "./assets/icons/integrations_20.svg",
+  "menu-notification-20": "./assets/icons/notification_20.svg",
+  "menu-info-20": "./assets/icons/menu-info_20.svg",
+  "menu-user-20": "./assets/icons/menu-user_20.svg",
+  "source-email-20": "./assets/icons/source-email_20.svg",
+  "source-max-20": "./assets/icons/source-max_20.svg",
+  "source-telegram-20": "./assets/icons/source-telegram_20.svg",
+  "source-whatsapp-20": "./assets/icons/source-whatsapp_20.svg",
 };
 const designSystemIcons = {};
 
 const catalog = {
-  start: { title: "Входящее сообщение", subtitle: "Каналы: Telegram, Email", color: "var(--cmgui-color-special-1)", icon: "start" },
+  start: { title: "Начало сценария", subtitle: "Каналы: Email, Telegram", color: "var(--cmgui-color-special-1)", icon: "start" },
   form: { title: "Форма сбора контактов", subtitle: "Ожидание контактов: 1 мин.", color: "var(--cmgui-color-special-15)", icon: "form" },
   transfer: { title: "На группу: Отдел продаж", subtitle: "Ожидание ответа: 1 мин.", color: "var(--cmgui-color-special-2)", icon: "last-manager" },
   success: { title: "Чат взят в работу", subtitle: "", color: "var(--cmgui-color-special-1)", icon: "success" },
@@ -189,8 +232,9 @@ const catalog = {
   menuNode: { title: "Меню", subtitle: "Ожидание нажатия кнопки: 20 сек.", color: "var(--cmgui-color-special-13)", icon: "menu" },
   schedule: { title: "Распределение по графику", subtitle: "График: Будние дни", color: "var(--cmgui-color-special-13)", icon: "time-20" },
   segment: { title: "Распределение по сегментам", subtitle: "Группа сегментов: Сегмент 1, Сегмент 2", color: "var(--cmgui-color-special-13)", icon: "distribution" },
+  condition: { title: "Распределение по условиям", subtitle: "Условие: Город равно Москва", color: "var(--cmgui-color-special-13)", icon: "row-data" },
   empty: { title: "Добавить операцию", subtitle: "", color: "var(--cmgui-color-bg-main-gray-dark)", icon: "attention", muted: true },
-  finish: { title: "Завершить сценарий через 72 ч", subtitle: "После отправить чат: Всем сотрудникам", color: "var(--cmgui-color-special-21)", icon: "node-connection-line" },
+  finish: { title: "Закрытие чата", subtitle: "", color: "var(--cmgui-color-special-15)", icon: "finish" },
 };
 
 const starter = {
@@ -212,22 +256,35 @@ const starter = {
 };
 
 let appState = loadAppState();
-let state = getCurrentScenario()?.board || createInitialBoard(["Telegram", "Email"]);
+let state = getCurrentScenario()?.board || createInitialBoard(["Email", "Telegram"]);
 let selectedId = null;
 let hoveredId = null;
+let selectedEdgeId = null;
+let hoveredEdgeId = null;
+let edgeLabelPlacements = new Map();
 let draggedNodeId = null;
+let connectionDrag = null;
 let pendingSourceId = null;
 let operationSourceId = null;
 let operationReplaceId = null;
 let operationOutputKey = null;
 let outcomeMenuSourceId = null;
+let outcomeMenuTargetId = null;
 let contextMenuNodeId = null;
 let titleEditingNodeId = null;
 let settingsNodeId = null;
 let settingsDrafts = {};
 let settingsErrors = {};
 let pendingSettingsNodeIds = new Set();
+let pendingPlaceholderBackups = new Map();
+let bulkSelectedNodeIds = new Set();
+let bulkSelectedEdgeIds = new Set();
+let selectionDrag = null;
+let suppressNextBoardClick = false;
 let isSettingsCloseConfirmOpen = false;
+let isScenarioTitleEditing = false;
+let scenarioTitleBeforeEdit = "";
+let scenarioSearchQuery = "";
 let history = [];
 let future = [];
 let persistTimer = null;
@@ -237,8 +294,10 @@ const svg = d3.select("#scenarioSvg");
 const viewport = d3.select("#viewport");
 const gridLayer = d3.select("#gridLayer");
 const edgeLayer = d3.select("#edgeLayer");
+const connectionPreviewLayer = d3.select("#connectionPreviewLayer");
 const labelLayer = d3.select("#labelLayer");
 const nodeLayer = d3.select("#nodeLayer");
+const selectionLayer = d3.select("#selectionLayer");
 const zoom = d3
   .zoom()
   .scaleExtent([0.25, 1])
@@ -258,6 +317,7 @@ const zoom = d3
     viewport.attr("transform", event.transform);
     document.querySelector("#zoomLabel").textContent = `${Math.round(event.transform.k * 100)}%`;
     state.viewport = { x: event.transform.x, y: event.transform.y, k: event.transform.k };
+    updateNodeTitleEditorPosition(event.transform);
     schedulePersistState({ markDirty: false });
   })
   .on("end", () => {
@@ -267,9 +327,11 @@ const zoom = d3
 svg.call(zoom).on("dblclick.zoom", null);
 svg.on("contextmenu", (event) => event.preventDefault());
 svg.on("wheel.board", handleTrackpadWheel, { passive: false });
+svg.on("mousedown.selection", startBoardSelection);
 setupIcons();
 renderMenu();
 wireControls();
+window.addEventListener("beforeunload", flushPendingPersist);
 drawGrid();
 render();
 restoreViewport();
@@ -319,8 +381,8 @@ function setupIcons() {
 }
 
 function renderMenu() {
-  const top = ["star", "zap", "workflow", "message", "settings", "branch"];
-  const bottom = ["bell", "info", "user"];
+  const top = ["menu-star-20", "menu-analytic-report-20", "menu-dashboard-20", "menu-message-20", "menu-settings-20", "menu-integrations-20"];
+  const bottom = ["menu-notification-20", "menu-info-20", "menu-user-20"];
   document.querySelector("#menuTop").innerHTML = top
     .map((item, index) => `<button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button is-compact is-subtle ${index === 4 ? "is-active" : ""}" title="Раздел"><span class="cmgui-icon">${iconSvg(item, 20)}</span></button>`)
     .join("");
@@ -333,8 +395,11 @@ function wireControls() {
   document.addEventListener(
     "click",
     (event) => {
+      scheduleNodeSettingsDropdownClose(event.target);
       if (outcomeMenuSourceId && !event.target.closest("#outcomeMenu") && !event.target.closest(".node-add-button")) closeOutcomeMenu();
       if (contextMenuNodeId && !event.target.closest("#nodeContextMenu") && !event.target.closest(".node-more-icon")) closeNodeContextMenu();
+      if (isScenarioTitleEditing && !event.target.closest(".top-title-wrap")) commitScenarioTitleEdit();
+      if (document.body.classList.contains("is-scenario-create-open") && !event.target.closest(".scenario-create-channel-select")) closeScenarioCreateChannelsDropdown();
       if (titleEditingNodeId && !event.target.closest("#nodeTitleEditor")) commitNodeTitleEdit();
       if (!document.body.classList.contains("is-node-settings-open") || isSettingsCloseConfirmOpen) return;
       if (event.target.closest("#nodeSettingsSidebar") || event.target.closest("#nodeSettingsCloseConfirm")) return;
@@ -343,14 +408,40 @@ function wireControls() {
     true,
   );
   document.querySelector(".top-back-button").addEventListener("click", showScenarioList);
+  document.querySelector("#scenarioTitleText").addEventListener("click", startScenarioTitleEdit);
+  document.querySelector(".top-title-edit").addEventListener("click", startScenarioTitleEdit);
+  document.querySelector("#scenarioTitleText").addEventListener("mouseenter", showScenarioTitleTooltip);
+  document.querySelector("#scenarioTitleText").addEventListener("mousemove", moveScenarioTitleTooltip);
+  document.querySelector("#scenarioTitleText").addEventListener("mouseleave", hideEdgeTooltip);
+  document.querySelector("#scenarioTitleInput").addEventListener("blur", commitScenarioTitleEdit);
+  document.querySelector("#scenarioTitleInput").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      event.currentTarget.blur();
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeScenarioTitleEdit();
+    }
+  });
   document.querySelector("#createScenarioButton").addEventListener("click", openScenarioCreateModal);
   document.querySelector("#createScenarioEmptyButton").addEventListener("click", openScenarioCreateModal);
+  document.querySelector("#scenarioSearchInput").addEventListener("input", (event) => {
+    scenarioSearchQuery = event.target.value;
+    renderScenarioList();
+  });
   document.querySelector("#scenarioCreateModal").addEventListener("click", (event) => {
     if (event.target.id === "scenarioCreateModal") closeScenarioCreateModal();
   });
   document.querySelector("#scenarioCreateClose").addEventListener("click", closeScenarioCreateModal);
   document.querySelector("#scenarioCreateCancel").addEventListener("click", closeScenarioCreateModal);
   document.querySelector("#scenarioCreateForm").addEventListener("submit", createScenarioFromForm);
+  document.querySelector("#scenarioNameInput").addEventListener("input", updateScenarioCreateNameState);
+  document.querySelector("#scenarioNameInput").addEventListener("blur", () => updateScenarioCreateNameState({ showError: true }));
+  document.querySelector("#scenarioCreateChannelsSelect").addEventListener("click", toggleScenarioCreateChannelsDropdown);
+  document.querySelectorAll("#scenarioCreateChannelsDropdown input[name='channels']").forEach((input) => {
+    input.addEventListener("change", updateScenarioCreateChannelsValue);
+  });
   document.querySelector("#saveButton").addEventListener("click", saveState);
   document.querySelector("#undoButton").addEventListener("click", undo);
   document.querySelector("#redoButton").addEventListener("click", redo);
@@ -366,8 +457,13 @@ function wireControls() {
     const button = event.target.closest("[data-outcome-key]");
     if (!button) return;
     const sourceId = outcomeMenuSourceId;
+    const targetId = outcomeMenuTargetId;
     const outputKey = button.dataset.outcomeKey;
     closeOutcomeMenu();
+    if (sourceId && targetId) {
+      connectNodesManually(sourceId, targetId, outputKey);
+      return;
+    }
     openOperationModal(sourceId, null, outputKey);
   });
   document.querySelector("#nodeContextMenu").addEventListener("click", handleNodeContextMenuClick);
@@ -425,7 +521,18 @@ function wireControls() {
       return;
     }
     if (isEditableEventTarget(event.target)) return;
+    if ((event.key === "Backspace" || event.key === "Delete") && (bulkSelectedNodeIds.size || bulkSelectedEdgeIds.size)) {
+      event.preventDefault();
+      deleteBulkSelection();
+      return;
+    }
+    if ((event.key === "Backspace" || event.key === "Delete") && selectedEdgeId) {
+      event.preventDefault();
+      removeEdgeById(selectedEdgeId);
+      return;
+    }
     if ((event.key === "Backspace" || event.key === "Delete") && selectedId) {
+      event.preventDefault();
       removeSelected();
     }
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
@@ -449,6 +556,188 @@ function handleTrackpadWheel(event) {
   const current = d3.zoomTransform(svg.node());
   const next = current.translate(-delta.x / current.k, -delta.y / current.k);
   svg.call(zoom.transform, next);
+}
+
+function startBoardSelection(event) {
+  if (event.button !== 0 || connectionDrag || document.body.classList.contains("is-node-settings-open") || document.body.classList.contains("is-operation-modal-open")) return;
+  if (event.target.closest?.(".scenario-node-svg, .scenario-edge-group, .edge-label-svg, .bulk-selection-menu")) return;
+  event.preventDefault();
+  closeOutcomeMenu();
+  closeNodeContextMenu();
+  selectedId = null;
+  selectedEdgeId = null;
+  hoveredEdgeId = null;
+  const start = boardPointFromEvent(event);
+  selectionDrag = { start, current: start, singleEdgeCandidateId: null };
+  bulkSelectedNodeIds = new Set();
+  bulkSelectedEdgeIds = new Set();
+  render();
+  window.addEventListener("mousemove", updateBoardSelection);
+  window.addEventListener("mouseup", endBoardSelection, { once: true });
+}
+
+function updateBoardSelection(event) {
+  if (!selectionDrag) return;
+  selectionDrag.current = boardPointFromEvent(event);
+  updateBulkSelection(rectFromPoints(selectionDrag.start, selectionDrag.current));
+  rememberSingleEdgeSelectionCandidate();
+  renderEdges();
+  renderNodes();
+  renderSelectionOverlay();
+}
+
+function endBoardSelection(event) {
+  window.removeEventListener("mousemove", updateBoardSelection);
+  if (!selectionDrag) return;
+  const finishedSelection = selectionDrag;
+  const rect = rectFromPoints(finishedSelection.start, finishedSelection.current);
+  selectionDrag = null;
+  if (rect.width < 4 && rect.height < 4) {
+    clearBulkSelection();
+    render();
+    return;
+  }
+  updateBulkSelection(rect);
+  restoreSingleEdgeSelectionCandidate(finishedSelection);
+  normalizeSingleEdgeBulkSelection();
+  suppressNextBoardClick = true;
+  window.setTimeout(() => {
+    suppressNextBoardClick = false;
+  }, 0);
+  render();
+}
+
+function rememberSingleEdgeSelectionCandidate() {
+  if (!selectionDrag || bulkSelectedNodeIds.size || bulkSelectedEdgeIds.size !== 1) return;
+  selectionDrag.singleEdgeCandidateId = [...bulkSelectedEdgeIds][0];
+}
+
+function restoreSingleEdgeSelectionCandidate(finishedSelection) {
+  if (!finishedSelection?.singleEdgeCandidateId || bulkSelectedNodeIds.size || bulkSelectedEdgeIds.size) return;
+  if (!state.edges.some((edgeItem) => edgeItem.id === finishedSelection.singleEdgeCandidateId)) return;
+  bulkSelectedEdgeIds = new Set([finishedSelection.singleEdgeCandidateId]);
+}
+
+function normalizeSingleEdgeBulkSelection() {
+  if (bulkSelectedNodeIds.size || bulkSelectedEdgeIds.size !== 1) return;
+  selectedEdgeId = [...bulkSelectedEdgeIds][0];
+  selectedId = null;
+  bulkSelectedEdgeIds = new Set();
+  hoveredEdgeId = null;
+  closeNodeContextMenu();
+  closeOutcomeMenu();
+}
+
+function boardPointFromEvent(event) {
+  const transform = d3.zoomTransform(svg.node());
+  const [x, y] = transform.invert(d3.pointer(event, svg.node()));
+  return { x, y };
+}
+
+function rectFromPoints(a, b) {
+  const x = Math.min(a.x, b.x);
+  const y = Math.min(a.y, b.y);
+  return { x, y, width: Math.abs(a.x - b.x), height: Math.abs(a.y - b.y) };
+}
+
+function updateBulkSelection(selectionRect) {
+  bulkSelectedNodeIds = new Set(
+    state.nodes
+      .filter((nodeItem) => !isStartNode(nodeItem) && rectsOverlap(selectionRect, nodeBounds(nodeItem), 0))
+      .map((nodeItem) => nodeItem.id),
+  );
+  bulkSelectedEdgeIds = new Set(
+    state.edges
+      .filter((edgeItem) => edgeIntersectsSelection(edgeItem, selectionRect))
+      .map((edgeItem) => edgeItem.id),
+  );
+}
+
+function clearBulkSelection() {
+  bulkSelectedNodeIds = new Set();
+  bulkSelectedEdgeIds = new Set();
+  selectionDrag = null;
+}
+
+function nodeBounds(nodeItem) {
+  return { x: nodeItem.x, y: nodeItem.y, width: NODE_W, height: NODE_H };
+}
+
+function edgeIntersectsSelection(edgeItem, selectionRect) {
+  const source = getNode(edgeItem.source);
+  const target = getNode(edgeItem.target);
+  if (!source || !target) return false;
+  const points = edgeVisualPoints(edgeItem);
+  if (!points.length) return false;
+  if (polylineIntersectsRect(points, selectionRect)) return true;
+  const labelPlacement = edgeLabelPlacements.get(edgeItem.id);
+  return labelPlacement ? rectsOverlap(selectionRect, labelPlacement, 0) : false;
+}
+
+function polylineIntersectsRect(points, rect) {
+  return points.some((point, index) => {
+    if (pointInRect(point, rect)) return true;
+    if (index === 0) return false;
+    return segmentIntersectsRect(points[index - 1], point, rect);
+  });
+}
+
+function pointInRect(point, rect) {
+  return point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height;
+}
+
+function segmentIntersectsRect(a, b, rect) {
+  const left = rect.x;
+  const right = rect.x + rect.width;
+  const top = rect.y;
+  const bottom = rect.y + rect.height;
+  if (a.x === b.x) {
+    const x = a.x;
+    return x >= left && x <= right && rangesOverlap(a.y, b.y, top, bottom);
+  }
+  if (a.y === b.y) {
+    const y = a.y;
+    return y >= top && y <= bottom && rangesOverlap(a.x, b.x, left, right);
+  }
+  return lineSegmentsIntersect(a, b, { x: left, y: top }, { x: right, y: top }) || lineSegmentsIntersect(a, b, { x: right, y: top }, { x: right, y: bottom }) || lineSegmentsIntersect(a, b, { x: right, y: bottom }, { x: left, y: bottom }) || lineSegmentsIntersect(a, b, { x: left, y: bottom }, { x: left, y: top });
+}
+
+function rangesOverlap(a, b, min, max) {
+  return Math.max(Math.min(a, b), min) <= Math.min(Math.max(a, b), max);
+}
+
+function lineSegmentsIntersect(a, b, c, d) {
+  const det = (p, q, r) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+  const d1 = det(a, b, c);
+  const d2 = det(a, b, d);
+  const d3 = det(c, d, a);
+  const d4 = det(c, d, b);
+  return d1 * d2 <= 0 && d3 * d4 <= 0;
+}
+
+function edgeBounds(edgeItem) {
+  const points = edgeVisualPoints(edgeItem);
+  if (!points.length) return null;
+  const labelPlacement = edgeLabelPlacements.get(edgeItem.id);
+  if (labelPlacement) {
+    points.push({ x: labelPlacement.x, y: labelPlacement.y });
+    points.push({ x: labelPlacement.x + labelPlacement.width, y: labelPlacement.y + labelPlacement.height });
+  }
+  const minX = Math.min(...points.map((point) => point.x));
+  const maxX = Math.max(...points.map((point) => point.x));
+  const minY = Math.min(...points.map((point) => point.y));
+  const maxY = Math.max(...points.map((point) => point.y));
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+function routeToPoints(route) {
+  if (Math.abs(route.y2 - route.y1) < 1) return [{ x: route.x1, y: route.y1 }, { x: route.x2, y: route.y2 }];
+  return [
+    { x: route.x1, y: route.y1 },
+    { x: route.midX, y: route.y1 },
+    { x: route.midX, y: route.y2 },
+    { x: route.x2, y: route.y2 },
+  ];
 }
 
 function normalizeWheel(event) {
@@ -480,6 +769,7 @@ function drawGrid() {
 function render() {
   renderEdges();
   renderNodes();
+  renderSelectionOverlay();
   renderProperties();
   renderNodeSettingsSidebar();
   updateHistoryButtons();
@@ -489,33 +779,90 @@ function renderAppShell() {
   const hasScenarios = appState.scenarios.length > 0;
   const currentScenario = getCurrentScenario();
   document.body.classList.toggle("is-scenario-list", !currentScenario);
+  document.querySelector("#scenarioListToolbar").style.display = hasScenarios ? "flex" : "none";
   document.querySelector("#scenarioEmptyState").style.display = hasScenarios ? "none" : "grid";
+  document.querySelector("#scenarioListTableWrap").style.display = hasScenarios ? "block" : "none";
   renderScenarioList();
   if (currentScenario) {
-    document.querySelector(".top-bar strong").textContent = currentScenario.name;
+    syncScenarioStartNode(currentScenario);
+    document.querySelector("#scenarioTitleText").textContent = currentScenario.name;
+    if (!isScenarioTitleEditing) document.querySelector("#scenarioTitleInput").value = currentScenario.name;
   }
   updateSaveButton();
 }
 
 function renderScenarioList() {
-  const grid = document.querySelector("#scenarioListGrid");
-  grid.innerHTML = appState.scenarios
-    .map((scenarioItem) => {
-      const channels = scenarioItem.channels?.length ? scenarioItem.channels.join(", ") : "Каналы не выбраны";
-      const nodesCount = scenarioItem.board?.nodes?.length || 0;
-      return `<button class="scenario-list-card" type="button" data-scenario-id="${scenarioItem.id}">
-        <span class="scenario-list-card-title">${escapeHtml(scenarioItem.name)}</span>
-        <span class="scenario-list-card-meta">${escapeHtml(channels)}</span>
-        <span class="scenario-list-card-meta">${nodesCount} операций</span>
-      </button>`;
-    })
-    .join("");
-  grid.querySelectorAll(".scenario-list-card").forEach((card) => {
-    card.addEventListener("click", () => openScenario(card.dataset.scenarioId));
+  const table = document.querySelector("#scenarioListTable");
+  const footer = document.querySelector("#scenarioTableFooter");
+  const search = scenarioSearchQuery.trim().toLowerCase();
+  const scenarios = search ? appState.scenarios.filter((scenarioItem) => scenarioItem.name.toLowerCase().includes(search)) : appState.scenarios;
+  table.innerHTML = `<thead>
+    <tr>
+      <th>Название</th>
+      <th>Группы</th>
+      <th>Каналы</th>
+      <th aria-label="Действия"></th>
+    </tr>
+  </thead>
+  <tbody>
+    ${
+      scenarios.length
+        ? scenarios.map((scenarioItem) => renderScenarioTableRow(scenarioItem)).join("")
+        : `<tr><td class="scenario-table-empty" colspan="4">Ничего не найдено</td></tr>`
+    }
+  </tbody>`;
+  if (footer) footer.innerHTML = "";
+  table.querySelectorAll("[data-scenario-row]").forEach((row) => {
+    row.addEventListener("click", () => openScenario(row.dataset.scenarioRow));
+  });
+  table.querySelectorAll("[data-scenario-action]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      handleScenarioTableAction(button.dataset.scenarioAction, button.dataset.scenarioId);
+    });
   });
 }
 
+function renderScenarioTableRow(scenarioItem) {
+  const groups = scenarioGroups(scenarioItem);
+  const channels = scenarioItem.channels?.length ? scenarioItem.channels.join(", ") : "";
+  return `<tr data-scenario-row="${escapeAttr(scenarioItem.id)}">
+    <td><span class="scenario-cell-title">${escapeHtml(scenarioItem.name)}</span></td>
+    <td><span>${escapeHtml(groups || "Не выбраны")}</span></td>
+    <td>${channels ? `<span>${escapeHtml(channels)}</span>` : `<span class="scenario-channel-add">${iconSvg("plus", 16)}</span>`}</td>
+    <td>
+      <div class="scenario-row-actions">
+        <button type="button" data-scenario-action="open" data-scenario-id="${escapeAttr(scenarioItem.id)}" title="Настроить" aria-label="Настроить">${iconSvg("settings-20", 20)}</button>
+        <button type="button" data-scenario-action="copy" data-scenario-id="${escapeAttr(scenarioItem.id)}" title="Копировать" aria-label="Копировать">${iconSvg("copy-20", 20)}</button>
+        <button type="button" data-scenario-action="delete" data-scenario-id="${escapeAttr(scenarioItem.id)}" title="Удалить" aria-label="Удалить">${iconSvg("delete-20", 20)}</button>
+      </div>
+    </td>
+  </tr>`;
+}
+
+function handleScenarioTableAction(action, scenarioId) {
+  if (action === "open") {
+    openScenario(scenarioId);
+    return;
+  }
+  if (action === "copy") {
+    copyScenario(scenarioId);
+    return;
+  }
+  if (action === "delete") deleteScenario(scenarioId);
+}
+
+function scenarioGroups(scenarioItem) {
+  const groups = new Set();
+  scenarioItem.board?.nodes?.forEach((nodeItem) => {
+    const groupName = nodeItem.settings?.groupTransfer?.groupName || (nodeItem.title?.startsWith("На группу:") ? nodeItem.title.replace("На группу:", "").trim() : "");
+    if (groupName) groups.add(groupName);
+  });
+  return Array.from(groups).join(", ");
+}
+
 function renderNodes() {
+  const reachableNodeIds = getReachableScenarioNodeIds();
   const nodes = nodeLayer.selectAll(".scenario-node-svg").data(state.nodes, (d) => d.id);
   nodes.exit().remove();
   const enter = nodes
@@ -525,16 +872,25 @@ function renderNodes() {
     .call(
       d3
         .drag()
-        .filter((event) => event.button === 0)
+        .filter((event) => event.button === 0 && !event.target.closest?.(".node-hover-port, .node-add-button, .node-more-icon"))
         .on("start", function (event, d) {
           event.sourceEvent?.stopPropagation();
           const transform = d3.zoomTransform(svg.node());
           const [pointerX, pointerY] = transform.invert(d3.pointer(event, svg.node()));
-          d.dragOffsetX = pointerX - d.x;
-          d.dragOffsetY = pointerY - d.y;
+          const dragIds = bulkSelectedNodeIds.has(d.id) ? [...bulkSelectedNodeIds] : [d.id];
+          if (!bulkSelectedNodeIds.has(d.id)) clearBulkSelection();
+          dragIds.forEach((nodeId) => {
+            const nodeItem = getNode(nodeId);
+            if (!nodeItem || isStartNode(nodeItem)) return;
+            nodeItem.dragStartX = nodeItem.x;
+            nodeItem.dragStartY = nodeItem.y;
+          });
+          d.dragStartPointerX = pointerX;
+          d.dragStartPointerY = pointerY;
+          d.dragNodeIds = dragIds;
           d.dragMoved = false;
           draggedNodeId = d.id;
-          selectedId = d.id;
+          selectedId = bulkSelectedNodeIds.has(d.id) ? null : d.id;
           pushHistory();
           renderProperties();
           nodeLayer.selectAll(".scenario-node-svg").classed("is-selected", (nodeItem) => nodeItem.id === selectedId);
@@ -543,16 +899,30 @@ function renderNodes() {
           event.sourceEvent?.stopPropagation();
           const transform = d3.zoomTransform(svg.node());
           const [pointerX, pointerY] = transform.invert(d3.pointer(event, svg.node()));
-          d.x = pointerX - (d.dragOffsetX || 0);
-          d.y = pointerY - (d.dragOffsetY || 0);
+          const dx = pointerX - (d.dragStartPointerX || pointerX);
+          const dy = pointerY - (d.dragStartPointerY || pointerY);
+          (d.dragNodeIds || [d.id]).forEach((nodeId) => {
+            const nodeItem = getNode(nodeId);
+            if (!nodeItem || isStartNode(nodeItem)) return;
+            nodeItem.x = snapToDragGrid((nodeItem.dragStartX ?? nodeItem.x) + dx);
+            nodeItem.y = snapToDragGrid((nodeItem.dragStartY ?? nodeItem.y) + dy);
+          });
           d.dragMoved = true;
-          d3.select(this).attr("transform", `translate(${d.x},${d.y})`);
+          nodeLayer.selectAll(".scenario-node-svg").attr("transform", (nodeItem) => `translate(${nodeItem.x},${nodeItem.y})`);
           renderEdges();
+          renderSelectionOverlay();
         })
         .on("end", function (event, d) {
           const wasMoved = Boolean(d.dragMoved);
-          delete d.dragOffsetX;
-          delete d.dragOffsetY;
+          (d.dragNodeIds || [d.id]).forEach((nodeId) => {
+            const nodeItem = getNode(nodeId);
+            if (!nodeItem) return;
+            delete nodeItem.dragStartX;
+            delete nodeItem.dragStartY;
+          });
+          delete d.dragStartPointerX;
+          delete d.dragStartPointerY;
+          delete d.dragNodeIds;
           delete d.dragMoved;
           draggedNodeId = null;
           const isStillHovered = isPointerOverNode(event, d);
@@ -561,6 +931,7 @@ function renderNodes() {
           d3.select(this).classed("is-selected", d.id === selectedId);
           updateNodeText(this, d, d.id === selectedId || d.id === hoveredId);
           renderEdges();
+          renderSelectionOverlay();
           schedulePersistState();
         }),
     );
@@ -573,8 +944,14 @@ function renderNodes() {
   const textGroup = enter.append("g").attr("class", "node-text-group");
   textGroup.append("text").attr("class", "node-title-svg").attr("x", 60).attr("y", 27);
   textGroup.append("text").attr("class", "node-subtitle-svg").attr("x", 60).attr("y", 44);
-  enter.append("circle").attr("class", "node-hover-dot node-hover-dot-left").attr("cx", NODE_PORT_LEFT_X).attr("cy", 30).attr("r", NODE_PORT_R);
-  enter.append("circle").attr("class", "node-hover-dot node-hover-dot-right").attr("cx", NODE_PORT_RIGHT_X).attr("cy", 30).attr("r", NODE_PORT_R);
+  const leftPort = enter.append("g").attr("class", "node-hover-port node-hover-port-left");
+  leftPort.append("circle").attr("class", "node-hover-dot-hitarea").attr("cx", NODE_PORT_LEFT_X).attr("cy", 30).attr("r", 9);
+  leftPort.append("circle").attr("class", "node-hover-dot-ring").attr("cx", NODE_PORT_LEFT_X).attr("cy", 30).attr("r", 9);
+  leftPort.append("circle").attr("class", "node-hover-dot node-hover-dot-left").attr("cx", NODE_PORT_LEFT_X).attr("cy", 30).attr("r", NODE_PORT_R);
+  const rightPort = enter.append("g").attr("class", "node-hover-port node-hover-port-right");
+  rightPort.append("circle").attr("class", "node-hover-dot-hitarea").attr("cx", NODE_PORT_RIGHT_X).attr("cy", 30).attr("r", 9);
+  rightPort.append("circle").attr("class", "node-hover-dot-ring").attr("cx", NODE_PORT_RIGHT_X).attr("cy", 30).attr("r", 9);
+  rightPort.append("circle").attr("class", "node-hover-dot node-hover-dot-right").attr("cx", NODE_PORT_RIGHT_X).attr("cy", 30).attr("r", NODE_PORT_R);
   const addButton = enter.append("g").attr("class", "node-add-button").attr("transform", `translate(${NODE_W + 8},14)`);
   addButton.append("rect").attr("width", 32).attr("height", 32).attr("rx", 16);
   addButton.append("g").attr("class", "node-add-icon").attr("transform", "translate(8,8)");
@@ -586,8 +963,14 @@ function renderNodes() {
   merged
     .attr("transform", (d) => `translate(${d.x},${d.y})`)
     .classed("is-selected", (d) => d.id === selectedId)
+    .classed("is-bulk-selected", (d) => bulkSelectedNodeIds.has(d.id))
+    .classed("is-hovered", (d) => d.id === hoveredId)
+    .classed("is-connection-muted", (d) => isNodeMutedDuringConnection(d))
+    .classed("is-connection-available", (d) => Boolean(connectionDrag && isValidConnectionTarget(d, connectionDrag)))
+    .classed("is-connection-target-node", (d) => Boolean(connectionDrag?.targetId === d.id))
     .classed("is-muted", (d) => d.muted)
     .classed("is-placeholder", (d) => isPlaceholderNode(d))
+    .classed("is-outside-scenario", (d) => !reachableNodeIds.has(d.id))
     .on("mouseenter", function (event, d) {
       if (draggedNodeId === d.id) return;
       hoveredId = d.id;
@@ -601,6 +984,9 @@ function renderNodes() {
     })
     .on("click", (event, d) => {
       event.stopPropagation();
+      clearBulkSelection();
+      selectedEdgeId = null;
+      hoveredEdgeId = null;
       if (isPlaceholderNode(d)) {
         selectedId = d.id;
         hoveredId = d.id;
@@ -621,24 +1007,38 @@ function renderNodes() {
       }
     });
 
-  merged.select(".node-icon-bg").attr("fill", (d) => d.color);
+  merged.select(".node-icon-bg").attr("fill", (d) => (reachableNodeIds.has(d.id) ? d.color : "var(--cmgui-color-bg-main-gray-dark)"));
   merged.select(".node-icon-bg").attr("x", (d) => (isPlaceholderNode(d) ? 16 : 16)).attr("y", (d) => (isPlaceholderNode(d) ? 14 : 14));
   merged.select(".node-icon-svg").html((d) => iconSvg(isPlaceholderNode(d) ? "add-20" : d.icon, 20));
   merged.select(".node-icon-svg").attr("transform", (d) => (isPlaceholderNode(d) ? "translate(22,20)" : "translate(22,20)"));
   merged.select(".node-add-icon").html(() => iconSvg("add", 16));
-  merged.select(".node-more-graphic").html((d) => iconSvg(isPlaceholderNode(d) ? "delete" : isFullscreenActionNode(d) ? "fullscreen-20" : "more", 20));
+  merged.select(".node-more-graphic").html((d) => iconSvg(isPlaceholderNode(d) ? "delete" : "more", 20));
   merged.select(".node-more-icon").attr("transform", (d) => (isPlaceholderNode(d) ? `translate(${NODE_W - 36},20)` : `translate(${NODE_W - 48},8)`));
   merged.select(".node-more-hitarea").attr("width", (d) => (isPlaceholderNode(d) ? 20 : 44)).attr("height", (d) => (isPlaceholderNode(d) ? 20 : 44)).attr("rx", (d) => (isPlaceholderNode(d) ? 10 : 22));
   merged.select(".node-more-graphic").attr("transform", (d) => (isPlaceholderNode(d) ? "translate(0,0)" : "translate(12,12)"));
-  merged.select(".node-title-svg").attr("x", (d) => (isPlaceholderNode(d) ? 60 : 60)).attr("y", (d) => (isPlaceholderNode(d) ? 35 : 27));
+  merged.select(".node-title-svg").attr("x", (d) => (isPlaceholderNode(d) ? 60 : 60)).attr("y", (d) => (isPlaceholderNode(d) || !d.subtitle ? 35 : 27));
   merged.select(".node-subtitle-svg").attr("x", (d) => (isPlaceholderNode(d) ? 60 : 60)).attr("y", (d) => (isPlaceholderNode(d) ? 44 : 44));
   merged.select(".node-hover-zone").attr("width", (d) => {
-    const rightEdge = isPlaceholderNode(d) ? NODE_W : nodeRightPortX(d) + NODE_PORT_R;
+    const rightEdge = shouldShowRightPort(d) || isConnectionRightPortTarget(d) ? nodeRightPortX(d) + NODE_PORT_R : NODE_W;
     return rightEdge - (NODE_PORT_LEFT_X - NODE_PORT_R);
   });
-  merged.select(".node-hover-dot-left").style("display", (d) => (canReceiveInput(d) ? null : "none"));
-  merged.select(".node-hover-dot-right").attr("cx", (d) => nodeRightPortX(d)).style("display", (d) => (hasFreeOutputs(d) && !isPlaceholderNode(d) ? null : "none"));
-  merged.select(".node-add-button").style("display", (d) => (hasFreeOutputs(d) && !isPlaceholderNode(d) ? null : "none"));
+  merged.select(".node-hover-port-left").style("display", (d) => (canReceiveInput(d) ? null : "none"));
+  merged.select(".node-hover-port-right").style("display", (d) => (shouldShowRightPort(d) ? null : "none"));
+  merged.select(".node-hover-port-right .node-hover-dot-hitarea").attr("cx", (d) => nodeRightPortX(d));
+  merged.select(".node-hover-port-right .node-hover-dot-ring").attr("cx", (d) => nodeRightPortX(d));
+  merged.select(".node-hover-dot-right").attr("cx", (d) => nodeRightPortX(d));
+  merged.select(".node-hover-port-left").classed("is-connect-target", (d) => Boolean(connectionDrag?.direction === "output" && canReceiveInput(d)));
+  merged.select(".node-hover-port-right").classed("is-connect-target", (d) => Boolean(connectionDrag?.direction === "input" && hasFreeOutputs(d) && !isPlaceholderNode(d)));
+  merged.select(".node-hover-port-left").classed("is-connection-source", (d) => Boolean(connectionDrag?.direction === "input" && d.id === connectionDrag.sourceId));
+  merged.select(".node-hover-port-right").classed("is-connection-source", (d) => Boolean(connectionDrag?.direction === "output" && d.id === connectionDrag.sourceId));
+  merged.selectAll(".node-hover-port").on("click", (event) => {
+    event.stopPropagation();
+  });
+  merged.select(".node-add-button").style("display", (d) => {
+    if (!hasFreeOutputs(d) || isPlaceholderNode(d)) return "none";
+    if (!connectionDrag) return null;
+    return d.id === connectionDrag.sourceId && connectionDrag.direction === "output" ? null : "none";
+  });
   merged.select(".node-more-icon").style("display", (d) => (isStartNode(d) ? "none" : null));
   merged.each(function (d) {
     updateNodeText(this, d, d.id === selectedId || d.id === hoveredId);
@@ -654,35 +1054,35 @@ function renderNodes() {
       removeNodeById(d.id);
       return;
     }
-    if (isFullscreenActionNode(d)) {
-      selectedId = d.id;
-      openNodeSettings(d.id);
-      return;
-    }
     if (isStartNode(d)) return;
     openNodeContextMenu(d.id);
   });
-  merged.select(".node-hover-dot-right").on("click", (event, d) => {
-    event.stopPropagation();
-    pendingSourceId = d.id;
-    selectedId = d.id;
-    render();
-  });
-  merged.select(".node-hover-dot-left").on("click", (event, d) => {
-    event.stopPropagation();
-    if (!canReceiveInput(d)) return;
-    if (pendingSourceId && pendingSourceId !== d.id) {
-      pushHistory();
-      state.edges.push(edge(pendingSourceId, d.id));
-      pendingSourceId = null;
-      render();
-      schedulePersistState();
-    }
-  });
+  merged.select(".node-hover-port-right").call(
+    d3
+      .drag()
+      .filter((event, d) => event.button === 0 && hasFreeOutputs(d) && !isPlaceholderNode(d))
+      .on("start", (event, d) => startConnectionDrag(event, d, "output"))
+      .on("drag", updateConnectionDrag)
+      .on("end", endConnectionDrag),
+  );
+  merged.select(".node-hover-port-left").call(
+    d3
+      .drag()
+      .filter((event, d) => event.button === 0 && canReceiveInput(d))
+      .on("start", (event, d) => startConnectionDrag(event, d, "input"))
+      .on("drag", updateConnectionDrag)
+      .on("end", endConnectionDrag),
+  );
 
   svg.on("click", () => {
+    if (suppressNextBoardClick) {
+      suppressNextBoardClick = false;
+      return;
+    }
     selectedId = null;
     hoveredId = null;
+    selectedEdgeId = null;
+    hoveredEdgeId = null;
     pendingSourceId = null;
     operationSourceId = null;
     closeNodeContextMenu();
@@ -739,6 +1139,62 @@ function closeNodeContextMenu() {
   menu.innerHTML = "";
 }
 
+function scheduleNodeSettingsDropdownClose(target) {
+  window.setTimeout(() => {
+    if (!settingsNodeId || isSettingsCloseConfirmOpen) return;
+    if (!(target instanceof Element)) return;
+    const sidebar = document.querySelector("#nodeSettingsSidebar");
+    if (!sidebar || !sidebar.contains(target)) return;
+    if (
+      target.closest(
+        ".node-dropdown, #startChannelsSelect, #groupSelect, #employeeSelect, #distributionSelect, [id^='scheduleSelect-'], [id^='segmentSelect-'], [id^='conditionParameterSelect-'], [id^='conditionOperatorSelect-'], [id^='conditionValueSelect-'], #startEmployeeSelect, #startGroupSelect",
+      )
+    ) {
+      return;
+    }
+    closeOpenNodeSettingsDropdowns();
+  }, 0);
+}
+
+function closeOpenNodeSettingsDropdowns() {
+  const nodeItem = getNode(settingsNodeId);
+  if (!nodeItem || !isConfigurableNode(nodeItem)) return;
+  const draft = getNodeSettingsDraft(nodeItem);
+  let patch = null;
+  if (isStartNode(nodeItem)) {
+    if (!draft.channelsDropdownOpen && !draft.employeeDropdownOpen && !draft.groupDropdownOpen) return;
+    patch = { channelsDropdownOpen: false, employeeDropdownOpen: false, groupDropdownOpen: false };
+  } else if (isGroupTransferNode(nodeItem)) {
+    if (!draft.groupDropdownOpen && !draft.distributionDropdownOpen) return;
+    patch = { groupDropdownOpen: false, distributionDropdownOpen: false };
+  } else if (isSimpleTransferNode(nodeItem)) {
+    if (!draft.employeeDropdownOpen) return;
+    patch = { employeeDropdownOpen: false };
+  } else if (isScheduleNode(nodeItem)) {
+    if (!draft.schedules.some((schedule) => schedule.dropdownOpen)) return;
+    patch = { schedules: draft.schedules.map((schedule) => ({ ...schedule, dropdownOpen: false })) };
+  } else if (isSegmentNode(nodeItem)) {
+    if (!draft.groups.some((group) => group.dropdownOpen)) return;
+    patch = { groups: draft.groups.map((group) => ({ ...group, dropdownOpen: false })) };
+  } else if (isConditionNode(nodeItem)) {
+    if (!draft.groups.some((group) => group.conditions.some((condition) => condition.parameterDropdownOpen || condition.operatorDropdownOpen || condition.valueDropdownOpen))) return;
+    patch = {
+      groups: draft.groups.map((group) => ({
+        ...group,
+        conditions: group.conditions.map((condition) => ({
+          ...condition,
+          parameterDropdownOpen: false,
+          operatorDropdownOpen: false,
+          valueDropdownOpen: false,
+        })),
+      })),
+    };
+  }
+  if (!patch) return;
+  updateNodeSettingsDraft(nodeItem, patch);
+  renderNodeSettingsSidebar();
+}
+
 function handleNodeContextMenuClick(event) {
   const button = event.target.closest("[data-node-menu-action]");
   if (!button || !contextMenuNodeId) return;
@@ -767,15 +1223,30 @@ function startNodeTitleEdit(nodeId) {
   if (!nodeItem || !input) return;
   titleEditingNodeId = nodeId;
   selectedId = nodeId;
-  const transform = d3.zoomTransform(svg.node());
-  const [x, y] = transform.apply([nodeItem.x + 60, nodeItem.y + 13]);
   input.value = nodeItem.title || "";
-  input.style.left = `${Math.round(x)}px`;
-  input.style.top = `${Math.round(y)}px`;
-  input.style.width = `${Math.round((isPlaceholderNode(nodeItem) ? 176 : NODE_TEXT_DEFAULT_WIDTH) * transform.k)}px`;
+  updateNodeTitleEditorPosition();
+  nodeLayer.selectAll(".scenario-node-svg").classed("is-title-editing", (d) => d.id === nodeId);
   input.classList.add("is-open");
   input.focus();
   input.select();
+}
+
+function updateNodeTitleEditorPosition(transform = d3.zoomTransform(svg.node())) {
+  if (!titleEditingNodeId) return;
+  const nodeItem = getNode(titleEditingNodeId);
+  const input = document.querySelector("#nodeTitleEditor");
+  if (!nodeItem || !input) return;
+  const [x, y] = transform.apply([nodeItem.x + 60, nodeItem.y + 13]);
+  const svgRect = svg.node().getBoundingClientRect();
+  const width = isPlaceholderNode(nodeItem) ? 176 : NODE_TEXT_DEFAULT_WIDTH;
+  const scale = transform.k;
+  input.style.left = `${Math.round(svgRect.left + x)}px`;
+  input.style.top = `${Math.round(svgRect.top + y)}px`;
+  input.style.width = `${Math.round(width * scale)}px`;
+  input.style.height = `${20 * scale}px`;
+  input.style.fontSize = `${14 * scale}px`;
+  input.style.lineHeight = `${20 * scale}px`;
+  input.style.transform = "";
 }
 
 function commitNodeTitleEdit() {
@@ -787,12 +1258,29 @@ function commitNodeTitleEdit() {
     return;
   }
   pushHistory();
-  const title = input.value.trim() || defaultTitleForNode(nodeItem);
-  nodeItem.title = title;
+  const title = input.value.trim();
+  if (title) {
+    nodeItem.title = title;
+    nodeItem.customTitle = true;
+  } else {
+    nodeItem.customTitle = false;
+    applyCurrentAutoTitle(nodeItem);
+  }
   closeNodeTitleEditor(false);
   selectedId = nodeItem.id;
   render();
   schedulePersistState();
+}
+
+function applyCurrentAutoTitle(nodeItem) {
+  if (isStartNode(nodeItem)) return applyStartTitle(nodeItem, getStartSettings(nodeItem));
+  if (isGroupTransferNode(nodeItem)) return applyGroupTransferTitle(nodeItem, getGroupTransferSettings(nodeItem));
+  if (isSimpleTransferNode(nodeItem)) return applySimpleTransferTitle(nodeItem, getSimpleTransferSettings(nodeItem));
+  if (isInfoMessageNode(nodeItem)) return applyInfoMessageTitle(nodeItem, getInfoMessageSettings(nodeItem));
+  if (isContactFormNode(nodeItem)) return applyContactFormTitle(nodeItem, getContactFormSettings(nodeItem));
+  if (isMenuNode(nodeItem)) return applyMenuTitle(nodeItem, getMenuSettings(nodeItem));
+  if (isScheduleNode(nodeItem)) return applyScheduleTitle(nodeItem, getScheduleSettings(nodeItem));
+  if (isSegmentNode(nodeItem)) return applySegmentTitle(nodeItem, getSegmentSettings(nodeItem));
 }
 
 function closeNodeTitleEditor(shouldCommit = true) {
@@ -804,10 +1292,16 @@ function closeNodeTitleEditor(shouldCommit = true) {
   const input = document.querySelector("#nodeTitleEditor");
   if (!input) return;
   input.classList.remove("is-open");
+  input.style.transform = "";
+  input.style.height = "";
+  input.style.fontSize = "";
+  input.style.lineHeight = "";
+  nodeLayer.selectAll(".scenario-node-svg").classed("is-title-editing", false);
 }
 
 function defaultTitleForNode(nodeItem) {
   if (!nodeItem) return "Операция";
+  if (isFinishNode(nodeItem)) return "Закрытие чата";
   if (nodeItem.operationType === "group-transfer") return "На группу";
   if (SIMPLE_TRANSFER_CONFIG[nodeItem.operationType]) return SIMPLE_TRANSFER_CONFIG[nodeItem.operationType].title;
   if (nodeItem.operationType === INFO_MESSAGE_OPERATION) return "Информационное сообщение";
@@ -824,8 +1318,8 @@ function copyNodeWithoutLinks(nodeId) {
   pushHistory();
   const copy = clone(sourceNode);
   copy.id = `${sourceNode.kind}-${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 6)}`;
-  copy.x = sourceNode.x + NODE_W + NODE_CREATE_GAP_X;
-  copy.y = sourceNode.y;
+  copy.x = sourceNode.x;
+  copy.y = snapToDragGrid(sourceNode.y + NODE_H + 80);
   delete copy.dragOffsetX;
   delete copy.dragOffsetY;
   delete copy.dragMoved;
@@ -839,43 +1333,536 @@ function copyNodeWithoutLinks(nodeId) {
 function isPointerOverNode(event, nodeItem) {
   const transform = d3.zoomTransform(svg.node());
   const [pointerX, pointerY] = transform.invert(d3.pointer(event, svg.node()));
+  return isPointOverNode(pointerX, pointerY, nodeItem);
+}
+
+function isPointOverNode(pointerX, pointerY, nodeItem) {
   const left = nodeItem.x + NODE_PORT_LEFT_X - NODE_PORT_R;
-  const rightEdge = isPlaceholderNode(nodeItem) ? NODE_W : nodeRightPortX(nodeItem) + NODE_PORT_R;
+  const rightEdge = hasVisibleRightPort(nodeItem) ? nodeRightPortX(nodeItem) + NODE_PORT_R : NODE_W;
   const right = nodeItem.x + rightEdge;
   const top = nodeItem.y - 1;
   const bottom = nodeItem.y + NODE_HOVER_H - 1;
   return pointerX >= left && pointerX <= right && pointerY >= top && pointerY <= bottom;
 }
 
-function renderEdges() {
-  const edges = edgeLayer.selectAll(".scenario-edge").data(state.edges, (d) => d.id);
-  edges.exit().remove();
-  edges
+function startConnectionDrag(event, sourceNode, direction = "output") {
+  event.sourceEvent?.stopPropagation();
+  closeOutcomeMenu();
+  closeNodeContextMenu();
+  selectedEdgeId = null;
+  hoveredEdgeId = null;
+  const start = direction === "input" ? inputPortPoint(sourceNode) : outputPortPoint(sourceNode);
+  connectionDrag = {
+    sourceId: sourceNode.id,
+    direction,
+    start,
+    current: { ...start },
+    targetId: null,
+  };
+  selectedId = sourceNode.id;
+  hoveredId = sourceNode.id;
+  renderConnectionPreview();
+}
+
+function updateConnectionDrag(event) {
+  if (!connectionDrag) return;
+  event.sourceEvent?.stopPropagation();
+  const transform = d3.zoomTransform(svg.node());
+  const [x, y] = transform.invert(d3.pointer(event, svg.node()));
+  const targetNode = findConnectionTarget(x, y, connectionDrag);
+  connectionDrag.targetId = targetNode?.id || null;
+  connectionDrag.current = targetNode ? connectionTargetPortPoint(targetNode, connectionDrag.direction) : { x, y };
+  hoveredId = connectionDrag.targetId || connectionDrag.sourceId;
+  renderEdges();
+  renderConnectionPreview();
+  renderNodes();
+}
+
+function endConnectionDrag(event) {
+  if (!connectionDrag) return;
+  event.sourceEvent?.stopPropagation();
+  const { sourceId, targetId, direction, current } = connectionDrag;
+  const menuPoint = current ? d3.zoomTransform(svg.node()).apply([current.x, current.y]) : null;
+  connectionDrag = null;
+  clearConnectionPreview();
+  if (targetId) {
+    if (direction === "input") connectNodesManually(targetId, sourceId, null, { menuPoint });
+    else connectNodesManually(sourceId, targetId, null, { menuPoint });
+    return;
+  }
+  hoveredId = nodeIdUnderPointer(event);
+  render();
+}
+
+function nodeIdUnderPointer(event) {
+  return state.nodes.find((nodeItem) => isPointerOverNode(event, nodeItem))?.id || null;
+}
+
+function renderConnectionPreview() {
+  if (!connectionDrag) {
+    clearConnectionPreview();
+    return;
+  }
+  const preview = connectionPreviewLayer.selectAll(".connection-preview-edge").data([connectionDrag]);
+  preview
     .enter()
     .append("path")
-    .attr("class", "scenario-edge")
-    .merge(edges)
-    .attr("d", edgePath)
-    .attr("stroke", colorForTone)
+    .attr("class", "connection-preview-edge")
+    .merge(preview)
+    .attr("d", connectionDrag.direction === "input" ? connectionPreviewPath(connectionDrag.current, connectionDrag.start) : connectionPreviewPath(connectionDrag.start, connectionDrag.current))
     .attr("marker-end", "url(#arrowPlain)");
+}
+
+function clearConnectionPreview() {
+  connectionPreviewLayer.selectAll(".connection-preview-edge").remove();
+}
+
+function connectionPreviewPath(start, end) {
+  if (Math.abs(end.y - start.y) < 1) return `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
+  if (end.x <= start.x + 48) {
+    const outwardX = start.x + 64;
+    const bridgeX = end.x - 64;
+    const midY = start.y + (end.y - start.y) / 2;
+    return roundedPolylinePath(
+      [
+        { x: start.x, y: start.y },
+        { x: outwardX, y: start.y },
+        { x: outwardX, y: midY },
+        { x: bridgeX, y: midY },
+        { x: bridgeX, y: end.y },
+        { x: end.x, y: end.y },
+      ],
+      18,
+    );
+  }
+  const midX = start.x + (end.x - start.x) / 2;
+  const radius = Math.min(18, Math.abs(midX - start.x) / 2, Math.abs(end.x - midX) / 2, Math.abs(end.y - start.y) / 2);
+  if (radius < 1) return `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
+  const directionY = end.y > start.y ? 1 : -1;
+  return [
+    `M ${start.x} ${start.y}`,
+    `L ${midX - radius} ${start.y}`,
+    `Q ${midX} ${start.y} ${midX} ${start.y + directionY * radius}`,
+    `L ${midX} ${end.y - directionY * radius}`,
+    `Q ${midX} ${end.y} ${midX + radius} ${end.y}`,
+    `L ${end.x} ${end.y}`,
+  ].join(" ");
+}
+
+function outputPortPoint(nodeItem) {
+  return {
+    x: nodeItem.x + nodeRightPortX(nodeItem) + NODE_PORT_R + NODE_PORT_ARROW_GAP,
+    y: nodeItem.y + NODE_H / 2,
+  };
+}
+
+function inputPortPoint(nodeItem) {
+  return {
+    x: nodeItem.x + NODE_PORT_LEFT_X - NODE_PORT_R - NODE_PORT_ARROW_GAP,
+    y: nodeItem.y + NODE_H / 2,
+  };
+}
+
+function connectionTargetPortPoint(nodeItem, direction) {
+  return direction === "input" ? outputPortPoint(nodeItem) : inputPortPoint(nodeItem);
+}
+
+function isValidConnectionTarget(nodeItem, dragState = connectionDrag) {
+  if (!nodeItem || !dragState) return false;
+  if (dragState.direction === "input") return hasFreeOutputs(nodeItem) && !isPlaceholderNode(nodeItem);
+  return canReceiveInput(nodeItem);
+}
+
+function isNodeMutedDuringConnection(nodeItem) {
+  if (!connectionDrag || nodeItem.id === connectionDrag.sourceId) return false;
+  return !isValidConnectionTarget(nodeItem, connectionDrag);
+}
+
+function findConnectionTarget(x, y, dragState) {
+  const hitRadius = 12;
+  const portTarget = state.nodes.find((nodeItem) => {
+    if (!isValidConnectionTarget(nodeItem, dragState)) return false;
+    const port = dragState.direction === "input" ? { x: nodeItem.x + nodeRightPortX(nodeItem), y: nodeItem.y + NODE_H / 2 } : { x: nodeItem.x + NODE_PORT_LEFT_X, y: nodeItem.y + NODE_H / 2 };
+    return Math.hypot(x - port.x, y - port.y) <= hitRadius;
+  });
+  if (portTarget) return portTarget;
+  return state.nodes.find((nodeItem) => isValidConnectionTarget(nodeItem, dragState) && isPointOverNode(x, y, nodeItem)) || null;
+}
+
+function connectNodesManually(sourceId, targetId, outputKey = null, options = {}) {
+  const sourceNode = getNode(sourceId);
+  const targetNode = getNode(targetId);
+  if (!sourceNode || !targetNode || !canReceiveInput(targetNode)) {
+    render();
+    return;
+  }
+  const outputs = freeOutputs(sourceNode);
+  if (!outputKey && outputs.length > 1) {
+    openOutcomeMenu(sourceId, { targetId, anchor: options.menuPoint });
+    render();
+    return;
+  }
+  const output = outputKey ? nodeOutputs(sourceNode).find((item) => item.key === outputKey && outputs.some((freeOutput) => freeOutput.key === item.key)) : outputs[0];
+  if (!output) {
+    render();
+    return;
+  }
+  pushHistory();
+  state.edges = state.edges.filter((edgeItem) => !(edgeItem.source === sourceId && edgeItem.outputKey === output.key && isPlaceholderNode(getNode(edgeItem.target))));
+  removeDetachedPlaceholderTargets(new Set(state.nodes.filter(isPlaceholderNode).map((nodeItem) => nodeItem.id)));
+  state.edges.push(createOutputEdge(sourceNode, targetId, output.key));
+  selectedId = null;
+  hoveredId = null;
+  render();
+  schedulePersistState();
+}
+
+function snapToDragGrid(value) {
+  return Math.round(value / NODE_DRAG_GRID_STEP) * NODE_DRAG_GRID_STEP;
+}
+
+function renderEdges() {
+  edgeLabelPlacements = buildEdgeLabelPlacements();
+  const edgeGroups = edgeLayer.selectAll(".scenario-edge-group").data(state.edges, (d) => d.id);
+  edgeGroups.exit().remove();
+  const edgeGroupsEnter = edgeGroups.enter().append("g").attr("class", "scenario-edge-group");
+  edgeGroupsEnter.append("path").attr("class", "scenario-edge-hitarea").attr("marker-end", null);
+  edgeGroupsEnter.append("path").attr("class", "scenario-edge");
+  edgeGroupsEnter.merge(edgeGroups).each(function (d) {
+    const group = d3.select(this);
+    const path = edgePath(d);
+    group
+      .select(".scenario-edge-hitarea")
+      .attr("d", path)
+      .attr("marker-end", null)
+      .on("mouseenter", (event) => {
+        hoveredEdgeId = d.id;
+        renderEdges();
+      })
+      .on("mouseleave", (event) => {
+        if (hoveredEdgeId === d.id) hoveredEdgeId = null;
+        renderEdges();
+      })
+      .on("click", (event) => {
+        event.stopPropagation();
+        clearBulkSelection();
+        selectedEdgeId = d.id;
+        selectedId = null;
+        hoveredEdgeId = d.id;
+        closeNodeContextMenu();
+        closeOutcomeMenu();
+        render();
+      });
+    group
+      .select(".scenario-edge")
+      .attr("d", path)
+      .attr("stroke", edgeColor(d))
+      .attr("marker-end", isEdgeActive(d) ? "url(#arrowAccent)" : "url(#arrowPlain)");
+  });
 
   const labels = labelLayer.selectAll(".edge-label-svg").data(state.edges.filter((d) => d.label), (d) => d.id);
   labels.exit().remove();
   const enter = labels.enter().append("g").attr("class", "edge-label-svg");
   enter.append("rect").attr("rx", 4);
   enter.append("text").attr("x", EDGE_LABEL_PADDING_X).attr("y", 12);
-  enter.merge(labels).each(function (d) {
+  const labelSelection = enter.merge(labels);
+  labelSelection.each(function (d) {
     const group = d3.select(this);
     const text = group.select("text").text(d.label);
+    const placement = edgeLabelPlacements.get(d.id);
+    const width = placement?.width || estimateEdgeLabelWidth(d.label);
     const maxTextWidth = EDGE_LABEL_MAX_WIDTH - EDGE_LABEL_PADDING_X * 2;
     fitSvgText(text, d.label, maxTextWidth);
-    const width = Math.min(EDGE_LABEL_MAX_WIDTH, Math.ceil(text.node().getComputedTextLength()) + EDGE_LABEL_PADDING_X * 2);
-    const p = edgeLabelPoint(d, width);
-    group.attr("transform", `translate(${p.x - width / 2},${p.y - 12})`).attr("class", "edge-label-svg");
-    group.select("rect").attr("width", width).attr("height", 24).attr("fill", colorForTone);
-    text.attr("x", EDGE_LABEL_PADDING_X).attr("y", 12).attr("fill", "white").attr("font", "var(--cmgui-font-caption)");
-    group.on("mouseenter", (event) => showEdgeTooltip(event, d.label)).on("mouseleave", hideEdgeTooltip);
+    d.__labelClipped = text.text() !== (d.label || "");
+    d.__labelWidth = width;
   });
+  labelSelection.each(function (d) {
+    const group = d3.select(this);
+    const text = group.select("text");
+    const width = d.__labelWidth || EDGE_LABEL_MAX_WIDTH;
+    const placement = edgeLabelPlacements.get(d.id) || edgeLabelRect(d, width);
+    group.attr("transform", `translate(${placement.x},${placement.y})`).attr("class", "edge-label-svg");
+    group.select("rect").attr("width", width).attr("height", 24).attr("fill", edgeColor(d));
+    text.attr("x", EDGE_LABEL_PADDING_X).attr("y", 12).attr("fill", "white").attr("font", "var(--cmgui-font-caption)");
+    group
+      .on("mouseenter", (event) => {
+        hoveredEdgeId = d.id;
+        renderEdges();
+        if (d.__labelClipped) showEdgeTooltip(event, d.label);
+      })
+      .on("mouseleave", (event) => {
+        if (hoveredEdgeId === d.id) hoveredEdgeId = null;
+        hideEdgeTooltip();
+        renderEdges();
+      })
+      .on("click", (event) => {
+        event.stopPropagation();
+        clearBulkSelection();
+        selectedEdgeId = d.id;
+        selectedId = null;
+        hoveredEdgeId = d.id;
+        render();
+      });
+    delete d.__labelWidth;
+  });
+}
+
+function renderSelectionOverlay() {
+  selectionLayer.selectAll("*").remove();
+  if (selectionDrag) {
+    const rect = rectFromPoints(selectionDrag.start, selectionDrag.current);
+    selectionLayer
+      .append("rect")
+      .attr("class", "bulk-selection-rect")
+      .attr("x", rect.x)
+      .attr("y", rect.y)
+      .attr("width", rect.width)
+      .attr("height", rect.height);
+  }
+  if (!selectionDrag && (bulkSelectedNodeIds.size || bulkSelectedEdgeIds.size)) renderBulkSelectionMenu();
+  if (!selectionDrag && !bulkSelectedNodeIds.size && !bulkSelectedEdgeIds.size && selectedEdgeId) renderSelectedEdgeMenu();
+}
+
+function renderBulkSelectionMenu() {
+  const bounds = bulkSelectionBounds();
+  if (!bounds) return;
+  const menuWidth = 96;
+  const menuHeight = 44;
+  const menuX = bounds.x + bounds.width / 2 - menuWidth / 2;
+  const menuY = bounds.y - 58;
+  const menu = selectionLayer.append("g").attr("class", "bulk-selection-menu").attr("transform", `translate(${menuX},${menuY})`);
+  menu.append("rect").attr("class", "bulk-selection-menu-bg").attr("width", menuWidth).attr("height", menuHeight).attr("rx", 12);
+  const copyButton = menu.append("g").attr("class", "bulk-selection-menu-button").attr("transform", "translate(8,0)").on("click", (event) => {
+    event.stopPropagation();
+    copyBulkSelection();
+  });
+  copyButton.append("rect").attr("width", 40).attr("height", 44).attr("rx", 20);
+  copyButton.append("g").attr("transform", "translate(10,12)").html(iconSvg("copy-20", 20));
+  const deleteButton = menu.append("g").attr("class", "bulk-selection-menu-button").attr("transform", "translate(48,0)").on("click", (event) => {
+    event.stopPropagation();
+    deleteBulkSelection();
+  });
+  deleteButton.append("rect").attr("width", 40).attr("height", 44).attr("rx", 20);
+  deleteButton.append("g").attr("transform", "translate(10,12)").html(iconSvg("delete-20", 20));
+}
+
+function renderSelectedEdgeMenu() {
+  const edgeItem = state.edges.find((item) => item.id === selectedEdgeId);
+  if (!edgeItem) return;
+  const point = edgeMenuPoint(edgeItem);
+  if (!point) return;
+  const menuWidth = 44;
+  const menuHeight = 44;
+  const menuX = point.x - menuWidth / 2;
+  const menuY = point.y - menuHeight / 2;
+  const menu = selectionLayer.append("g").attr("class", "bulk-selection-menu edge-selection-menu").attr("transform", `translate(${menuX},${menuY})`);
+  menu.append("rect").attr("class", "bulk-selection-menu-bg").attr("width", menuWidth).attr("height", menuHeight).attr("rx", 12);
+  const deleteButton = menu.append("g").attr("class", "bulk-selection-menu-button").on("click", (event) => {
+    event.stopPropagation();
+    removeEdgeById(edgeItem.id);
+  });
+  deleteButton.append("rect").attr("width", 44).attr("height", 44).attr("rx", 12);
+  deleteButton.append("g").attr("transform", "translate(12,12)").html(iconSvg("delete-20", 20));
+}
+
+function edgeMenuPoint(edgeItem) {
+  return polylineMidpoint(edgeVisualPoints(edgeItem));
+}
+
+function edgeVisualPoints(edgeItem) {
+  const source = getNode(edgeItem.source);
+  const target = getNode(edgeItem.target);
+  if (!source || !target) return [];
+  const route = edgeRoute(source, target, edgeItem);
+  if (!route) return [];
+  if (route.isBackRoute && route.points) return [...route.points];
+  const labelPlacement = edgeItem.label && edgeItem.source !== edgeItem.target ? edgeLabelPlacements.get(edgeItem.id) : null;
+  if (labelPlacement) return edgePointsThroughLabel(route, labelPlacement);
+  return route.points ? [...route.points] : routeToPoints(route);
+}
+
+function edgePointsThroughLabel(route, labelPlacement) {
+  const labelY = labelPlacement.y + labelPlacement.height / 2;
+  const labelLeft = labelPlacement.x;
+  const labelRight = labelPlacement.x + labelPlacement.width;
+  const approachX = labelPlacement.approachX ?? labelLeft - 56;
+  if (route.points) {
+    const outwardX = route.outwardX ?? Math.max(route.layoutX1 + 64, route.x1 + 64);
+    const bridgeX = Math.min(route.bridgeX ?? approachX, approachX);
+    const midY = route.midY ?? route.y1 + (route.y2 - route.y1) / 2;
+    const afterLabelX = labelExitX(labelRight, route.x2);
+    const points = [
+      { x: route.x1, y: route.y1 },
+      { x: route.layoutX1, y: route.y1 },
+      { x: outwardX, y: route.y1 },
+      { x: outwardX, y: midY },
+      { x: bridgeX, y: midY },
+      { x: bridgeX, y: labelY },
+      { x: labelLeft, y: labelY },
+      { x: labelRight, y: labelY },
+    ];
+    if (Math.abs(labelY - route.y2) > 1) {
+      points.push({ x: afterLabelX, y: labelY }, { x: afterLabelX, y: route.y2 });
+    }
+    points.push({ x: route.x2, y: route.y2 });
+    return normalizePolylinePoints(points);
+  }
+  const beforeLabelX = labelApproachX(route, labelLeft, approachX);
+  const afterLabelX = labelExitX(labelRight, route.x2);
+  if (beforeLabelX < route.x1 - 1 && Math.abs(route.y1 - labelY) > 80) {
+    const sourceLaneX = Math.max(route.x1 + 64, route.layoutX1 + 64);
+    const midY = route.y1 + (labelY - route.y1) / 2;
+    const points = [
+      { x: route.x1, y: route.y1 },
+      { x: sourceLaneX, y: route.y1 },
+      { x: sourceLaneX, y: midY },
+      { x: beforeLabelX, y: midY },
+      { x: beforeLabelX, y: labelY },
+      { x: labelLeft, y: labelY },
+      { x: labelRight, y: labelY },
+    ];
+    if (Math.abs(labelY - route.y2) > 1) {
+      points.push({ x: afterLabelX, y: labelY }, { x: afterLabelX, y: route.y2 });
+    }
+    points.push({ x: route.x2, y: route.y2 });
+    return normalizePolylinePoints(points);
+  }
+  const points = [
+    { x: route.x1, y: route.y1 },
+    { x: beforeLabelX, y: route.y1 },
+    { x: beforeLabelX, y: labelY },
+    { x: labelLeft, y: labelY },
+    { x: labelRight, y: labelY },
+  ];
+  if (Math.abs(labelY - route.y2) > 1) {
+    points.push({ x: afterLabelX, y: labelY }, { x: afterLabelX, y: route.y2 });
+  }
+  points.push({ x: route.x2, y: route.y2 });
+  return normalizePolylinePoints(points);
+}
+
+function polylineMidpoint(points) {
+  if (!points.length) return null;
+  if (points.length === 1) return points[0];
+  const lengths = [];
+  let total = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const prev = points[index - 1];
+    const current = points[index];
+    const length = Math.hypot(current.x - prev.x, current.y - prev.y);
+    lengths.push(length);
+    total += length;
+  }
+  let distance = total / 2;
+  for (let index = 1; index < points.length; index += 1) {
+    const prev = points[index - 1];
+    const current = points[index];
+    const length = lengths[index - 1];
+    if (distance > length) {
+      distance -= length;
+      continue;
+    }
+    const ratio = length ? distance / length : 0;
+    return { x: prev.x + (current.x - prev.x) * ratio, y: prev.y + (current.y - prev.y) * ratio };
+  }
+  return points[points.length - 1];
+}
+
+function bulkSelectionBounds() {
+  const rects = [
+    ...state.nodes.filter((nodeItem) => bulkSelectedNodeIds.has(nodeItem.id)).map(nodeBounds),
+    ...state.edges.filter((edgeItem) => bulkSelectedEdgeIds.has(edgeItem.id)).map(edgeBounds).filter(Boolean),
+  ];
+  if (!rects.length) return null;
+  const minX = Math.min(...rects.map((rect) => rect.x));
+  const minY = Math.min(...rects.map((rect) => rect.y));
+  const maxX = Math.max(...rects.map((rect) => rect.x + rect.width));
+  const maxY = Math.max(...rects.map((rect) => rect.y + rect.height));
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+function buildEdgeLabelPlacements() {
+  const result = new Map();
+  const labelItems = state.edges
+    .filter((edgeItem) => edgeItem.label)
+    .map((edgeItem) => {
+      const width = estimateEdgeLabelWidth(edgeItem.label);
+      return { edge: edgeItem, edgeIndex: state.edges.indexOf(edgeItem), orderY: edgeLabelOrderY(edgeItem), ...edgeLabelRect(edgeItem, width) };
+    });
+  const regularItems = [];
+  labelItems.forEach((item) => {
+    if (item.edge.source === item.edge.target) {
+      result.set(item.id, item);
+      return;
+    }
+    regularItems.push(item);
+  });
+  layoutEdgeLabelPlacements(regularItems).forEach((value, key) => result.set(key, value));
+  return result;
+}
+
+function edgeLabelRect(edgeItem, width) {
+  const p = edgeLabelPoint(edgeItem, width);
+  return { id: edgeItem.id, x: p.x - width / 2, y: p.y - 12, width, height: 24 };
+}
+
+function edgeLabelOrderY(edgeItem) {
+  const source = getNode(edgeItem.source);
+  const target = getNode(edgeItem.target);
+  if (!source || !target) return 0;
+  const route = edgeRoute(source, target, edgeItem);
+  if (!route) return target.y;
+  return route.labelY ?? route.loopY ?? route.y2;
+}
+
+function layoutEdgeLabelPlacements(items) {
+  const placements = [];
+  const result = new Map();
+  const groupOffsets = [0, 28, -28, 56, -56, 84, -84, 112, -112];
+  const groups = new Map();
+  items.forEach((item) => {
+    const key = item.edge.target || item.id;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  });
+  [...groups.values()]
+    .sort((a, b) => Math.min(...a.map((item) => item.y)) - Math.min(...b.map((item) => item.y)) || Math.min(...a.map((item) => item.x)) - Math.min(...b.map((item) => item.x)))
+    .forEach((group) => {
+      const orderedGroup = group.slice().sort((a, b) => a.orderY - b.orderY || a.edgeIndex - b.edgeIndex);
+      const centerOffset = (orderedGroup.length - 1) / 2;
+      const baseCandidates = orderedGroup.map((item, index) => ({
+        ...item,
+        y: item.y + Math.round((index - centerOffset) * 28),
+      }));
+      let placedGroup = null;
+      for (const offset of groupOffsets) {
+        const candidates = baseCandidates.map((item) => ({ ...item, y: item.y + offset }));
+        if (!candidates.some((candidate) => placements.some((other) => rectsOverlap(candidate, other)))) {
+          placedGroup = candidates;
+          break;
+        }
+      }
+      placedGroup ||= baseCandidates.map((item) => ({ ...item, y: item.y + groupOffsets[groupOffsets.length - 1] }));
+      const approachX = Math.min(...placedGroup.map((placed) => placed.x)) - 56;
+      placedGroup.forEach((placed) => {
+        const placedWithLane = { ...placed, approachX };
+        placements.push(placedWithLane);
+        result.set(placed.id, placedWithLane);
+      });
+    });
+  return result;
+}
+
+function rectsOverlap(a, b, gap = 4) {
+  return a.x < b.x + b.width + gap && a.x + a.width + gap > b.x && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
+}
+
+function isEdgeActive(edgeItem) {
+  return edgeItem.id === selectedEdgeId || edgeItem.id === hoveredEdgeId || bulkSelectedEdgeIds.has(edgeItem.id);
+}
+
+function edgeColor(edgeItem) {
+  return isEdgeActive(edgeItem) ? "var(--cmgui-color-special-13)" : colorForTone(edgeItem);
 }
 
 function showEdgeTooltip(event, text) {
@@ -892,12 +1879,76 @@ function hideEdgeTooltip() {
   document.querySelector("#edgeTooltip")?.classList.remove("is-open");
 }
 
+function showScenarioTitleTooltip(event) {
+  const title = event.currentTarget;
+  if (!(title instanceof HTMLElement) || title.scrollWidth <= title.clientWidth + 1) return;
+  showEdgeTooltip(event, title.textContent || "");
+}
+
+function moveScenarioTitleTooltip(event) {
+  const tooltip = document.querySelector("#edgeTooltip");
+  if (!tooltip?.classList.contains("is-open")) return;
+  tooltip.style.left = `${event.clientX + 12}px`;
+  tooltip.style.top = `${event.clientY + 12}px`;
+}
+
+function startScenarioTitleEdit(event) {
+  event?.stopPropagation();
+  const currentScenario = getCurrentScenario();
+  const input = document.querySelector("#scenarioTitleInput");
+  if (!currentScenario || !input) return;
+  hideEdgeTooltip();
+  isScenarioTitleEditing = true;
+  scenarioTitleBeforeEdit = currentScenario.name;
+  document.querySelector(".top-title-wrap")?.classList.add("is-editing");
+  input.value = currentScenario.name;
+  input.focus();
+  input.select();
+}
+
+function commitScenarioTitleEdit() {
+  if (!isScenarioTitleEditing) return;
+  const currentScenario = getCurrentScenario();
+  const input = document.querySelector("#scenarioTitleInput");
+  if (!currentScenario || !input) {
+    closeScenarioTitleEdit();
+    return;
+  }
+  const nextName = input.value.trim();
+  if (nextName && nextName !== currentScenario.name) {
+    currentScenario.name = nextName;
+    document.querySelector("#scenarioTitleText").textContent = nextName;
+    schedulePersistState();
+    renderScenarioList();
+  }
+  closeScenarioTitleEdit();
+}
+
+function closeScenarioTitleEdit() {
+  isScenarioTitleEditing = false;
+  const input = document.querySelector("#scenarioTitleInput");
+  if (input) input.value = getCurrentScenario()?.name || scenarioTitleBeforeEdit;
+  document.querySelector(".top-title-wrap")?.classList.remove("is-editing");
+  scenarioTitleBeforeEdit = "";
+}
+
 function updateNodeText(groupElement, nodeData, compact) {
   const group = d3.select(groupElement);
   const titleWidth = isPlaceholderNode(nodeData) ? 176 : compact ? NODE_TEXT_COMPACT_WIDTH : NODE_TEXT_DEFAULT_WIDTH;
   fitSvgText(group.select(".node-title-svg"), nodeData.title, titleWidth);
-  fitSvgText(group.select(".node-subtitle-svg"), nodeData.subtitle, compact ? NODE_TEXT_COMPACT_WIDTH : NODE_TEXT_DEFAULT_WIDTH);
-  if (isPlaceholderNode(nodeData)) group.select(".node-subtitle-svg").text("");
+  fitNodeSubtitle(group.select(".node-subtitle-svg"), isPlaceholderNode(nodeData) ? "" : nodeData.subtitle, compact ? NODE_TEXT_COMPACT_WIDTH : NODE_TEXT_DEFAULT_WIDTH);
+}
+
+function fitNodeSubtitle(textSelection, value, maxWidth) {
+  fitSvgText(textSelection, value, maxWidth);
+  const fittedValue = textSelection.text();
+  const colonIndex = fittedValue.indexOf(":");
+  if (colonIndex < 0 || !fittedValue.slice(colonIndex + 1).trim()) return;
+  const labelPart = fittedValue.slice(0, colonIndex + 1);
+  const valuePart = fittedValue.slice(colonIndex + 1);
+  textSelection.text(null);
+  textSelection.append("tspan").attr("class", "node-subtitle-label").text(labelPart);
+  textSelection.append("tspan").attr("class", "node-subtitle-value").text(valuePart);
 }
 
 function fitSvgText(textSelection, value, maxWidth) {
@@ -930,6 +1981,9 @@ function edgePath(d) {
   if (!a || !b) return "";
   const route = edgeRoute(a, b, d);
   if (!route) return "";
+  if (route.isBackRoute && route.points) return roundedPolylinePath(route.points, route.radius);
+  const labelPlacement = d.label && d.source !== d.target ? edgeLabelPlacements.get(d.id) : null;
+  if (labelPlacement) return edgePathThroughLabel(route, labelPlacement);
   if (route.points) return roundedPolylinePath(route.points, route.radius);
 
   const { x1, y1, x2, y2, layoutX1, layoutX2, midX, radius } = route;
@@ -937,52 +1991,131 @@ function edgePath(d) {
 
   const directionY = y2 > y1 ? 1 : -1;
   const commands = [`M ${x1} ${y1}`];
-  if (Math.abs(layoutX1 - x1) > 0.5) commands.push(`L ${layoutX1} ${y1}`);
+  if (layoutX1 > x1 + 0.5) commands.push(`L ${layoutX1} ${y1}`);
   commands.push(
     `L ${midX - radius} ${y1}`,
     `Q ${midX} ${y1} ${midX} ${y1 + directionY * radius}`,
     `L ${midX} ${y2 - directionY * radius}`,
     `Q ${midX} ${y2} ${midX + radius} ${y2}`,
-    `L ${layoutX2} ${y2}`,
+    `L ${x2} ${y2}`,
   );
-  if (Math.abs(layoutX2 - x2) > 0.5) commands.push(`L ${x2} ${y2}`);
   return commands.join(" ");
+}
+
+function edgePathThroughLabel(route, labelPlacement) {
+  const labelY = labelPlacement.y + labelPlacement.height / 2;
+  const labelLeft = labelPlacement.x;
+  const labelRight = labelPlacement.x + labelPlacement.width;
+  const approachX = labelPlacement.approachX ?? labelLeft - 56;
+  if (route.points) {
+    const outwardX = route.outwardX ?? Math.max(route.layoutX1 + 64, route.x1 + 64);
+    const bridgeX = Math.min(route.bridgeX ?? approachX, approachX);
+    const midY = route.midY ?? route.y1 + (route.y2 - route.y1) / 2;
+    const afterLabelX = labelExitX(labelRight, route.x2);
+    const points = [
+      { x: route.x1, y: route.y1 },
+      { x: route.layoutX1, y: route.y1 },
+      { x: outwardX, y: route.y1 },
+      { x: outwardX, y: midY },
+      { x: bridgeX, y: midY },
+      { x: bridgeX, y: labelY },
+      { x: labelLeft, y: labelY },
+      { x: labelRight, y: labelY },
+    ];
+    if (Math.abs(labelY - route.y2) > 1) {
+      points.push({ x: afterLabelX, y: labelY }, { x: afterLabelX, y: route.y2 });
+    }
+    points.push({ x: route.x2, y: route.y2 });
+    return roundedPolylinePath(normalizePolylinePoints(points), route.radius || 18);
+  }
+  const beforeLabelX = labelApproachX(route, labelLeft, approachX);
+  const afterLabelX = labelExitX(labelRight, route.x2);
+  if (beforeLabelX < route.x1 - 1 && Math.abs(route.y1 - labelY) > 80) {
+    const sourceLaneX = Math.max(route.x1 + 64, route.layoutX1 + 64);
+    const midY = route.y1 + (labelY - route.y1) / 2;
+    const points = [
+      { x: route.x1, y: route.y1 },
+      { x: sourceLaneX, y: route.y1 },
+      { x: sourceLaneX, y: midY },
+      { x: beforeLabelX, y: midY },
+      { x: beforeLabelX, y: labelY },
+      { x: labelLeft, y: labelY },
+      { x: labelRight, y: labelY },
+    ];
+    if (Math.abs(labelY - route.y2) > 1) {
+      points.push({ x: afterLabelX, y: labelY }, { x: afterLabelX, y: route.y2 });
+    }
+    points.push({ x: route.x2, y: route.y2 });
+    return roundedPolylinePath(normalizePolylinePoints(points), route.radius || 18);
+  }
+  const points = [
+    { x: route.x1, y: route.y1 },
+    { x: beforeLabelX, y: route.y1 },
+    { x: beforeLabelX, y: labelY },
+    { x: labelLeft, y: labelY },
+    { x: labelRight, y: labelY },
+  ];
+  if (Math.abs(labelY - route.y2) > 1) {
+    points.push({ x: afterLabelX, y: labelY }, { x: afterLabelX, y: route.y2 });
+  }
+  points.push({ x: route.x2, y: route.y2 });
+  return roundedPolylinePath(points, route.radius || 18);
+}
+
+function labelExitX(labelRight, targetX) {
+  const minExitX = labelRight + 40;
+  const maxExitX = targetX - 40;
+  if (maxExitX < minExitX) return minExitX;
+  return Math.min(maxExitX, labelRight + 72);
+}
+
+function labelApproachX(route, labelLeft, preferredX) {
+  if (labelLeft <= route.x1 + 24) return Math.min(preferredX, labelLeft - 40);
+  const minX = route.x1 + 24;
+  const maxX = labelLeft - 16;
+  return Math.max(minX, Math.min(preferredX, maxX));
+}
+
+function normalizePolylinePoints(points) {
+  return points.filter((point, index) => {
+    const prev = points[index - 1];
+    return !prev || Math.abs(prev.x - point.x) > 0.5 || Math.abs(prev.y - point.y) > 0.5;
+  });
 }
 
 function edgeLabelPoint(d, labelWidth = EDGE_LABEL_MAX_WIDTH) {
   const a = getNode(d.source);
   const b = getNode(d.target);
   if (!a || !b) return { x: 0, y: 0 };
+  if (a.id === b.id) {
+    const route = selfLoopRoute(a, d);
+    return { x: a.x + NODE_W / 2, y: route.loopY };
+  }
   const route = edgeRoute(a, b, d);
   if (!route) return { x: 0, y: 0 };
   return { x: b.x - EDGE_LABEL_SIDE_GAP - labelWidth / 2, y: route.y2 };
 }
 
 function edgeRoute(sourceNode, targetNode, edgeItem = null) {
-  const sourcePortVisible = isNodePortVisible(sourceNode.id);
+  if (sourceNode.id === targetNode.id) return selfLoopRoute(sourceNode, edgeItem);
+  const sourcePortVisible = isNodePortVisible(sourceNode.id) && hasVisibleRightPort(sourceNode);
   const targetPortVisible = isNodePortVisible(targetNode.id) && canReceiveInput(targetNode);
-  const x1 = sourceNode.x + (sourcePortVisible ? nodeRightPortX(sourceNode) : NODE_W + NODE_PORT_EDGE_GAP);
   const layoutX1 = sourceNode.x + NODE_W + NODE_PORT_EDGE_GAP;
+  const layoutX2 = targetNode.x - NODE_PORT_EDGE_GAP;
+  const x1 = sourcePortVisible ? sourceNode.x + nodeRightPortX(sourceNode) + NODE_PORT_R + NODE_PORT_ARROW_GAP : layoutX1;
   const y1 = sourceNode.y + NODE_H / 2;
   const x2 = targetNode.x + (targetPortVisible ? NODE_PORT_LEFT_X - NODE_PORT_R - NODE_PORT_ARROW_GAP : -NODE_PORT_EDGE_GAP);
-  const layoutX2 = targetPortVisible ? x2 : targetNode.x - NODE_PORT_EDGE_GAP;
   const y2 = targetNode.y + NODE_H / 2;
-  if (layoutX2 <= layoutX1 + 48 && Math.abs(y2 - y1) > 1) {
-    const labelWidth = edgeItem?.label ? estimateEdgeLabelWidth(edgeItem.label) : 0;
-    const outwardX = layoutX1 + 64;
-    const labelLeftX = targetNode.x - EDGE_LABEL_SIDE_GAP * 2 - labelWidth;
-    const bridgeX = Math.min(layoutX2 - 64, labelLeftX - 40);
-    const midY = y1 + (y2 - y1) / 2;
-    const points = [{ x: x1, y: y1 }];
-    if (Math.abs(layoutX1 - x1) > 0.5) points.push({ x: layoutX1, y: y1 });
-    points.push(
-      { x: outwardX, y: y1 },
-      { x: outwardX, y: midY },
-      { x: bridgeX, y: midY },
-      { x: bridgeX, y: y2 },
-      { x: layoutX2, y: y2 },
-    );
-    if (Math.abs(layoutX2 - x2) > 0.5) points.push({ x: x2, y: y2 });
+  if (targetNode.x < sourceNode.x) {
+    const backIndex = backEdgeIndex(sourceNode.id, targetNode.id, edgeItem);
+    const direction = backIndex % 2 === 0 ? -1 : 1;
+    const ring = Math.floor(backIndex / 2);
+    const outerY =
+      direction < 0
+        ? Math.min(sourceNode.y, targetNode.y) - 56 - ring * 40
+        : Math.max(sourceNode.y + NODE_H, targetNode.y + NODE_H) + 56 + ring * 40;
+    const rightX = Math.max(x1 + 56, sourceNode.x + NODE_W + 56);
+    const leftX = Math.min(x2 - 56, targetNode.x - 56);
     return {
       x1,
       y1,
@@ -991,12 +2124,95 @@ function edgeRoute(sourceNode, targetNode, edgeItem = null) {
       layoutX1,
       layoutX2,
       radius: 18,
+      isBackRoute: true,
+      labelX: targetNode.x - EDGE_LABEL_SIDE_GAP - (edgeItem?.label ? estimateEdgeLabelWidth(edgeItem.label) : EDGE_LABEL_MAX_WIDTH) / 2,
+      labelY: outerY,
+      points: [
+        { x: x1, y: y1 },
+        { x: rightX, y: y1 },
+        { x: rightX, y: outerY },
+        { x: leftX, y: outerY },
+        { x: leftX, y: y2 },
+        { x: x2, y: y2 },
+      ],
+    };
+  }
+  if (layoutX2 <= layoutX1 + 48 && Math.abs(y2 - y1) > 1) {
+    const labelWidth = edgeItem?.label ? estimateEdgeLabelWidth(edgeItem.label) : 0;
+    const outwardX = layoutX1 + 64;
+    const labelLeftX = targetNode.x - EDGE_LABEL_SIDE_GAP * 2 - labelWidth;
+    const bridgeX = Math.min(layoutX2 - 64, labelLeftX - 40);
+    const midY = y1 + (y2 - y1) / 2;
+    const points = [{ x: x1, y: y1 }];
+    if (layoutX1 > x1 + 0.5) points.push({ x: layoutX1, y: y1 });
+    points.push(
+      { x: outwardX, y: y1 },
+      { x: outwardX, y: midY },
+      { x: bridgeX, y: midY },
+      { x: bridgeX, y: y2 },
+      { x: x2, y: y2 },
+    );
+    return {
+      x1,
+      y1,
+      x2,
+      y2,
+      layoutX1,
+      layoutX2,
+      outwardX,
+      bridgeX,
+      midY,
+      radius: 18,
       points,
     };
   }
   const midX = layoutX2 > layoutX1 ? layoutX1 + (layoutX2 - layoutX1) / 2 : Math.max(layoutX1 + 56, targetNode.x + NODE_W + 56);
   const radius = Math.min(18, Math.abs(midX - layoutX1) / 2, Math.abs(layoutX2 - midX) / 2, Math.abs(y2 - y1) / 2);
   return { x1, y1, x2, y2, layoutX1, layoutX2, midX, radius };
+}
+
+function backEdgeIndex(sourceId, targetId, edgeItem) {
+  const backEdges = state.edges.filter((item) => {
+    const sourceNode = getNode(item.source);
+    const targetNode = getNode(item.target);
+    return sourceNode && targetNode && item.source !== item.target && targetNode.x < sourceNode.x;
+  });
+  return Math.max(0, edgeItem ? backEdges.findIndex((item) => item.id === edgeItem.id) : backEdges.length - 1);
+}
+
+function selfLoopRoute(nodeItem, edgeItem = null) {
+  const y1 = nodeItem.y + NODE_H / 2;
+  const portVisible = isNodePortVisible(nodeItem.id);
+  const x1 = portVisible && hasVisibleRightPort(nodeItem) ? nodeItem.x + nodeRightPortX(nodeItem) + NODE_PORT_R + NODE_PORT_ARROW_GAP : nodeItem.x + NODE_W + NODE_PORT_EDGE_GAP;
+  const x2 = portVisible && canReceiveInput(nodeItem) ? nodeItem.x + NODE_PORT_LEFT_X - NODE_PORT_R - NODE_PORT_ARROW_GAP : nodeItem.x - NODE_PORT_EDGE_GAP;
+  const loopIndex = selfLoopIndex(nodeItem.id, edgeItem);
+  const direction = loopIndex % 2 === 0 ? -1 : 1;
+  const ring = Math.floor(loopIndex / 2);
+  const verticalGap = 52 + ring * 40;
+  const loopY = nodeItem.y + NODE_H / 2 + direction * verticalGap;
+  const rightX = Math.max(nodeItem.x + NODE_W + 44 + ring * 16, x1 + 36);
+  const leftX = Math.min(nodeItem.x - 44 - ring * 16, x2 - 36);
+  return {
+    x1,
+    y1,
+    x2,
+    y2: y1,
+    radius: 18,
+    points: [
+      { x: x1, y: y1 },
+      { x: rightX, y: y1 },
+      { x: rightX, y: loopY },
+      { x: leftX, y: loopY },
+      { x: leftX, y: y1 },
+      { x: x2, y: y1 },
+    ],
+    loopY,
+  };
+}
+
+function selfLoopIndex(nodeId, edgeItem) {
+  const loops = state.edges.filter((item) => item.source === nodeId && item.target === nodeId);
+  return Math.max(0, edgeItem ? loops.findIndex((item) => item.id === edgeItem.id) : loops.length - 1);
 }
 
 function roundedPolylinePath(points, radius) {
@@ -1026,15 +2242,40 @@ function shortenPoint(from, toward, distance) {
 }
 
 function isNodePortVisible(nodeId) {
-  return nodeId === selectedId || nodeId === hoveredId;
+  if (nodeId === selectedId || nodeId === hoveredId) return true;
+  if (!connectionDrag) return false;
+  const nodeItem = getNode(nodeId);
+  return isValidConnectionTarget(nodeItem, connectionDrag);
 }
 
 function nodeRightPortX(nodeItem) {
-  return hasFreeOutputs(nodeItem) && !isPlaceholderNode(nodeItem) ? NODE_PORT_RIGHT_X : NODE_PORT_RIGHT_COMPACT_X;
+  if (isConnectionRightPortTarget(nodeItem)) return NODE_PORT_RIGHT_COMPACT_X;
+  return hasVisibleRightPort(nodeItem) ? NODE_PORT_RIGHT_X : NODE_W;
+}
+
+function isConnectionRightPortTarget(nodeItem) {
+  return Boolean(connectionDrag?.direction === "input" && connectionDrag.sourceId !== nodeItem?.id && hasFreeOutputs(nodeItem) && !isPlaceholderNode(nodeItem));
+}
+
+function hasVisibleRightPort(nodeItem) {
+  return hasFreeOutputs(nodeItem) && !isPlaceholderNode(nodeItem);
+}
+
+function shouldShowRightPort(nodeItem) {
+  if (!hasVisibleRightPort(nodeItem)) return false;
+  if (!connectionDrag) return true;
+  if (connectionDrag.direction === "output") return nodeItem.id === connectionDrag.sourceId;
+  return true;
 }
 
 function canReceiveInput(nodeItem) {
-  return nodeItem.kind !== "start";
+  if (!nodeItem || nodeItem.kind === "start") return false;
+  if (isTransferOperationNode(nodeItem)) return true;
+  return !state.edges.some((edgeItem) => edgeItem.target === nodeItem.id);
+}
+
+function isTransferOperationNode(nodeItem) {
+  return isGroupTransferNode(nodeItem) || isSimpleTransferNode(nodeItem);
 }
 
 function renderProperties() {
@@ -1098,7 +2339,9 @@ function replacePlaceholderNode(replaceId, kind, operationType = null) {
   pushHistory();
   const target = getNode(replaceId);
   if (!target || !isPlaceholderNode(target)) return addNode(kind, null, operationType);
+  if (!pendingPlaceholderBackups.has(replaceId)) pendingPlaceholderBackups.set(replaceId, clone(target));
   Object.assign(target, node(replaceId, kind, target.x, target.y));
+  target.muted = Boolean(catalog[kind]?.muted);
   configureNodeForOperation(target, operationType);
   createOutputPlaceholdersFor(target);
   selectedId = replaceId;
@@ -1118,6 +2361,7 @@ function replaceNodeFromOperation(replaceId, kind, operationType = null) {
   const nextNode = node(replaceId, kind, target.x, target.y);
   configureNodeForOperation(nextNode, operationType);
   Object.assign(target, nextNode);
+  target.muted = Boolean(catalog[kind]?.muted);
   const outputsByKey = new Map(nodeOutputs(target).map((output) => [output.key, output]));
   const keptTargetIds = new Set();
   state.edges = state.edges.filter((edgeItem) => {
@@ -1202,6 +2446,14 @@ function configureNodeForOperation(nodeItem, operationType) {
     nodeItem.settings = { segment: settings };
     applySegmentTitle(nodeItem, settings);
   }
+  if (operationType === CONDITION_OPERATION) {
+    const settings = createConditionSettings();
+    nodeItem.title = "Распределение по условиям";
+    nodeItem.color = "var(--cmgui-color-special-13)";
+    nodeItem.icon = "row-data";
+    nodeItem.settings = { condition: settings };
+    applyConditionTitle(nodeItem, settings);
+  }
 }
 
 function createOutputPlaceholdersFor(sourceNode) {
@@ -1246,8 +2498,9 @@ function alignOutputPlaceholdersFor(sourceNode) {
     const output = outputByKey.get(edgeItem.outputKey);
     const targetNode = getNode(edgeItem.target);
     if (!output || !isPlaceholderNode(targetNode)) return;
-    targetNode.x = sourceNode.x + NODE_W + gap;
-    targetNode.y = sourceNode.y + (output.offsetY || 0);
+    const position = snappedNodePosition(sourceNode.x + NODE_W + gap, sourceNode.y + (output.offsetY || 0));
+    targetNode.x = position.x;
+    targetNode.y = position.y;
   });
 }
 
@@ -1255,21 +2508,25 @@ function centerNodePosition() {
   const transform = d3.zoomTransform(svg.node());
   const rect = svg.node().getBoundingClientRect();
   const [x, y] = transform.invert([rect.width / 2, rect.height / 2]);
-  return { x: x - NODE_W / 2, y: y - NODE_H / 2 };
+  return snappedNodePosition(x - NODE_W / 2, y - NODE_H / 2);
 }
 
 function nextNodePosition(sourceNode, outputKey = null) {
   const output = outputKey ? nodeOutputs(sourceNode).find((item) => item.key === outputKey) : firstFreeOutput(sourceNode);
   const gap = output?.placeholder ? placeholderCreateGap(sourceNode) : NODE_CREATE_GAP_X;
   const offsetY = output?.offsetY || 0;
-  return { x: sourceNode.x + NODE_W + gap, y: sourceNode.y + offsetY };
+  return snappedNodePosition(sourceNode.x + NODE_W + gap, sourceNode.y + offsetY);
+}
+
+function snappedNodePosition(x, y) {
+  return { x: snapToDragGrid(x), y: snapToDragGrid(y) };
 }
 
 function placeholderCreateGap(sourceNode) {
-  const widestLabel = nodeOutputs(sourceNode)
-    .filter((output) => output.placeholder)
-    .reduce((maxWidth, output) => Math.max(maxWidth, estimateEdgeLabelWidth(output.label || "")), 0);
-  return widestLabel + EDGE_LABEL_SIDE_GAP * 2;
+  const placeholderOutputs = nodeOutputs(sourceNode).filter((output) => output.placeholder);
+  const widestLabel = placeholderOutputs.reduce((maxWidth, output) => Math.max(maxWidth, estimateEdgeLabelWidth(output.label || "")), 0);
+  const hoverReserve = placeholderOutputs.length > 1 ? EDGE_LABEL_HOVER_RESERVE_X : 0;
+  return widestLabel + EDGE_LABEL_SIDE_GAP * 2 + hoverReserve;
 }
 
 function estimateEdgeLabelWidth(label) {
@@ -1283,17 +2540,19 @@ function estimateEdgeLabelWidth(label) {
 function nodeOutputs(nodeItem) {
   if (!nodeItem) return [];
   if (isPlaceholderNode(nodeItem)) return [];
+  if (isFinishNode(nodeItem)) return [];
   if (nodeItem.kind === "start") return [{ key: "main", label: "" }];
   if (isInfoMessageNode(nodeItem)) return [{ key: "delivered", label: "Сообщение доставлено", tone: "success", placeholder: true }];
   if (isContactFormNode(nodeItem)) {
     return [
-      { key: "completed", label: "Форма заполнена", tone: "plain", placeholder: true, offsetY: -92 },
-      { key: "expired", label: "Форма не заполнена", tone: "plain", placeholder: true, offsetY: 92 },
+      { key: "completed", label: "Форма заполнена", tone: "plain", placeholder: true, offsetY: -OUTPUT_STACK_GAP_Y },
+      { key: "expired", label: "Форма не заполнена", tone: "plain", placeholder: true, offsetY: OUTPUT_STACK_GAP_Y },
     ];
   }
   if (isMenuNode(nodeItem)) return menuOutputs(nodeItem);
   if (isScheduleNode(nodeItem)) return scheduleOutputs(nodeItem);
   if (isSegmentNode(nodeItem)) return segmentOutputs(nodeItem);
+  if (isConditionNode(nodeItem)) return conditionOutputs(nodeItem);
   if (isTransferWithFallbackNode(nodeItem)) return [{ key: "failed", label: "Никто не ответил", tone: "plain", placeholder: true }];
   return [{ key: "main", label: "" }];
 }
@@ -1307,7 +2566,7 @@ function menuOutputs(nodeItem) {
     label: button.text || `Кнопка ${index + 1}`,
     tone: "plain",
     placeholder: true,
-    offsetY: Math.round((index - center) * 92),
+    offsetY: Math.round((index - center) * OUTPUT_STACK_GAP_Y),
   }));
 }
 
@@ -1320,7 +2579,7 @@ function scheduleOutputs(nodeItem) {
     label: schedule.name || `График ${index + 1}`,
     tone: "plain",
     placeholder: true,
-    offsetY: Math.round((index - center) * 92),
+    offsetY: Math.round((index - center) * OUTPUT_STACK_GAP_Y),
   }));
 }
 
@@ -1333,7 +2592,20 @@ function segmentOutputs(nodeItem) {
     label: group.name || `Группа сегментов ${index + 1}`,
     tone: "plain",
     placeholder: true,
-    offsetY: Math.round((index - center) * 92),
+    offsetY: Math.round((index - center) * OUTPUT_STACK_GAP_Y),
+  }));
+}
+
+function conditionOutputs(nodeItem) {
+  const settings = getConditionSettings(nodeItem);
+  const count = Math.max(1, settings.groups.length);
+  const center = (count - 1) / 2;
+  return settings.groups.map((group, index) => ({
+    key: group.id,
+    label: group.name || `Группа условий ${index + 1}`,
+    tone: "plain",
+    placeholder: true,
+    offsetY: Math.round((index - center) * OUTPUT_STACK_GAP_Y),
   }));
 }
 
@@ -1353,34 +2625,96 @@ function isPlaceholderNode(nodeItem) {
   return nodeItem?.kind === "empty";
 }
 
+function getReachableScenarioNodeIds() {
+  const startNode = state.nodes.find((nodeItem) => isStartNode(nodeItem)) || state.nodes[0];
+  const reachable = new Set();
+  if (!startNode) return reachable;
+  const queue = [startNode.id];
+  while (queue.length) {
+    const nodeId = queue.shift();
+    if (reachable.has(nodeId)) continue;
+    reachable.add(nodeId);
+    state.edges.forEach((edgeItem) => {
+      if (edgeItem.source === nodeId && !reachable.has(edgeItem.target)) queue.push(edgeItem.target);
+    });
+  }
+  return reachable;
+}
+
+function getCycleNodeIds() {
+  const nodesById = new Map(state.nodes.map((nodeItem) => [nodeItem.id, nodeItem]));
+  const adjacency = new Map(state.nodes.map((nodeItem) => [nodeItem.id, []]));
+  state.edges.forEach((edgeItem) => {
+    if (!nodesById.has(edgeItem.source) || !nodesById.has(edgeItem.target)) return;
+    adjacency.get(edgeItem.source)?.push(edgeItem.target);
+  });
+
+  const visited = new Set();
+  const stack = [];
+  const onStack = new Set();
+  const cycleIds = new Set();
+
+  function visit(nodeId) {
+    visited.add(nodeId);
+    stack.push(nodeId);
+    onStack.add(nodeId);
+    (adjacency.get(nodeId) || []).forEach((nextId) => {
+      if (!visited.has(nextId)) {
+        visit(nextId);
+        return;
+      }
+      if (!onStack.has(nextId)) return;
+      const startIndex = stack.indexOf(nextId);
+      if (startIndex >= 0) stack.slice(startIndex).forEach((cycleNodeId) => cycleIds.add(cycleNodeId));
+    });
+    stack.pop();
+    onStack.delete(nodeId);
+  }
+
+  state.nodes.forEach((nodeItem) => {
+    if (!visited.has(nodeItem.id)) visit(nodeItem.id);
+  });
+  return cycleIds;
+}
+
 function isStartNode(nodeItem) {
   return nodeItem?.kind === "start";
 }
 
-function openOutcomeMenu(sourceId) {
+function isFinishNode(nodeItem) {
+  return nodeItem?.kind === "finish";
+}
+
+function openOutcomeMenu(sourceId, options = {}) {
   const sourceNode = getNode(sourceId);
   const outputs = freeOutputs(sourceNode);
   if (!sourceNode || !outputs.length) return;
-  if (outputs.length === 1 && !outputs[0].label) {
+  if (!options.targetId && outputs.length === 1 && !outputs[0].label) {
     openOperationModal(sourceId, null, outputs[0].key);
     return;
   }
+  closeNodeContextMenu();
   outcomeMenuSourceId = sourceId;
+  outcomeMenuTargetId = options.targetId || null;
   const menu = document.querySelector("#outcomeMenu");
-  menu.innerHTML = outputs.map(renderOutcomeMenuItem).join("");
+  menu.innerHTML = outputs.map((output) => renderOutcomeMenuItem(output, sourceNode)).join("");
   const transform = d3.zoomTransform(svg.node());
-  const screen = transform.apply([sourceNode.x + NODE_W + 8, sourceNode.y + NODE_H / 2]);
+  const screen = options.anchor || transform.apply([sourceNode.x + NODE_W + 8, sourceNode.y + NODE_H / 2]);
   menu.style.visibility = "hidden";
   menu.classList.add("is-open");
   const menuHeight = menu.offsetHeight;
-  menu.style.left = `${Math.round(screen[0] + 56)}px`;
-  menu.style.top = `${Math.round(screen[1] - menuHeight / 2)}px`;
+  const menuWidth = menu.offsetWidth;
+  const leftOffset = options.anchor ? 16 : 56;
+  menu.style.left = `${Math.round(screen[0] + leftOffset)}px`;
+  menu.style.top = `${Math.round(Math.max(16, Math.min(screen[1] - menuHeight / 2, window.innerHeight - menuHeight - 16)))}px`;
+  if (screen[0] + leftOffset + menuWidth > window.innerWidth - 16) menu.style.left = `${Math.round(window.innerWidth - menuWidth - 16)}px`;
   menu.style.visibility = "";
   menu.setAttribute("aria-hidden", "false");
 }
 
 function closeOutcomeMenu() {
   outcomeMenuSourceId = null;
+  outcomeMenuTargetId = null;
   const menu = document.querySelector("#outcomeMenu");
   if (!menu) return;
   menu.classList.remove("is-open");
@@ -1388,13 +2722,20 @@ function closeOutcomeMenu() {
   menu.innerHTML = "";
 }
 
-function renderOutcomeMenuItem(output) {
-  const iconName = output.tone === "success" ? "success" : output.tone === "danger" || output.key === "failed" ? "fail" : "success";
+function renderOutcomeMenuItem(output, sourceNode) {
+  const iconName = outcomeIconName(output, sourceNode);
   const label = output.label || "Основной выход";
-  return `<button class="outcome-menu-card" type="button" data-outcome-key="${escapeAttr(output.key)}">
-    <span class="outcome-menu-icon">${iconSvg(iconName, 20)}</span>
+  return `<button class="node-context-menu-item outcome-menu-item" type="button" data-outcome-key="${escapeAttr(output.key)}">
+    <span class="cmgui-icon">${iconSvg(iconName, 20)}</span>
     <span>${escapeHtml(label)}</span>
   </button>`;
+}
+
+function outcomeIconName(output, sourceNode) {
+  if (isMenuNode(sourceNode)) return "menu";
+  if (output.tone === "danger" || output.key === "failed" || output.key === "expired" || /(^|\s)не\s/i.test(output.label || "")) return "fail";
+  if (output.tone === "success" || output.key === "completed" || output.key === "delivered") return "success";
+  return "menu";
 }
 
 function openOperationModal(sourceId = null, replaceId = null, outputKey = null) {
@@ -1438,12 +2779,13 @@ function closeNodeSettings(clearSelection = true) {
   settingsNodeId = null;
   document.body.classList.remove("is-node-settings-open");
   document.querySelector("#nodeSettingsSidebar").setAttribute("aria-hidden", "true");
+  hoveredId = null;
   if (clearSelection) {
     selectedId = null;
-    hoveredId = null;
   }
   renderNodeSettingsSidebar();
   renderEdges();
+  renderNodes();
   closeOutcomeMenu();
   nodeLayer.selectAll(".scenario-node-svg").classed("is-selected", (nodeItem) => nodeItem.id === selectedId);
 }
@@ -1463,7 +2805,42 @@ function cancelNodeSettings(clearSelection = true) {
   settingsNodeId = null;
   document.body.classList.remove("is-node-settings-open");
   document.querySelector("#nodeSettingsSidebar").setAttribute("aria-hidden", "true");
+  hoveredId = null;
+  if (pendingPlaceholderBackups.has(nodeId)) {
+    restorePendingPlaceholder(nodeId);
+    if (clearSelection) {
+      selectedId = null;
+    }
+    renderNodeSettingsSidebar();
+    render();
+    schedulePersistState();
+    return;
+  }
   removeNodeById(nodeId);
+}
+
+function restorePendingPlaceholder(nodeId) {
+  const backup = pendingPlaceholderBackups.get(nodeId);
+  const nodeItem = getNode(nodeId);
+  if (!backup || !nodeItem) return;
+  pushHistory();
+  const outgoingPlaceholderIds = new Set(
+    state.edges
+      .filter((edgeItem) => edgeItem.source === nodeId)
+      .map((edgeItem) => edgeItem.target)
+      .filter((targetId) => isPlaceholderNode(getNode(targetId))),
+  );
+  state.edges = state.edges.filter((edgeItem) => edgeItem.source !== nodeId && !outgoingPlaceholderIds.has(edgeItem.source) && !outgoingPlaceholderIds.has(edgeItem.target));
+  state.nodes = state.nodes.filter((item) => !outgoingPlaceholderIds.has(item.id));
+  Object.keys(nodeItem).forEach((key) => delete nodeItem[key]);
+  Object.assign(nodeItem, clone(backup));
+  pendingPlaceholderBackups.delete(nodeId);
+  outgoingPlaceholderIds.forEach((id) => {
+    delete settingsDrafts[id];
+    delete settingsErrors[id];
+    pendingSettingsNodeIds.delete(id);
+    pendingPlaceholderBackups.delete(id);
+  });
 }
 
 function requestNodeSettingsClose() {
@@ -1505,12 +2882,15 @@ function hasUnsavedNodeSettings(nodeId) {
 }
 
 function stableStringifySettings(nodeItem, settings) {
+  if (isStartNode(nodeItem)) return JSON.stringify(normalizeComparableStartSettings(settings));
+  if (isFinishNode(nodeItem)) return JSON.stringify({});
   if (isGroupTransferNode(nodeItem)) return JSON.stringify(normalizeComparableGroupTransferSettings(settings));
   if (isInfoMessageNode(nodeItem)) return JSON.stringify(normalizeComparableInfoMessageSettings(settings));
   if (isContactFormNode(nodeItem)) return JSON.stringify(normalizeComparableContactFormSettings(settings));
   if (isMenuNode(nodeItem)) return JSON.stringify(normalizeComparableMenuSettings(settings));
   if (isScheduleNode(nodeItem)) return JSON.stringify(normalizeComparableScheduleSettings(settings));
   if (isSegmentNode(nodeItem)) return JSON.stringify(normalizeComparableSegmentSettings(settings));
+  if (isConditionNode(nodeItem)) return JSON.stringify(normalizeComparableConditionSettings(settings));
   return JSON.stringify(normalizeComparableSimpleTransferSettings(nodeItem.operationType, settings));
 }
 
@@ -1543,7 +2923,10 @@ function renderNodeSettingsSidebar() {
   const errors = settingsErrors[nodeItem.id] || {};
   const bodyScrollTop = sidebar.querySelector(".node-settings-body")?.scrollTop || 0;
   const title = settingsTitleForNode(nodeItem);
-  sidebar.innerHTML = `<form class="node-settings-form" id="nodeSettingsForm">
+  const showCycleSettings = isTransferOperationNode(nodeItem) && getCycleNodeIds().has(nodeItem.id);
+  const showPrimarySettingsHead = showCycleSettings || isMenuNode(nodeItem);
+  sidebar.classList.toggle("is-wide", isConditionNode(nodeItem));
+  sidebar.innerHTML = `<form class="node-settings-form ${isConditionNode(nodeItem) ? "is-condition-settings" : ""}" id="nodeSettingsForm">
     <header class="node-settings-header">
       <h2>${escapeHtml(title)}</h2>
       <button class="node-settings-close" type="button" id="nodeSettingsClose" title="Закрыть" aria-label="Закрыть">
@@ -1551,24 +2934,23 @@ function renderNodeSettingsSidebar() {
       </button>
     </header>
     <div class="node-settings-body">
-      ${renderPrimarySettingsCard(nodeItem, settings, errors)}
-      <section class="node-settings-card technical-settings-card ${settings.technicalOpen ? "is-open" : ""}">
-        <button class="node-settings-card-head" type="button" id="technicalToggle">
-          <span>Технические настройки</span>
-          <span class="cmgui-icon">${iconSvg(settings.technicalOpen ? "arrow-up" : "arrow-down", 20)}</span>
-        </button>
-        ${
-          settings.technicalOpen
-            ? `<div class="node-settings-card-content">
-                <div class="cycle-row">
-                  <span>Число циклов, если операция будет зациклена</span>
-                  ${renderCounter("cycleLimitInput", settings.cycleLimit, { min: 1, max: 9999999 })}
-                </div>
-                ${renderSettingsAlert("Настройка будет применяться, если операция зациклена. После прохождения максимального количества циклов, сценарий будет завершен, а чат переадресуется в соответствии с настройками завершения сценария.")}
-              </div>`
-            : ""
-        }
-      </section>
+      ${renderPrimarySettingsCard(nodeItem, settings, errors, showPrimarySettingsHead)}
+      ${
+        !showCycleSettings
+          ? ""
+          : `<section class="node-settings-card technical-settings-card is-open">
+        <div class="node-settings-card-head is-static">
+          <span>Настройки цикла</span>
+        </div>
+        <div class="node-settings-card-content">
+          <div class="cycle-row">
+            <span>Число циклов, если операция будет зациклена</span>
+            ${renderCounter("cycleLimitInput", settings.cycleLimit, { min: 1, max: 9999999 })}
+          </div>
+          ${renderSettingsAlert("После прохождения максимального количества циклов, сценарий остановится и будет завершен спустя время, установленное в операции «Начало сценария»")}
+        </div>
+      </section>`
+      }
     </div>
     <footer class="node-settings-footer">
       <button class="cmgui-button cmgui-button-size-medium cmgui-button-primary cmgui-button-fill" type="submit">Сохранить</button>
@@ -1579,6 +2961,7 @@ function renderNodeSettingsSidebar() {
   wireNodeSettingsSidebar(sidebar, nodeItem, settings);
   const body = sidebar.querySelector(".node-settings-body");
   if (body) body.scrollTop = bodyScrollTop;
+  positionOpenNodeSettingsDropdowns();
 }
 
 function renderCounter(id, value, { min = 0, max = 9999999 } = {}) {
@@ -1596,66 +2979,148 @@ function renderCounter(id, value, { min = 0, max = 9999999 } = {}) {
   </div>`;
 }
 
-function renderPrimarySettingsCard(nodeItem, settings, errors) {
-  if (isGroupTransferNode(nodeItem)) return settings.groupName ? renderGroupTransferCard(settings) : renderEmptyGroupTransferCard(errors);
-  if (isInfoMessageNode(nodeItem)) return renderInfoMessageCard(settings, errors);
-  if (isContactFormNode(nodeItem)) return renderContactFormCard(settings);
-  if (isMenuNode(nodeItem)) return renderMenuCard(settings, errors);
-  if (isScheduleNode(nodeItem)) return renderScheduleCard(settings, errors);
-  if (isSegmentNode(nodeItem)) return renderSegmentCard(settings, errors);
-  return renderSimpleTransferCard(nodeItem, settings, errors);
+function renderPrimarySettingsCard(nodeItem, settings, errors, showHeader = true) {
+  if (isStartNode(nodeItem)) return renderStartSettingsCards(settings, errors);
+  if (isFinishNode(nodeItem)) return renderFinishCard();
+  if (isGroupTransferNode(nodeItem)) return renderGroupTransferCard(settings, errors, showHeader);
+  if (isInfoMessageNode(nodeItem)) return renderInfoMessageCard(settings, errors, showHeader);
+  if (isContactFormNode(nodeItem)) return renderContactFormCard(settings, showHeader);
+  if (isMenuNode(nodeItem)) return renderMenuCard(settings, errors, showHeader);
+  if (isScheduleNode(nodeItem)) return renderScheduleCard(settings, errors, showHeader);
+  if (isSegmentNode(nodeItem)) return renderSegmentCard(settings, errors, showHeader);
+  if (isConditionNode(nodeItem)) return renderConditionCard(settings, errors, showHeader);
+  return renderSimpleTransferCard(nodeItem, settings, errors, showHeader);
 }
 
-function renderEmptyGroupTransferCard(errors = {}) {
-  return `<section class="node-settings-card">
-    <div class="node-settings-card-head is-static">
-      <span>Группа не выбрана</span>
-    </div>
-    <div class="group-picker">
-      <button class="cmgui-button cmgui-button-size-medium cmgui-button-secondary cmgui-button-outline add-group-button" type="button" id="addGroupButton" aria-expanded="false">
-      <span class="cmgui-icon">${iconSvg("add-20", 20)}</span>
-      <span>Добавить группу</span>
-      </button>
-      ${errors.groupName ? `<span class="settings-field-error">${escapeHtml(errors.groupName)}</span>` : ""}
-    </div>
+function renderSettingsCardHead(title, showHeader = true) {
+  return showHeader ? `<div class="node-settings-card-head is-static"><span>${escapeHtml(title)}</span></div>` : "";
+}
+
+function renderFinishCard() {
+  return `<section class="node-settings-card finish-settings-card">
+    ${renderSettingsAlert("Как только обращение дойдет до данной операции, оно будет закрыто и отобразится для пользователя только в отчетах.")}
   </section>`;
 }
 
-function renderGroupTransferCard(settings) {
-  return `<section class="node-settings-card group-transfer-card">
-    <div class="node-settings-card-head is-static">
-      <span>${escapeHtml(settings.groupName)}</span>
-      <span class="group-title-actions">
-        <button class="node-settings-icon-button" type="button" id="changeGroupButton" title="Сменить группу" aria-label="Сменить группу">${iconSvg("arrows-both-ways", 20)}</button>
-        ${settings.groupDropdownOpen ? renderGroupDropdown(settings) : ""}
-      </span>
-    </div>
-    <div class="distribution-row">
-      ${renderDesignSelect("distributionSelect", "Порядок распределения сообщений*", settings.distribution, [
-        ["all", "Всем сразу"],
-        ["queued", "По очереди"],
-        ["balanced", "Равномерно"],
-      ], settings.distributionDropdownOpen)}
-      <span class="group-count">Участвуют ${settings.employees.length} ${formatEmployeeCount(settings.employees.length)}</span>
-    </div>
-    ${renderEmployeesTable(settings)}
-    ${renderResponseTimeout(settings)}
-    ${renderSettingsAlert(alertForDistribution(settings.distribution))}
-  </section>`;
-}
-
-function renderSimpleTransferCard(nodeItem, settings, errors = {}) {
-  const config = SIMPLE_TRANSFER_CONFIG[nodeItem.operationType];
-  return `<section class="node-settings-card simple-transfer-card">
+function renderStartSettingsCards(settings, errors = {}) {
+  const selectedChannels = settings.channels.length ? settings.channels.join(", ") : "Каналы для приема сообщений";
+  const hasSelectedChannels = settings.channels.length > 0;
+  const hasStartName = Boolean(settings.name?.trim());
+  return `<section class="node-settings-card start-settings-card">
     <div class="node-settings-card-head is-static">
       <span>Основные параметры</span>
     </div>
+    <label class="cmgui-text-field">
+      <span class="cmgui-text-field-wrapper ${errors.name ? "is-error" : ""} ${hasStartName ? "" : "is-empty"}">
+        <span class="cmgui-text-field-label ${hasStartName ? "cmgui-text-field-label-active" : ""}">Название*</span>
+        <input class="cmgui-text-field-input" id="startScenarioNameInput" value="${escapeAttr(settings.name)}" />
+      </span>
+    </label>
+    <div class="cmgui-select-container start-channel-select">
+      <div class="cmgui-select cmgui-select-size-medium">
+        <button class="cmgui-select-field ${settings.channelsDropdownOpen ? "cmgui-select-field-active" : ""} ${hasSelectedChannels ? "" : "is-empty"}" type="button" id="startChannelsSelect" aria-expanded="${settings.channelsDropdownOpen}">
+          ${hasSelectedChannels ? `<span class="cmgui-select-label cmgui-select-label-active"><span class="cmgui-select-label-text-active">Каналы для приема сообщений</span></span>` : ""}
+          <span class="cmgui-select-field-output ${hasSelectedChannels ? "" : "is-placeholder"}">${escapeHtml(selectedChannels)}</span>
+          <span class="cmgui-select-field-suffix">${iconSvg("arrow-list-down", 20)}</span>
+        </button>
+      </div>
+      ${settings.channelsDropdownOpen ? renderStartChannelsDropdown(settings) : ""}
+    </div>
+  </section>
+  <section class="node-settings-card technical-settings-card start-finish-card is-open">
+    <div class="node-settings-card-head is-static">
+      <span>Правило завершения сценария</span>
+    </div>
+    <div class="node-settings-card-content">
+      <div class="start-finish-time-row">
+        <span>Завершать сценарий через</span>
+        <span class="cmgui-text-field-wrapper start-hours-field ${errors.finishAfterHours ? "is-error" : ""}">
+          <input class="cmgui-text-field-input" id="startFinishHoursInput" value="${settings.finishAfterHours}" inputmode="numeric" />
+        </span>
+        <div class="segment-control start-finish-unit-control" role="group" aria-label="Единица времени завершения сценария">
+          <button class="${settings.finishAfterUnit === "hours" ? "is-active" : ""}" type="button" data-start-finish-unit="hours">Часов</button>
+          <button class="${settings.finishAfterUnit === "days" ? "is-active" : ""}" type="button" data-start-finish-unit="days">Дней</button>
+        </div>
+      </div>
+      <div class="start-finish-label">После завершения отправить чат</div>
+      <div class="start-radio-group" role="radiogroup" aria-label="После завершения отправить чат">
+        ${renderStartRadio("all", "Всем сотрудникам в новые сообщения", settings.completionTarget)}
+        ${renderStartRadio("employee", "Сотруднику в новые сообщения", settings.completionTarget)}
+        ${renderStartRadio("group", "Группе в новые сообщения", settings.completionTarget)}
+      </div>
+      ${settings.completionTarget === "employee" ? renderSimpleSelect("startEmployeeSelect", "Сотрудник*", settings.employeeName, TRANSFER_EMPLOYEES.map((name) => [name, name]), settings.employeeDropdownOpen) : ""}
+      ${settings.completionTarget === "group" ? renderSimpleSelect("startGroupSelect", "Отдел*", settings.groupName, GROUP_TRANSFER_GROUPS.map((name) => [name, name]), settings.groupDropdownOpen) : ""}
+      ${renderSettingsAlert("Сценарий завершится, если чат не возьмут в работу в\u00A0течение выбранного времени после завершения всех операций и настроенных циклов.")}
+    </div>
+  </section>`;
+}
+
+function renderStartChannelsDropdown(settings) {
+  return `<div class="cmgui-dropdown cmgui-dropdown-placement-bottomLeft node-dropdown start-channel-dropdown" role="listbox" aria-label="Каналы">
+    <div class="cmgui-dropdown-content">
+      <div class="cmgui-dropdown-inner">
+        <ul class="cmgui-list cmgui-list-borderless cmgui-dropdown-list">
+          ${CHANNEL_OPTIONS.map(
+            (channel) => `<li class="cmgui-list-li" role="option">
+              <label class="start-channel-option">
+                <input type="checkbox" value="${escapeAttr(channel)}" data-start-channel="${escapeAttr(channel)}" ${settings.channels.includes(channel) ? "checked" : ""} />
+                <span class="start-channel-checkmark" aria-hidden="true"></span>
+                <span class="start-channel-source-icon cmgui-icon" aria-hidden="true">${iconSvg(CHANNEL_ICON_BY_CHANNEL[channel], 20)}</span>
+                <span>${escapeHtml(channel)}</span>
+              </label>
+            </li>`,
+          ).join("")}
+        </ul>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderStartRadio(value, label, selectedValue) {
+  return `<label class="cmgui-radio">
+    <input type="radio" name="startCompletionTarget" value="${escapeAttr(value)}" ${selectedValue === value ? "checked" : ""} />
+    <span class="cmgui-radio-mark"></span>
+    <span>${escapeHtml(label)}</span>
+  </label>`;
+}
+
+function renderGroupTransferCard(settings, errors = {}, showHeader = true) {
+  return `<section class="node-settings-card group-transfer-card">
+    ${renderSettingsCardHead("Основные параметры", showHeader)}
+    <div class="group-picker">
+      <div class="group-select ${errors.groupName ? "is-error" : ""}">
+        ${renderSimpleSelect("groupSelect", "Группа*", settings.groupName || "", GROUP_TRANSFER_GROUPS.map((name) => [name, name]), settings.groupDropdownOpen)}
+      </div>
+    </div>
+    ${
+      settings.groupName
+        ? `<div class="distribution-row">
+            ${renderDesignSelect("distributionSelect", "Порядок распределения сообщений*", settings.distribution, [
+              ["all", "Всем сразу"],
+              ["queued", "По очереди"],
+              ["balanced", "Равномерно"],
+            ], settings.distributionDropdownOpen)}
+            <span class="group-count">Участвуют ${settings.employees.length} ${formatEmployeeCount(settings.employees.length)}</span>
+          </div>
+          ${renderEmployeesTable(settings)}
+          ${renderResponseTimeout(settings)}
+          ${renderSettingsAlert(alertForDistribution(settings.distribution))}`
+        : ""
+    }
+  </section>`;
+}
+
+function renderSimpleTransferCard(nodeItem, settings, errors = {}, showHeader = true) {
+  const config = SIMPLE_TRANSFER_CONFIG[nodeItem.operationType];
+  return `<section class="node-settings-card simple-transfer-card">
+    ${renderSettingsCardHead("Основные параметры", showHeader)}
     ${renderSettingsAlert(config.alert)}
     ${
       config.requiredField === "employeeName"
         ? `<div class="employee-picker">
-            ${renderSimpleSelect("employeeSelect", "Сотрудник*", settings.employeeName || "", TRANSFER_EMPLOYEES.map((name) => [name, name]), settings.employeeDropdownOpen)}
-            ${errors.employeeName ? `<span class="settings-field-error">${escapeHtml(errors.employeeName)}</span>` : ""}
+            <div class="employee-select ${errors.employeeName ? "is-error" : ""}">
+              ${renderSimpleSelect("employeeSelect", "Сотрудник*", settings.employeeName || "", TRANSFER_EMPLOYEES.map((name) => [name, name]), settings.employeeDropdownOpen)}
+            </div>
           </div>`
         : ""
     }
@@ -1663,11 +3128,9 @@ function renderSimpleTransferCard(nodeItem, settings, errors = {}) {
   </section>`;
 }
 
-function renderInfoMessageCard(settings, errors = {}) {
+function renderInfoMessageCard(settings, errors = {}, showHeader = true) {
   return `<section class="node-settings-card info-message-card">
-    <div class="node-settings-card-head is-static">
-      <span>Основные параметры</span>
-    </div>
+    ${renderSettingsCardHead("Основные параметры", showHeader)}
     ${renderSettingsAlert("Клиент получит сообщение, а затем сценарий перейдет к следующей операции (через указанное ниже время)")}
     <label class="cmgui-text-field info-message-textarea">
       <span class="cmgui-text-field-wrapper is-textarea ${errors.messageText ? "is-error" : ""}">
@@ -1678,11 +3141,9 @@ function renderInfoMessageCard(settings, errors = {}) {
   </section>`;
 }
 
-function renderContactFormCard(settings) {
+function renderContactFormCard(settings, showHeader = true) {
   return `<section class="node-settings-card contact-form-card">
-    <div class="node-settings-card-head is-static">
-      <span>Основные параметры</span>
-    </div>
+    ${renderSettingsCardHead("Основные параметры", showHeader)}
     ${renderSettingsAlert("Клиенту будет предложено оставить свои контактные данные. Эта операция работает только для онлайн-чатов и не работает для мессенджеров или Email.")}
     <div class="contact-form-preview">
       <div class="contact-form-preview-row">
@@ -1707,11 +3168,9 @@ function renderContactFormCard(settings) {
   </section>`;
 }
 
-function renderMenuCard(settings, errors = {}) {
+function renderMenuCard(settings, errors = {}, showHeader = true) {
   return `<section class="node-settings-card menu-settings-card">
-    <div class="node-settings-card-head is-static">
-      <span>Основные параметры</span>
-    </div>
+    ${renderSettingsCardHead("Основные параметры", showHeader)}
     ${renderSettingsAlert("Клиент получит сообщение и предложение выбрать какое-либо действие. От его выбора зависит следующая операция сценария.")}
     <label class="cmgui-text-field info-message-textarea menu-message-textarea">
       <span class="cmgui-text-field-wrapper is-textarea ${errors.messageText ? "is-error" : ""}">
@@ -1750,18 +3209,16 @@ function renderMenuButtonRow(button, index, total, errors = {}) {
   </div>`;
 }
 
-function renderScheduleCard(settings, errors = {}) {
+function renderScheduleCard(settings, errors = {}, showHeader = true) {
   return `<section class="node-settings-card schedule-settings-card">
-    <div class="node-settings-card-head is-static">
-      <span>График работы</span>
-    </div>
+    ${renderSettingsCardHead("График работы", showHeader)}
     ${renderSettingsAlert("Чат будет обработан в зависимости от активного графика работы. Если активно сразу несколько графиков, то приоритетным будет тот, который находится выше")}
     <div class="menu-buttons-list schedule-list">
       ${settings.schedules.map((schedule, index) => renderScheduleRow(schedule, index, settings.schedules.length, errors)).join("")}
     </div>
     <button class="cmgui-button cmgui-button-size-medium cmgui-button-secondary cmgui-button-outline menu-add-button" type="button" id="addScheduleButton" ${settings.schedules.length >= SCHEDULE_MAX_COUNT ? "disabled" : ""}>
       <span class="cmgui-icon">${iconSvg("add-20", 20)}</span>
-      <span>Добавить график</span>
+      <span>Добавить график работы</span>
     </button>
   </section>`;
 }
@@ -1781,11 +3238,9 @@ function renderScheduleRow(schedule, index, total, errors = {}) {
   </div>`;
 }
 
-function renderSegmentCard(settings, errors = {}) {
+function renderSegmentCard(settings, errors = {}, showHeader = true) {
   return `<section class="node-settings-card segment-settings-card">
-    <div class="node-settings-card-head is-static">
-      <span>Группы сегментов</span>
-    </div>
+    ${renderSettingsCardHead("Группы сегментов", showHeader)}
     ${renderSettingsAlert("Чат будет обработан в зависимости от сегмента посетителя, написавшего сообщение. Если посетитель попадет в несколько групп сегментов одновременно, то приоритетным будет тот, который находится выше")}
     <div class="menu-buttons-list segment-list">
       ${settings.groups.map((group, index) => renderSegmentRow(group, index, settings.groups.length, errors)).join("")}
@@ -1812,11 +3267,77 @@ function renderSegmentRow(group, index, total, errors = {}) {
   </div>`;
 }
 
+function renderConditionCard(settings, errors = {}, showHeader = true) {
+  return `<section class="node-settings-card condition-settings-card">
+    ${renderSettingsCardHead("Группы условий", showHeader)}
+    <div class="condition-groups-list">
+      ${settings.groups.map((group, index) => renderConditionGroup(group, index, settings.groups.length, errors)).join("")}
+    </div>
+    <button class="cmgui-button cmgui-button-size-medium cmgui-button-secondary cmgui-button-outline condition-add-group-button" type="button" id="addConditionGroupButton" ${settings.groups.length >= CONDITION_MAX_COUNT ? "disabled" : ""}>
+      <span class="cmgui-icon">${iconSvg("add-20", 20)}</span>
+      <span>Добавить группу условий</span>
+    </button>
+  </section>`;
+}
+
+function renderConditionGroup(group, index, totalGroups, errors = {}) {
+  const groupErrors = errors.groups?.[group.id] || {};
+  const isOpen = group.open !== false;
+  return `<div class="condition-group ${isOpen ? "is-open" : ""}" data-condition-group="${escapeAttr(group.id)}">
+    <button class="condition-group-head" type="button" data-condition-group-toggle="${escapeAttr(group.id)}">
+      <span>${escapeHtml(group.name || `Группа условий ${index + 1}`)}</span>
+      <span class="cmgui-icon condition-group-arrow ${isOpen ? "is-open" : ""}">${iconSvg("arrow-list-down", 20)}</span>
+    </button>
+    ${
+      isOpen
+        ? `<div class="condition-group-content">
+            <label class="cmgui-text-field condition-group-name">
+              <span class="cmgui-text-field-wrapper ${groupErrors.name ? "is-error" : ""} ${group.name?.trim() ? "" : "is-empty"}">
+                <span class="cmgui-text-field-label ${group.name?.trim() ? "cmgui-text-field-label-active" : ""}">Название*</span>
+                <input class="cmgui-text-field-input" data-condition-group-name="${escapeAttr(group.id)}" value="${escapeAttr(group.name || "")}" />
+              </span>
+            </label>
+            <div class="condition-list">
+              ${group.conditions.map((condition, conditionIndex) => renderConditionRow(group, condition, conditionIndex, group.conditions.length, totalGroups, groupErrors)).join("")}
+            </div>
+            <button class="cmgui-button cmgui-button-size-medium cmgui-button-secondary cmgui-button-outline condition-add-button" type="button" data-condition-add="${escapeAttr(group.id)}">
+              <span class="cmgui-icon">${iconSvg("add-20", 20)}</span>
+              <span>Добавить условие</span>
+            </button>
+          </div>`
+        : ""
+    }
+  </div>`;
+}
+
+function renderConditionRow(group, condition, index, total, totalGroups, errors = {}) {
+  const parameterId = `conditionParameterSelect-${condition.id}`;
+  const operatorId = `conditionOperatorSelect-${condition.id}`;
+  const valueId = `conditionValueSelect-${condition.id}`;
+  const hasError = errors.conditions?.[condition.id];
+  const valueOptions = conditionValuesForParameter(condition.parameter);
+  return `<div class="condition-row" data-condition-row="${escapeAttr(condition.id)}" data-condition-group-row="${escapeAttr(group.id)}">
+    <div class="condition-fields ${hasError ? "is-error" : ""}">
+      <div class="condition-select condition-parameter-select">
+        ${renderSimpleSelect(parameterId, "Параметр*", condition.parameter || "", CONDITION_PARAMETERS.map((name) => [name, name]), condition.parameterDropdownOpen)}
+      </div>
+      <div class="condition-select condition-operator-select">
+        ${renderSimpleSelect(operatorId, "Условие*", condition.operator || "", CONDITION_OPERATORS, condition.operatorDropdownOpen)}
+      </div>
+      <div class="condition-select condition-value-select">
+        ${renderSimpleSelect(valueId, "Значение*", condition.value || "", valueOptions.map((name) => [name, name]), condition.valueDropdownOpen)}
+      </div>
+    </div>
+    <button class="menu-button-remove" type="button" data-condition-remove="${escapeAttr(condition.id)}" data-condition-remove-group="${escapeAttr(group.id)}" title="Удалить" aria-label="Удалить" ${total <= 1 && totalGroups <= 1 ? "disabled" : ""}>${iconSvg("cancel", 20)}</button>
+  </div>`;
+}
+
 function renderSimpleSelect(id, placeholder, value, options, isOpen) {
   const selected = options.find(([optionValue]) => optionValue === value);
   return `<div class="cmgui-select-container simple-select">
     <div class="cmgui-select cmgui-select-size-medium">
-      <button class="cmgui-select-field ${isOpen ? "cmgui-select-field-active" : ""}" type="button" id="${id}" aria-expanded="${isOpen}">
+      <button class="cmgui-select-field ${isOpen ? "cmgui-select-field-active" : ""} ${selected ? "" : "is-empty"}" type="button" id="${id}" aria-expanded="${isOpen}">
+        ${selected ? `<span class="cmgui-select-label cmgui-select-label-active"><span class="cmgui-select-label-text-active">${escapeHtml(placeholder)}</span></span>` : ""}
         <span class="cmgui-select-field-output ${selected ? "" : "is-placeholder"}">${escapeHtml(selected ? selected[1] : placeholder)}</span>
         <span class="cmgui-select-field-suffix">${iconSvg("arrow-list-down", 20)}</span>
       </button>
@@ -1931,18 +3452,8 @@ function renderSelectPopup(id, options) {
   });
 }
 
-function renderGroupDropdown(settings) {
-  if (!settings.groupDropdownOpen) return "";
-  return renderDropdownPopup({
-    id: "groupDropdown",
-    options: GROUP_TRANSFER_GROUPS.map((groupName) => ({ value: groupName, title: groupName })),
-    action: { text: "Добавить новую группу", value: "__create_group__" },
-    width: "288px",
-  });
-}
-
 function renderDropdownPopup({ id, options, action, width }) {
-  return `<div class="cmgui-dropdown cmgui-dropdown-placement-bottomLeft node-dropdown" style="width:${width}" role="listbox" aria-label="Список">
+  return `<div class="cmgui-dropdown cmgui-dropdown-placement-bottomLeft node-dropdown" data-dropdown-popup-for="${escapeAttr(id)}" data-dropdown-width="${escapeAttr(width)}" style="width:${width}" role="listbox" aria-label="Список">
     <div class="cmgui-dropdown-content">
       <div class="cmgui-dropdown-inner">
         <label class="cmgui-text-field dropdown-search">
@@ -1982,6 +3493,24 @@ function renderSettingsAlert(text) {
   </div>`;
 }
 
+function positionOpenNodeSettingsDropdowns() {
+  const sidebar = document.querySelector("#nodeSettingsSidebar");
+  if (!sidebar) return;
+  sidebar.querySelectorAll(".node-dropdown[data-dropdown-popup-for]").forEach((dropdown) => {
+    const trigger = sidebar.querySelector(`#${cssEscape(dropdown.dataset.dropdownPopupFor)}`);
+    if (!trigger) return;
+    const triggerRect = trigger.getBoundingClientRect();
+    const sidebarRect = sidebar.getBoundingClientRect();
+    const widthValue = dropdown.dataset.dropdownWidth || "100%";
+    const width = widthValue.endsWith("%") ? triggerRect.width : Number.parseFloat(widthValue) || triggerRect.width;
+    dropdown.style.position = "fixed";
+    dropdown.style.left = `${Math.max(sidebarRect.left, Math.min(triggerRect.left, window.innerWidth - width - 8))}px`;
+    dropdown.style.top = `${triggerRect.bottom + 4}px`;
+    dropdown.style.width = `${width}px`;
+    dropdown.style.zIndex = "1000";
+  });
+}
+
 function wireNodeSettingsSidebar(sidebar, nodeItem, settings) {
   sidebar.querySelector("#nodeSettingsClose")?.addEventListener("click", () => cancelNodeSettings(true));
   sidebar.querySelector("#nodeSettingsCancel")?.addEventListener("click", () => cancelNodeSettings(true));
@@ -2003,23 +3532,101 @@ function wireNodeSettingsSidebar(sidebar, nodeItem, settings) {
     delete settingsDrafts[nodeItem.id];
     delete settingsErrors[nodeItem.id];
     pendingSettingsNodeIds.delete(nodeItem.id);
+    pendingPlaceholderBackups.delete(nodeItem.id);
     closeNodeSettings(true);
     render();
     schedulePersistState();
   });
-  sidebar.querySelector("#addGroupButton")?.addEventListener("click", () => {
-    updateNodeSettingsDraft(nodeItem, { groupDropdownOpen: !settings.groupDropdownOpen });
+  sidebar.querySelector("#startScenarioNameInput")?.addEventListener("input", (event) => {
+    const errors = { ...(settingsErrors[nodeItem.id] || {}) };
+    const wrapper = event.target.closest(".cmgui-text-field-wrapper");
+    const label = wrapper?.querySelector(".cmgui-text-field-label");
+    if (event.target.value.trim()) {
+      delete errors.name;
+      settingsErrors[nodeItem.id] = errors;
+      wrapper?.classList.remove("is-error", "is-empty");
+      label?.classList.add("cmgui-text-field-label-active");
+    } else {
+      wrapper?.classList.add("is-empty");
+      label?.classList.remove("cmgui-text-field-label-active");
+    }
+    updateNodeSettingsDraft(nodeItem, { name: event.target.value });
+  });
+  sidebar.querySelector("#startScenarioNameInput")?.addEventListener("blur", (event) => {
+    if (event.target.value.trim()) return;
+    settingsErrors[nodeItem.id] = { ...(settingsErrors[nodeItem.id] || {}), name: true };
+    event.target.closest(".cmgui-text-field-wrapper")?.classList.add("is-error", "is-empty");
+  });
+  sidebar.querySelector("#startChannelsSelect")?.addEventListener("click", () => {
+    updateNodeSettingsDraft(nodeItem, { channelsDropdownOpen: !settings.channelsDropdownOpen });
     renderNodeSettingsSidebar();
   });
-  sidebar.querySelector("#changeGroupButton")?.addEventListener("click", () => {
-    updateNodeSettingsDraft(nodeItem, { groupDropdownOpen: !settings.groupDropdownOpen });
-    renderNodeSettingsSidebar();
+  sidebar.querySelectorAll("[data-start-channel]").forEach((checkbox) => {
+    checkbox.addEventListener("change", () => {
+      const draft = getNodeSettingsDraft(nodeItem);
+      const channel = checkbox.dataset.startChannel;
+      const channels = checkbox.checked ? [...new Set([...draft.channels, channel])] : draft.channels.filter((item) => item !== channel);
+      updateNodeSettingsDraft(nodeItem, { channels });
+      renderNodeSettingsSidebar();
+    });
   });
-  sidebar.querySelector(".group-picker")?.insertAdjacentHTML("beforeend", renderGroupDropdown(settings));
-  sidebar.querySelectorAll("[data-dropdown-id='groupDropdown']").forEach((button) => {
+  sidebar.querySelector("#startFinishHoursInput")?.addEventListener("input", (event) => {
+    updateNodeSettingsDraft(nodeItem, { finishAfterHours: event.target.value });
+  });
+  sidebar.querySelector("#startFinishHoursInput")?.addEventListener("blur", (event) => {
+    const unit = getNodeSettingsDraft(nodeItem).finishAfterUnit;
+    const value = sanitizeStartFinishValue(event.target.value, settings.finishAfterHours, unit);
+    event.target.value = value;
+    updateNodeSettingsDraft(nodeItem, { finishAfterHours: value });
+  });
+  sidebar.querySelectorAll("[data-start-finish-unit]").forEach((button) => {
     button.addEventListener("click", () => {
-      const value = button.dataset.dropdownValue;
-      const groupName = value === "__create_group__" ? "Новая группа" : value;
+      const unit = button.dataset.startFinishUnit;
+      const draft = getNodeSettingsDraft(nodeItem);
+      updateNodeSettingsDraft(nodeItem, {
+        finishAfterUnit: unit,
+        finishAfterHours: sanitizeStartFinishValue(draft.finishAfterHours, draft.finishAfterHours, unit),
+      });
+      renderNodeSettingsSidebar();
+    });
+  });
+  sidebar.querySelectorAll('input[name="startCompletionTarget"]').forEach((radio) => {
+    radio.addEventListener("change", () => {
+      updateNodeSettingsDraft(nodeItem, {
+        completionTarget: radio.value,
+        employeeDropdownOpen: false,
+        groupDropdownOpen: false,
+      });
+      renderNodeSettingsSidebar();
+    });
+  });
+  sidebar.querySelector("#startEmployeeSelect")?.addEventListener("click", () => {
+    updateNodeSettingsDraft(nodeItem, { employeeDropdownOpen: !settings.employeeDropdownOpen });
+    renderNodeSettingsSidebar();
+  });
+  sidebar.querySelectorAll("[data-dropdown-id='startEmployeeSelect']").forEach((button) => {
+    button.addEventListener("click", () => {
+      updateNodeSettingsDraft(nodeItem, { employeeName: button.dataset.dropdownValue, employeeDropdownOpen: false });
+      renderNodeSettingsSidebar();
+    });
+  });
+  sidebar.querySelector("#startGroupSelect")?.addEventListener("click", () => {
+    updateNodeSettingsDraft(nodeItem, { groupDropdownOpen: !settings.groupDropdownOpen });
+    renderNodeSettingsSidebar();
+  });
+  sidebar.querySelectorAll("[data-dropdown-id='startGroupSelect']").forEach((button) => {
+    button.addEventListener("click", () => {
+      updateNodeSettingsDraft(nodeItem, { groupName: button.dataset.dropdownValue, groupDropdownOpen: false });
+      renderNodeSettingsSidebar();
+    });
+  });
+  sidebar.querySelector("#groupSelect")?.addEventListener("click", () => {
+    updateNodeSettingsDraft(nodeItem, { groupDropdownOpen: !settings.groupDropdownOpen });
+    renderNodeSettingsSidebar();
+  });
+  sidebar.querySelectorAll("[data-dropdown-id='groupSelect']").forEach((button) => {
+    button.addEventListener("click", () => {
+      const groupName = button.dataset.dropdownValue;
       delete settingsErrors[nodeItem.id];
       updateNodeSettingsDraft(nodeItem, { groupName, groupDropdownOpen: false, employees: createEmployeesForGroup(groupName) });
       renderNodeSettingsSidebar();
@@ -2035,15 +3642,6 @@ function wireNodeSettingsSidebar(sidebar, nodeItem, settings) {
       updateNodeSettingsDraft(nodeItem, { employeeName: button.dataset.dropdownValue, employeeDropdownOpen: false });
       renderNodeSettingsSidebar();
     });
-  });
-  sidebar.querySelector("#technicalToggle")?.addEventListener("click", () => {
-    updateNodeSettingsDraft(nodeItem, { technicalOpen: !settings.technicalOpen });
-    renderNodeSettingsSidebar();
-  });
-  sidebar.querySelector(".technical-settings-card:not(.is-open)")?.addEventListener("click", (event) => {
-    if (event.target.closest("button")) return;
-    updateNodeSettingsDraft(nodeItem, { technicalOpen: true });
-    renderNodeSettingsSidebar();
   });
   sidebar.querySelector("#distributionSelect")?.addEventListener("click", () => {
     updateNodeSettingsDraft(nodeItem, { distributionDropdownOpen: !settings.distributionDropdownOpen });
@@ -2292,6 +3890,146 @@ function wireNodeSettingsSidebar(sidebar, nodeItem, settings) {
       renderNodeSettingsSidebar();
     });
   });
+  sidebar.querySelectorAll("[data-condition-group-toggle]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const groupId = button.dataset.conditionGroupToggle;
+      const draft = getNodeSettingsDraft(nodeItem);
+      updateNodeSettingsDraft(nodeItem, {
+        groups: draft.groups.map((group) => (group.id === groupId ? { ...group, open: group.open === false } : group)),
+      });
+      renderNodeSettingsSidebar();
+    });
+  });
+  sidebar.querySelectorAll("[data-condition-group-name]").forEach((input) => {
+    input.addEventListener("input", (event) => {
+      const groupId = event.target.dataset.conditionGroupName;
+      const name = event.target.value;
+      const errors = { ...(settingsErrors[nodeItem.id] || {}) };
+      if (name.trim() && errors.groups?.[groupId]) {
+        delete errors.groups[groupId].name;
+        settingsErrors[nodeItem.id] = errors;
+        event.target.closest(".cmgui-text-field-wrapper")?.classList.remove("is-error", "is-empty");
+        event.target.closest(".cmgui-text-field-wrapper")?.querySelector(".cmgui-text-field-label")?.classList.add("cmgui-text-field-label-active");
+      } else if (!name.trim()) {
+        event.target.closest(".cmgui-text-field-wrapper")?.classList.add("is-empty");
+        event.target.closest(".cmgui-text-field-wrapper")?.querySelector(".cmgui-text-field-label")?.classList.remove("cmgui-text-field-label-active");
+      }
+      updateNodeSettingsDraft(nodeItem, {
+        groups: getNodeSettingsDraft(nodeItem).groups.map((group) => (group.id === groupId ? { ...group, name } : group)),
+      });
+    });
+    input.addEventListener("blur", (event) => {
+      if (event.target.value.trim()) return;
+      const groupId = event.target.dataset.conditionGroupName;
+      settingsErrors[nodeItem.id] = {
+        ...(settingsErrors[nodeItem.id] || {}),
+        groups: {
+          ...((settingsErrors[nodeItem.id] || {}).groups || {}),
+          [groupId]: { ...(((settingsErrors[nodeItem.id] || {}).groups || {})[groupId] || {}), name: true },
+        },
+      };
+      event.target.closest(".cmgui-text-field-wrapper")?.classList.add("is-error", "is-empty");
+    });
+  });
+  sidebar.querySelectorAll("[id^='conditionParameterSelect-'], [id^='conditionOperatorSelect-'], [id^='conditionValueSelect-']").forEach((button) => {
+    button.addEventListener("click", () => {
+      const selectKind = button.id.startsWith("conditionParameterSelect-") ? "parameter" : button.id.startsWith("conditionOperatorSelect-") ? "operator" : "value";
+      const conditionId = button.id.replace(/^condition(?:Parameter|Operator|Value)Select-/, "");
+      updateNodeSettingsDraft(nodeItem, {
+        groups: updateConditionInGroups(getNodeSettingsDraft(nodeItem).groups, conditionId, (condition) => ({
+          ...condition,
+          parameterDropdownOpen: selectKind === "parameter" ? !condition.parameterDropdownOpen : false,
+          operatorDropdownOpen: selectKind === "operator" ? !condition.operatorDropdownOpen : false,
+          valueDropdownOpen: selectKind === "value" ? !condition.valueDropdownOpen : false,
+        })),
+      });
+      renderNodeSettingsSidebar();
+    });
+  });
+  sidebar.querySelectorAll("[data-dropdown-id^='conditionParameterSelect-']").forEach((button) => {
+    button.addEventListener("click", () => {
+      const conditionId = button.dataset.dropdownId.replace("conditionParameterSelect-", "");
+      const parameter = button.dataset.dropdownValue;
+      const valueOptions = conditionValuesForParameter(parameter);
+      clearConditionError(nodeItem, conditionId);
+      updateNodeSettingsDraft(nodeItem, {
+        groups: updateConditionInGroups(getNodeSettingsDraft(nodeItem).groups, conditionId, (condition) => ({
+          ...condition,
+          parameter,
+          value: valueOptions.includes(condition.value) ? condition.value : valueOptions[0],
+          parameterDropdownOpen: false,
+          operatorDropdownOpen: false,
+          valueDropdownOpen: false,
+        })),
+      });
+      renderNodeSettingsSidebar();
+    });
+  });
+  sidebar.querySelectorAll("[data-dropdown-id^='conditionOperatorSelect-']").forEach((button) => {
+    button.addEventListener("click", () => {
+      const conditionId = button.dataset.dropdownId.replace("conditionOperatorSelect-", "");
+      clearConditionError(nodeItem, conditionId);
+      updateNodeSettingsDraft(nodeItem, {
+        groups: updateConditionInGroups(getNodeSettingsDraft(nodeItem).groups, conditionId, (condition) => ({
+          ...condition,
+          operator: button.dataset.dropdownValue,
+          parameterDropdownOpen: false,
+          operatorDropdownOpen: false,
+          valueDropdownOpen: false,
+        })),
+      });
+      renderNodeSettingsSidebar();
+    });
+  });
+  sidebar.querySelectorAll("[data-dropdown-id^='conditionValueSelect-']").forEach((button) => {
+    button.addEventListener("click", () => {
+      const conditionId = button.dataset.dropdownId.replace("conditionValueSelect-", "");
+      clearConditionError(nodeItem, conditionId);
+      updateNodeSettingsDraft(nodeItem, {
+        groups: updateConditionInGroups(getNodeSettingsDraft(nodeItem).groups, conditionId, (condition) => ({
+          ...condition,
+          value: button.dataset.dropdownValue,
+          parameterDropdownOpen: false,
+          operatorDropdownOpen: false,
+          valueDropdownOpen: false,
+        })),
+      });
+      renderNodeSettingsSidebar();
+    });
+  });
+  sidebar.querySelectorAll("[data-condition-add]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const groupId = button.dataset.conditionAdd;
+      updateNodeSettingsDraft(nodeItem, {
+        groups: getNodeSettingsDraft(nodeItem).groups.map((group) =>
+          group.id === groupId ? { ...group, conditions: [...group.conditions, createConditionItem()] } : group,
+        ),
+      });
+      renderNodeSettingsSidebar();
+    });
+  });
+  sidebar.querySelector("#addConditionGroupButton")?.addEventListener("click", () => {
+    const draft = getNodeSettingsDraft(nodeItem);
+    if (draft.groups.length >= CONDITION_MAX_COUNT) return;
+    updateNodeSettingsDraft(nodeItem, { groups: [...draft.groups, createConditionGroup(draft.groups.length + 1)] });
+    renderNodeSettingsSidebar();
+  });
+  sidebar.querySelectorAll("[data-condition-remove]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const draft = getNodeSettingsDraft(nodeItem);
+      const conditionId = button.dataset.conditionRemove;
+      const groupId = button.dataset.conditionRemoveGroup;
+      const groups = draft.groups
+        .map((group) => {
+          if (group.id !== groupId) return group;
+          const conditions = group.conditions.filter((item) => item.id !== conditionId);
+          return { ...group, conditions };
+        })
+        .filter((group) => group.conditions.length || draft.groups.length <= 1);
+      updateNodeSettingsDraft(nodeItem, { groups: groups.length ? groups : [createConditionGroup(1)] });
+      renderNodeSettingsSidebar();
+    });
+  });
   sidebar.querySelector("#messageTextInput")?.addEventListener("input", (event) => {
     const errors = { ...(settingsErrors[nodeItem.id] || {}) };
     if (event.target.value.trim()) {
@@ -2403,13 +4141,26 @@ function collectGroupTransferSettings(sidebar, settings) {
 }
 
 function collectNodeSettings(sidebar, nodeItem, settings) {
+  if (isStartNode(nodeItem)) return collectStartSettings(sidebar, settings);
+  if (isFinishNode(nodeItem)) return {};
   if (isGroupTransferNode(nodeItem)) return collectGroupTransferSettings(sidebar, settings);
   if (isInfoMessageNode(nodeItem)) return collectInfoMessageSettings(sidebar, settings);
   if (isContactFormNode(nodeItem)) return collectContactFormSettings(sidebar, settings);
   if (isMenuNode(nodeItem)) return collectMenuSettings(sidebar, settings);
   if (isScheduleNode(nodeItem)) return collectScheduleSettings(settings);
   if (isSegmentNode(nodeItem)) return collectSegmentSettings(settings);
+  if (isConditionNode(nodeItem)) return collectConditionSettings(settings);
   return collectSimpleTransferSettings(sidebar, nodeItem, settings);
+}
+
+function collectStartSettings(sidebar, settings) {
+  const nameInput = sidebar.querySelector("#startScenarioNameInput");
+  return createStartSettings({
+    ...settings,
+    name: nameInput ? nameInput.value : settings.name,
+    finishAfterHours: sanitizeStartFinishValue(sidebar.querySelector("#startFinishHoursInput")?.value, settings.finishAfterHours, settings.finishAfterUnit),
+    finishAfterUnit: settings.finishAfterUnit,
+  });
 }
 
 function collectSimpleTransferSettings(sidebar, nodeItem, settings) {
@@ -2458,25 +4209,35 @@ function collectSegmentSettings(settings) {
   return createSegmentSettings(settings);
 }
 
+function collectConditionSettings(settings) {
+  return createConditionSettings(settings);
+}
+
 function validateNodeSettings(nodeItem, settings) {
+  if (isStartNode(nodeItem)) return settings.name.trim() ? {} : { name: true };
+  if (isFinishNode(nodeItem)) return {};
   if (isGroupTransferNode(nodeItem)) return settings.groupName ? {} : { groupName: "Выберите отдел" };
   if (isInfoMessageNode(nodeItem)) return settings.messageText.trim() ? {} : { messageText: true };
   if (isContactFormNode(nodeItem)) return {};
   if (isMenuNode(nodeItem)) return validateMenuSettings(settings);
   if (isScheduleNode(nodeItem)) return validateScheduleSettings(settings);
   if (isSegmentNode(nodeItem)) return validateSegmentSettings(settings);
+  if (isConditionNode(nodeItem)) return validateConditionSettings(settings);
   const config = SIMPLE_TRANSFER_CONFIG[nodeItem.operationType];
   if (config?.requiredField === "employeeName" && !settings.employeeName) return { employeeName: config.requiredError };
   return {};
 }
 
 function closeDropdownPatchForNode(nodeItem) {
+  if (isStartNode(nodeItem)) return { channelsDropdownOpen: false, employeeDropdownOpen: false, groupDropdownOpen: false };
+  if (isFinishNode(nodeItem)) return {};
   if (isGroupTransferNode(nodeItem)) return { groupDropdownOpen: false, distributionDropdownOpen: false };
   if (isInfoMessageNode(nodeItem)) return {};
   if (isContactFormNode(nodeItem)) return {};
   if (isMenuNode(nodeItem)) return {};
   if (isScheduleNode(nodeItem)) return {};
   if (isSegmentNode(nodeItem)) return {};
+  if (isConditionNode(nodeItem)) return {};
   return { employeeDropdownOpen: false };
 }
 
@@ -2505,6 +4266,58 @@ function validateSegmentSettings(settings) {
     if (!group.name) groupErrors[group.id] = true;
   });
   return Object.keys(groupErrors).length ? { groups: groupErrors } : {};
+}
+
+function validateConditionSettings(settings) {
+  const groupErrors = {};
+  settings.groups.forEach((group) => {
+    const groupError = {};
+    if (!group.name.trim()) groupError.name = true;
+    const conditionErrors = {};
+    group.conditions.forEach((condition) => {
+      if (!condition.parameter || !condition.operator || !condition.value) conditionErrors[condition.id] = true;
+    });
+    if (Object.keys(conditionErrors).length) groupError.conditions = conditionErrors;
+    if (Object.keys(groupError).length) groupErrors[group.id] = groupError;
+  });
+  return Object.keys(groupErrors).length ? { groups: groupErrors } : {};
+}
+
+function createStartSettings(overrides = {}) {
+  const sourceChannels = Array.isArray(overrides.channels) ? overrides.channels : [];
+  const completionTarget = overrides.completionTarget ?? "all";
+  const finishAfterUnit = ["hours", "days"].includes(overrides.finishAfterUnit) ? overrides.finishAfterUnit : "hours";
+  return {
+    name: overrides.name || "Сценарий обработки чатов №1",
+    channels: sourceChannels,
+    finishAfterHours: 72,
+    finishAfterUnit: "hours",
+    completionTarget: "all",
+    employeeName: "",
+    groupName: "",
+    channelsDropdownOpen: false,
+    employeeDropdownOpen: false,
+    groupDropdownOpen: false,
+    finishOpen: false,
+    ...overrides,
+    channels: CHANNEL_OPTIONS.filter((channel) => sourceChannels.includes(channel)),
+    finishAfterUnit,
+    finishAfterHours: sanitizeStartFinishValue(overrides.finishAfterHours ?? 72, 72, finishAfterUnit),
+    completionTarget: ["all", "employee", "group"].includes(completionTarget) ? completionTarget : "all",
+  };
+}
+
+function normalizeComparableStartSettings(settings) {
+  const normalized = createStartSettings(settings);
+  return {
+    name: normalized.name.trim(),
+    channels: normalized.channels,
+    finishAfterHours: sanitizeStartFinishValue(normalized.finishAfterHours, 72, normalized.finishAfterUnit),
+    finishAfterUnit: normalized.finishAfterUnit,
+    completionTarget: normalized.completionTarget,
+    employeeName: normalized.completionTarget === "employee" ? normalized.employeeName || "" : "",
+    groupName: normalized.completionTarget === "group" ? normalized.groupName || "" : "",
+  };
 }
 
 function createGroupTransferSettings(overrides = {}) {
@@ -2647,6 +4460,82 @@ function createSegmentGroup(name = "") {
   };
 }
 
+function createConditionSettings(overrides = {}) {
+  const migratedGroups = Array.isArray(overrides.groups) ? overrides.groups : Array.isArray(overrides.conditions) ? [{ name: "Группа условий 1", open: true, conditions: overrides.conditions }] : null;
+  const defaultGroups = [createConditionGroup(1)];
+  const settings = {
+    cycleLimit: 1,
+    technicalOpen: false,
+    groups: defaultGroups,
+    ...overrides,
+    groups: migratedGroups || defaultGroups,
+  };
+  const groups = Array.isArray(settings.groups) && settings.groups.length ? settings.groups : defaultGroups;
+  return {
+    ...settings,
+    groups: groups.slice(0, CONDITION_MAX_COUNT).map((group, index) => createConditionGroup(index + 1, group)),
+  };
+}
+
+function createConditionGroup(index = 1, overrides = {}) {
+  const conditions = Array.isArray(overrides.conditions) && overrides.conditions.length ? overrides.conditions : [createConditionItem()];
+  return {
+    id: overrides.id || `condition-group-${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 6)}`,
+    name: overrides.name || `Группа условий ${index}`,
+    open: overrides.open !== false,
+    conditions: conditions.map((condition, conditionIndex) => createConditionItem({ ...condition, id: condition.id || undefined, index: conditionIndex })),
+  };
+}
+
+function createConditionItem(overrides = {}) {
+  const parameter = CONDITION_PARAMETERS.includes(overrides.parameter) ? overrides.parameter : "";
+  const valueOptions = conditionValuesForParameter(parameter);
+  return {
+    id: overrides.id || `condition-${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 6)}`,
+    parameter,
+    operator: CONDITION_OPERATORS.some(([operator]) => operator === overrides.operator) ? overrides.operator : "",
+    value: valueOptions.includes(overrides.value) ? overrides.value : "",
+    parameterDropdownOpen: Boolean(overrides.parameterDropdownOpen),
+    operatorDropdownOpen: Boolean(overrides.operatorDropdownOpen),
+    valueDropdownOpen: Boolean(overrides.valueDropdownOpen),
+  };
+}
+
+function conditionValuesForParameter(parameter) {
+  return CONDITION_VALUES_BY_PARAMETER[parameter] || [];
+}
+
+function conditionLabel(condition) {
+  const operator = CONDITION_OPERATORS.find(([value]) => value === condition.operator)?.[1] || "равно";
+  if (!condition.parameter || !condition.value) return "";
+  return `${condition.parameter} ${operator} ${condition.value}`;
+}
+
+function updateConditionInGroups(groups, conditionId, updater) {
+  return groups.map((group) => ({
+    ...group,
+    conditions: group.conditions.map((condition) =>
+      condition.id === conditionId
+        ? updater(condition)
+        : {
+            ...condition,
+            parameterDropdownOpen: false,
+            operatorDropdownOpen: false,
+            valueDropdownOpen: false,
+          },
+    ),
+  }));
+}
+
+function clearConditionError(nodeItem, conditionId) {
+  const errors = { ...(settingsErrors[nodeItem.id] || {}) };
+  if (!errors.groups) return;
+  Object.values(errors.groups).forEach((groupError) => {
+    if (groupError.conditions) delete groupError.conditions[conditionId];
+  });
+  settingsErrors[nodeItem.id] = errors;
+}
+
 function createEmployeesForGroup(groupName) {
   const names = GROUP_TRANSFER_EMPLOYEES_BY_GROUP[groupName] || GROUP_TRANSFER_EMPLOYEES_BY_GROUP["Отдел продаж"];
   return names.map((name, index) => ({ name, enabled: true, timeout: index === names.length - 1 && names.length > 2 ? 1500 : 15 }));
@@ -2668,6 +4557,15 @@ function getGroupTransferSettings(nodeItem) {
     groupName: inferredGroupName,
     technicalOpen: existing.technicalOpen ?? false,
     employees: Array.isArray(existing.employees) && existing.employees.length ? existing.employees : undefined,
+  });
+}
+
+function getStartSettings() {
+  const currentScenario = getCurrentScenario();
+  return createStartSettings({
+    ...(currentScenario?.settings?.start || {}),
+    name: currentScenario?.name || "Сценарий обработки чатов №1",
+    channels: Array.isArray(currentScenario?.channels) ? currentScenario.channels : [],
   });
 }
 
@@ -2721,13 +4619,24 @@ function getSegmentSettings(nodeItem) {
   });
 }
 
+function getConditionSettings(nodeItem) {
+  const existing = nodeItem.settings?.condition || {};
+  return createConditionSettings({
+    ...existing,
+    technicalOpen: existing.technicalOpen ?? false,
+  });
+}
+
 function getNodeSettings(nodeItem) {
+  if (isStartNode(nodeItem)) return getStartSettings(nodeItem);
+  if (isFinishNode(nodeItem)) return {};
   if (isGroupTransferNode(nodeItem)) return getGroupTransferSettings(nodeItem);
   if (isInfoMessageNode(nodeItem)) return getInfoMessageSettings(nodeItem);
   if (isContactFormNode(nodeItem)) return getContactFormSettings(nodeItem);
   if (isMenuNode(nodeItem)) return getMenuSettings(nodeItem);
   if (isScheduleNode(nodeItem)) return getScheduleSettings(nodeItem);
   if (isSegmentNode(nodeItem)) return getSegmentSettings(nodeItem);
+  if (isConditionNode(nodeItem)) return getConditionSettings(nodeItem);
   return getSimpleTransferSettings(nodeItem);
 }
 
@@ -2738,6 +4647,10 @@ function getNodeSettingsDraft(nodeItem) {
 
 function updateNodeSettingsDraft(nodeItem, patch) {
   const next = { ...getNodeSettingsDraft(nodeItem), ...patch };
+  if (isStartNode(nodeItem)) {
+    settingsDrafts[nodeItem.id] = createStartSettings(next);
+    return;
+  }
   if (isGroupTransferNode(nodeItem)) {
     settingsDrafts[nodeItem.id] = createGroupTransferSettings(next);
     return;
@@ -2762,16 +4675,39 @@ function updateNodeSettingsDraft(nodeItem, patch) {
     settingsDrafts[nodeItem.id] = createSegmentSettings(next);
     return;
   }
+  if (isConditionNode(nodeItem)) {
+    settingsDrafts[nodeItem.id] = createConditionSettings(next);
+    return;
+  }
+  if (isFinishNode(nodeItem)) {
+    settingsDrafts[nodeItem.id] = {};
+    return;
+  }
   settingsDrafts[nodeItem.id] = createSimpleTransferSettings(nodeItem.operationType, next);
 }
 
 function saveNodeSettings(nodeItem, settings) {
+  if (isStartNode(nodeItem)) {
+    saveStartSettings(nodeItem, settings);
+    return;
+  }
+  if (isFinishNode(nodeItem)) {
+    nodeItem.title = catalog.finish.title;
+    nodeItem.subtitle = catalog.finish.subtitle;
+    nodeItem.color = catalog.finish.color;
+    nodeItem.icon = catalog.finish.icon;
+    return;
+  }
   if (isSegmentNode(nodeItem)) {
     saveSegmentSettings(nodeItem, settings);
     return;
   }
   if (isScheduleNode(nodeItem)) {
     saveScheduleSettings(nodeItem, settings);
+    return;
+  }
+  if (isConditionNode(nodeItem)) {
+    saveConditionSettings(nodeItem, settings);
     return;
   }
   if (isMenuNode(nodeItem)) {
@@ -2792,6 +4728,28 @@ function saveNodeSettings(nodeItem, settings) {
   }
   nodeItem.settings = { ...(nodeItem.settings || {}), groupTransfer: createGroupTransferSettings(settings) };
   applyGroupTransferTitle(nodeItem, nodeItem.settings.groupTransfer);
+}
+
+function saveStartSettings(nodeItem, settings) {
+  const currentScenario = getCurrentScenario();
+  const normalized = createStartSettings(settings);
+  if (currentScenario) {
+    currentScenario.name = normalized.name.trim();
+    currentScenario.channels = normalized.channels;
+    currentScenario.settings = {
+      ...(currentScenario.settings || {}),
+      start: {
+        finishAfterHours: normalized.finishAfterHours,
+        finishAfterUnit: normalized.finishAfterUnit,
+        completionTarget: normalized.completionTarget,
+        employeeName: normalized.employeeName,
+        groupName: normalized.groupName,
+      },
+    };
+    document.querySelector("#scenarioTitleText").textContent = currentScenario.name;
+  }
+  nodeItem.settings = { ...(nodeItem.settings || {}), start: currentScenario?.settings?.start || {} };
+  applyStartTitle(nodeItem, normalized);
 }
 
 function saveSimpleTransferSettings(nodeItem, settings) {
@@ -2827,9 +4785,24 @@ function saveSegmentSettings(nodeItem, settings) {
   syncDynamicOutputEdges(nodeItem);
 }
 
+function saveConditionSettings(nodeItem, settings) {
+  nodeItem.settings = { ...(nodeItem.settings || {}), condition: createConditionSettings(settings) };
+  applyConditionTitle(nodeItem, nodeItem.settings.condition);
+  syncDynamicOutputEdges(nodeItem);
+}
+
 function applyGroupTransferTitle(nodeItem, settings) {
-  nodeItem.title = settings.groupName ? `На группу: ${settings.groupName}` : "На группу";
+  setAutoNodeTitle(nodeItem, settings.groupName ? `На группу: ${settings.groupName}` : "На группу");
   nodeItem.subtitle = settings.groupName ? `Ожидание ответа: ${formatTimeout(settings.responseTimeout, settings.timeoutUnit)}` : "Группа не выбрана";
+}
+
+function applyStartTitle(nodeItem, settings = createStartSettings()) {
+  setAutoNodeTitle(nodeItem, "Начало сценария");
+  nodeItem.subtitle = settings.channels.length ? `Каналы: ${settings.channels.join(", ")}` : "Каналы не выбраны";
+}
+
+function setAutoNodeTitle(nodeItem, title) {
+  if (!nodeItem?.customTitle) nodeItem.title = title;
 }
 
 function isGroupTransferNode(nodeItem) {
@@ -2860,8 +4833,12 @@ function isSegmentNode(nodeItem) {
   return nodeItem?.kind === "segment" && nodeItem.operationType === SEGMENT_OPERATION;
 }
 
+function isConditionNode(nodeItem) {
+  return nodeItem?.kind === "condition" && nodeItem.operationType === CONDITION_OPERATION;
+}
+
 function isFullscreenActionNode(nodeItem) {
-  return isScheduleNode(nodeItem) || isSegmentNode(nodeItem);
+  return isScheduleNode(nodeItem) || isSegmentNode(nodeItem) || isConditionNode(nodeItem);
 }
 
 function isConfigurableTransferNode(nodeItem) {
@@ -2869,7 +4846,7 @@ function isConfigurableTransferNode(nodeItem) {
 }
 
 function isConfigurableNode(nodeItem) {
-  return isConfigurableTransferNode(nodeItem) || isInfoMessageNode(nodeItem) || isContactFormNode(nodeItem) || isMenuNode(nodeItem) || isScheduleNode(nodeItem) || isSegmentNode(nodeItem);
+  return isStartNode(nodeItem) || isFinishNode(nodeItem) || isConfigurableTransferNode(nodeItem) || isInfoMessageNode(nodeItem) || isContactFormNode(nodeItem) || isMenuNode(nodeItem) || isScheduleNode(nodeItem) || isSegmentNode(nodeItem) || isConditionNode(nodeItem);
 }
 
 function isTransferWithFallbackNode(nodeItem) {
@@ -2877,10 +4854,13 @@ function isTransferWithFallbackNode(nodeItem) {
 }
 
 function settingsTitleForNode(nodeItem) {
+  if (isStartNode(nodeItem)) return "Начало сценария";
+  if (isFinishNode(nodeItem)) return "Закрытие чата";
   if (isContactFormNode(nodeItem)) return "Форма сбора контактов";
   if (isMenuNode(nodeItem)) return "Меню";
   if (isScheduleNode(nodeItem)) return "Распределение по графику";
   if (isSegmentNode(nodeItem)) return "Распределение по сегментам";
+  if (isConditionNode(nodeItem)) return "Распределение по условиям";
   if (isInfoMessageNode(nodeItem)) return "Информационное сообщение";
   if (isGroupTransferNode(nodeItem)) return "На группу";
   return SIMPLE_TRANSFER_CONFIG[nodeItem.operationType]?.title || nodeItem.title;
@@ -2889,39 +4869,45 @@ function settingsTitleForNode(nodeItem) {
 function applySimpleTransferTitle(nodeItem, settings) {
   const config = SIMPLE_TRANSFER_CONFIG[nodeItem.operationType];
   if (nodeItem.operationType === "employee-transfer") {
-    nodeItem.title = settings.employeeName ? `${config.title}: ${settings.employeeName}` : config.title;
+    setAutoNodeTitle(nodeItem, settings.employeeName ? `${config.title}: ${settings.employeeName}` : config.title);
     nodeItem.subtitle = settings.employeeName ? `Ожидание ответа: ${formatTimeout(settings.responseTimeout, settings.timeoutUnit)}` : config.emptySubtitle;
     return;
   }
-  nodeItem.title = config.title;
+  setAutoNodeTitle(nodeItem, config.title);
   nodeItem.subtitle = `Ожидание ответа: ${formatTimeout(settings.responseTimeout, settings.timeoutUnit)}`;
 }
 
 function applyInfoMessageTitle(nodeItem, settings) {
-  nodeItem.title = "Информационное сообщение";
+  setAutoNodeTitle(nodeItem, "Информационное сообщение");
   nodeItem.subtitle = `Следующая операция через: ${formatTimeout(settings.transitionDelay, settings.timeoutUnit)}`;
 }
 
 function applyContactFormTitle(nodeItem, settings) {
-  nodeItem.title = "Форма сбора контактов";
+  setAutoNodeTitle(nodeItem, "Форма сбора контактов");
   nodeItem.subtitle = `Ожидание контактов: ${formatTimeout(settings.contactWait, settings.timeoutUnit)}`;
 }
 
 function applyMenuTitle(nodeItem, settings) {
-  nodeItem.title = "Меню";
+  setAutoNodeTitle(nodeItem, "Меню");
   nodeItem.subtitle = `Ожидание нажатия кнопки: ${formatTimeout(settings.waitTime, settings.timeoutUnit)}`;
 }
 
 function applyScheduleTitle(nodeItem, settings) {
   const names = settings.schedules.map((schedule) => schedule.name).filter(Boolean);
-  nodeItem.title = "Распределение по графику";
+  setAutoNodeTitle(nodeItem, "Распределение по графику");
   nodeItem.subtitle = names.length ? `График: ${names.join(", ")}` : "График не выбран";
 }
 
 function applySegmentTitle(nodeItem, settings) {
   const names = settings.groups.map((group) => group.name).filter(Boolean);
-  nodeItem.title = "Распределение по сегментам";
+  setAutoNodeTitle(nodeItem, "Распределение по сегментам");
   nodeItem.subtitle = names.length ? `Группа сегментов: ${names.join(", ")}` : "Группа сегментов не выбрана";
+}
+
+function applyConditionTitle(nodeItem, settings) {
+  const labels = settings.groups.map((group) => group.name).filter(Boolean);
+  setAutoNodeTitle(nodeItem, "Распределение по условиям");
+  nodeItem.subtitle = labels.length ? `Группа условий: ${labels.join(", ")}` : "Группа условий не настроена";
 }
 
 function normalizeComparableSimpleTransferSettings(operationType, settings) {
@@ -2985,6 +4971,24 @@ function normalizeComparableSegmentSettings(settings) {
   };
 }
 
+function normalizeComparableConditionSettings(settings) {
+  const normalized = createConditionSettings(settings);
+  return {
+    cycleLimit: sanitizePositiveInteger(normalized.cycleLimit, 1),
+    groups: normalized.groups.map((group) => ({
+      id: group.id,
+      name: group.name || "",
+      open: group.open !== false,
+      conditions: group.conditions.map((condition) => ({
+        id: condition.id,
+        parameter: condition.parameter || "",
+        operator: condition.operator || "",
+        value: condition.value || "",
+      })),
+    })),
+  };
+}
+
 function syncDynamicOutputEdges(nodeItem) {
   const outputs = nodeOutputs(nodeItem).filter((output) => output.placeholder);
   const outputIds = new Set(outputs.map((output) => output.key));
@@ -3039,6 +5043,16 @@ function sanitizePositiveInteger(value, fallback) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function sanitizeIntegerInRange(value, fallback, min, max) {
+  const parsed = Number.parseInt(value, 10);
+  const normalized = Number.isFinite(parsed) ? parsed : fallback;
+  return Math.min(max, Math.max(min, normalized));
+}
+
+function sanitizeStartFinishValue(value, fallback, unit = "hours") {
+  return sanitizeIntegerInRange(value, fallback, 1, unit === "days" ? 3 : 72);
+}
+
 function moveArrayItem(items, fromIndex, toIndex) {
   const next = items.slice();
   const [item] = next.splice(fromIndex, 1);
@@ -3053,21 +5067,70 @@ function isEditableEventTarget(target) {
 }
 
 function openScenarioCreateModal() {
-  document.querySelector("#scenarioNameInput").value = `Сценарий обработки чатов №${appState.scenarios.length + 1}`;
+  const nameInput = document.querySelector("#scenarioNameInput");
+  nameInput.value = `Сценарий обработки чатов №${appState.scenarios.length + 1}`;
+  updateScenarioCreateNameState();
+  document.querySelectorAll("#scenarioCreateChannelsDropdown input[name='channels']").forEach((input) => {
+    input.checked = input.value === "Email" || input.value === "Telegram";
+  });
+  updateScenarioCreateChannelsValue();
+  closeScenarioCreateChannelsDropdown();
   document.body.classList.add("is-scenario-create-open");
   document.querySelector("#scenarioCreateModal").setAttribute("aria-hidden", "false");
-  document.querySelector("#scenarioNameInput").focus();
+  nameInput.focus();
 }
 
 function closeScenarioCreateModal() {
+  closeScenarioCreateChannelsDropdown();
   document.body.classList.remove("is-scenario-create-open");
   document.querySelector("#scenarioCreateModal").setAttribute("aria-hidden", "true");
+}
+
+function toggleScenarioCreateChannelsDropdown() {
+  const dropdown = document.querySelector("#scenarioCreateChannelsDropdown");
+  const button = document.querySelector("#scenarioCreateChannelsSelect");
+  const isOpen = dropdown.classList.toggle("is-open");
+  button.classList.toggle("cmgui-select-field-active", isOpen);
+  button.setAttribute("aria-expanded", String(isOpen));
+}
+
+function closeScenarioCreateChannelsDropdown() {
+  document.querySelector("#scenarioCreateChannelsDropdown")?.classList.remove("is-open");
+  document.querySelector("#scenarioCreateChannelsSelect")?.classList.remove("cmgui-select-field-active");
+  document.querySelector("#scenarioCreateChannelsSelect")?.setAttribute("aria-expanded", "false");
+}
+
+function updateScenarioCreateChannelsValue() {
+  const channels = [...document.querySelectorAll("#scenarioCreateChannelsDropdown input[name='channels']:checked")].map((input) => input.value);
+  const output = document.querySelector("#scenarioCreateChannelsValue");
+  const button = document.querySelector("#scenarioCreateChannelsSelect");
+  output.textContent = channels.length ? channels.join(", ") : "Каналы для приема сообщений";
+  output.classList.toggle("is-placeholder", !channels.length);
+  button.classList.toggle("is-empty", !channels.length);
+}
+
+function updateScenarioCreateNameState(options = {}) {
+  const input = document.querySelector("#scenarioNameInput");
+  const wrapper = input?.closest(".cmgui-text-field-wrapper");
+  const label = wrapper?.querySelector(".cmgui-text-field-label");
+  if (!input || !wrapper || !label) return;
+  const hasValue = Boolean(input.value.trim());
+  wrapper.classList.toggle("is-empty", !hasValue);
+  label.classList.toggle("cmgui-text-field-label-active", hasValue);
+  if (hasValue) wrapper.classList.remove("is-error");
+  else if (options.showError) wrapper.classList.add("is-error");
 }
 
 function createScenarioFromForm(event) {
   event.preventDefault();
   const form = event.currentTarget;
-  const name = document.querySelector("#scenarioNameInput").value.trim() || `Сценарий обработки чатов №${appState.scenarios.length + 1}`;
+  const nameInput = document.querySelector("#scenarioNameInput");
+  const name = nameInput.value.trim();
+  if (!name) {
+    updateScenarioCreateNameState({ showError: true });
+    nameInput.focus();
+    return;
+  }
   const channels = [...form.querySelectorAll('input[name="channels"]:checked')].map((input) => input.value);
   const scenarioItem = createScenario({ name, channels });
   appState.scenarios.unshift(scenarioItem);
@@ -3081,6 +5144,7 @@ function createScenarioFromForm(event) {
   operationOutputKey = null;
   closeOutcomeMenu();
   settingsNodeId = null;
+  pendingPlaceholderBackups = new Map();
   history = [];
   future = [];
   hasUnsavedScenarioChanges = false;
@@ -3105,6 +5169,7 @@ function openScenario(scenarioId) {
   operationOutputKey = null;
   closeOutcomeMenu();
   settingsNodeId = null;
+  pendingPlaceholderBackups = new Map();
   history = [];
   future = [];
   hasUnsavedScenarioChanges = false;
@@ -3125,6 +5190,29 @@ function showScenarioList() {
   operationOutputKey = null;
   closeOutcomeMenu();
   settingsNodeId = null;
+  pendingPlaceholderBackups = new Map();
+  persistAppState();
+  renderAppShell();
+}
+
+function copyScenario(scenarioId) {
+  const source = appState.scenarios.find((item) => item.id === scenarioId);
+  if (!source) return;
+  const copy = clone(source);
+  copy.id = `scenario-${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 6)}`;
+  copy.name = `${source.name} копия`;
+  copy.createdAt = Date.now();
+  copy.updatedAt = Date.now();
+  appState.scenarios.splice(appState.scenarios.indexOf(source) + 1, 0, copy);
+  persistAppState();
+  renderAppShell();
+}
+
+function deleteScenario(scenarioId) {
+  const index = appState.scenarios.findIndex((item) => item.id === scenarioId);
+  if (index < 0) return;
+  appState.scenarios.splice(index, 1);
+  if (appState.currentScenarioId === scenarioId) appState.currentScenarioId = null;
   persistAppState();
   renderAppShell();
 }
@@ -3142,6 +5230,95 @@ function removeSelected() {
   removeNodeById(selectedId);
 }
 
+function copyBulkSelection() {
+  if (!bulkSelectedNodeIds.size) return;
+  const selectedNodes = state.nodes.filter((nodeItem) => bulkSelectedNodeIds.has(nodeItem.id) && !isStartNode(nodeItem));
+  const bounds = bulkSelectionBounds();
+  if (!selectedNodes.length || !bounds) return;
+  pushHistory();
+  const idMap = new Map();
+  const offsetY = bounds.height + 80;
+  const copiedNodes = selectedNodes.map((nodeItem) => {
+    const nextId = `${nodeItem.id}-copy-${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 6)}`;
+    idMap.set(nodeItem.id, nextId);
+    const copy = clone(nodeItem);
+    copy.id = nextId;
+    copy.y = snapToDragGrid(copy.y + offsetY);
+    delete copy.dragOffsetX;
+    delete copy.dragOffsetY;
+    delete copy.dragMoved;
+    return copy;
+  });
+  const copiedEdges = state.edges
+    .filter((edgeItem) => idMap.has(edgeItem.source) && idMap.has(edgeItem.target))
+    .map((edgeItem) => ({
+      ...clone(edgeItem),
+      id: `${idMap.get(edgeItem.source)}-${idMap.get(edgeItem.target)}-${Math.random().toString(16).slice(2)}`,
+      source: idMap.get(edgeItem.source),
+      target: idMap.get(edgeItem.target),
+    }));
+  state.nodes.push(...copiedNodes);
+  state.edges.push(...copiedEdges);
+  bulkSelectedNodeIds = new Set(copiedNodes.map((nodeItem) => nodeItem.id));
+  bulkSelectedEdgeIds = new Set(copiedEdges.map((edgeItem) => edgeItem.id));
+  selectedId = null;
+  selectedEdgeId = null;
+  render();
+  schedulePersistState();
+}
+
+function deleteBulkSelection() {
+  if (!bulkSelectedNodeIds.size && !bulkSelectedEdgeIds.size) return;
+  pushHistory();
+  const nodeIds = new Set();
+  state.nodes
+    .filter((nodeItem) => bulkSelectedNodeIds.has(nodeItem.id) && !isStartNode(nodeItem))
+    .forEach((nodeItem) => collectNodeIdsForRemoval(nodeItem.id).forEach((id) => nodeIds.add(id)));
+  state.edges
+    .filter((edgeItem) => bulkSelectedEdgeIds.has(edgeItem.id) && isPlaceholderNode(getNode(edgeItem.target)))
+    .forEach((edgeItem) => collectNodeIdsForRemoval(edgeItem.target).forEach((id) => nodeIds.add(id)));
+  state.nodes = state.nodes.filter((nodeItem) => !nodeIds.has(nodeItem.id));
+  state.edges = state.edges.filter((edgeItem) => !nodeIds.has(edgeItem.source) && !nodeIds.has(edgeItem.target) && !bulkSelectedEdgeIds.has(edgeItem.id));
+  nodeIds.forEach((nodeId) => {
+    delete settingsDrafts[nodeId];
+    delete settingsErrors[nodeId];
+    pendingSettingsNodeIds.delete(nodeId);
+    pendingPlaceholderBackups.delete(nodeId);
+  });
+  if (settingsNodeId && nodeIds.has(settingsNodeId)) closeNodeSettings(false);
+  selectedId = null;
+  selectedEdgeId = null;
+  hoveredEdgeId = null;
+  clearBulkSelection();
+  render();
+  schedulePersistState();
+}
+
+function removeEdgeById(edgeId) {
+  const edgeItem = state.edges.find((item) => item.id === edgeId);
+  if (!edgeItem) return;
+  pushHistory();
+  hideEdgeTooltip();
+  const targetNode = getNode(edgeItem.target);
+  const placeholderIds = new Set(isPlaceholderNode(targetNode) ? [targetNode.id] : []);
+  state.edges = state.edges.filter((item) => item.id !== edgeId && !placeholderIds.has(item.source) && !placeholderIds.has(item.target));
+  if (placeholderIds.size) {
+    state.nodes = state.nodes.filter((nodeItem) => !placeholderIds.has(nodeItem.id));
+    placeholderIds.forEach((id) => {
+      delete settingsDrafts[id];
+      delete settingsErrors[id];
+      pendingSettingsNodeIds.delete(id);
+      pendingPlaceholderBackups.delete(id);
+    });
+  }
+  selectedEdgeId = null;
+  hoveredEdgeId = null;
+  if (placeholderIds.has(selectedId)) selectedId = null;
+  if (placeholderIds.has(hoveredId)) hoveredId = null;
+  render();
+  schedulePersistState();
+}
+
 function removeNodeById(nodeId) {
   if (!nodeId) return;
   pushHistory();
@@ -3151,6 +5328,7 @@ function removeNodeById(nodeId) {
   nodeIdsToRemove.forEach((removedId) => delete settingsDrafts[removedId]);
   nodeIdsToRemove.forEach((removedId) => delete settingsErrors[removedId]);
   nodeIdsToRemove.forEach((removedId) => pendingSettingsNodeIds.delete(removedId));
+  nodeIdsToRemove.forEach((removedId) => pendingPlaceholderBackups.delete(removedId));
   if (settingsNodeId && nodeIdsToRemove.has(settingsNodeId)) closeNodeSettings(false);
   if (operationSourceId && nodeIdsToRemove.has(operationSourceId)) {
     operationSourceId = null;
@@ -3163,6 +5341,8 @@ function removeNodeById(nodeId) {
   if (outcomeMenuSourceId && nodeIdsToRemove.has(outcomeMenuSourceId)) closeOutcomeMenu();
   if (contextMenuNodeId && nodeIdsToRemove.has(contextMenuNodeId)) closeNodeContextMenu();
   if (titleEditingNodeId && nodeIdsToRemove.has(titleEditingNodeId)) closeNodeTitleEditor(false);
+  if (selectedEdgeId && !state.edges.some((edgeItem) => edgeItem.id === selectedEdgeId)) selectedEdgeId = null;
+  if (hoveredEdgeId && !state.edges.some((edgeItem) => edgeItem.id === hoveredEdgeId)) hoveredEdgeId = null;
   selectedId = null;
   hoveredId = null;
   render();
@@ -3195,6 +5375,7 @@ function updateSaveButton() {
   const button = document.querySelector("#saveButton");
   if (!button) return;
   button.classList.toggle("is-ready", !hasUnsavedScenarioChanges);
+  button.setAttribute("aria-disabled", hasUnsavedScenarioChanges ? "false" : "true");
   button.textContent = hasUnsavedScenarioChanges ? "Сохранить" : "Сохранено";
 }
 
@@ -3210,6 +5391,12 @@ function schedulePersistState({ markDirty = true } = {}) {
   }
   window.clearTimeout(persistTimer);
   persistTimer = window.setTimeout(persistState, 120);
+}
+
+function flushPendingPersist() {
+  window.clearTimeout(persistTimer);
+  persistTimer = null;
+  persistState();
 }
 
 function persistAppState() {
@@ -3230,7 +5417,7 @@ function loadAppState() {
     const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
     if (legacyRaw) {
       const legacyBoard = normalizeLoadedState(JSON.parse(legacyRaw));
-      const migratedScenario = createScenario({ name: "Сценарий обработки чатов №1", channels: ["Telegram", "Email"], board: legacyBoard });
+      const migratedScenario = createScenario({ name: "Сценарий обработки чатов №1", channels: ["Email", "Telegram"], board: legacyBoard });
       return { scenarios: [migratedScenario], currentScenarioId: migratedScenario.id };
     }
   } catch {
@@ -3242,11 +5429,23 @@ function loadAppState() {
 function normalizeAppState(value) {
   return {
     scenarios: Array.isArray(value.scenarios)
-      ? value.scenarios.map((scenarioItem) => ({
-          ...scenarioItem,
-          channels: Array.isArray(scenarioItem.channels) ? scenarioItem.channels : [],
-          board: normalizeLoadedState(scenarioItem.board || createInitialBoard([])),
-        }))
+      ? value.scenarios.map((scenarioItem) => {
+          const normalizedScenario = {
+            ...scenarioItem,
+            channels: Array.isArray(scenarioItem.channels) ? scenarioItem.channels : [],
+            settings: {
+              ...(scenarioItem.settings || {}),
+              start: createStartSettings({
+                ...(scenarioItem.settings?.start || {}),
+                name: scenarioItem.name || "Сценарий обработки чатов №1",
+                channels: Array.isArray(scenarioItem.channels) ? scenarioItem.channels : [],
+              }),
+            },
+            board: normalizeLoadedState(scenarioItem.board || createInitialBoard([])),
+          };
+          syncScenarioStartNode(normalizedScenario);
+          return normalizedScenario;
+        })
       : [],
     currentScenarioId: value.currentScenarioId || null,
   };
@@ -3257,25 +5456,43 @@ function getCurrentScenario() {
 }
 
 function createScenario({ name, channels, board }) {
-  return {
+  const startSettings = createStartSettings({ name, channels });
+  const scenarioItem = {
     id: `scenario-${Date.now().toString(36)}-${Math.random().toString(16).slice(2, 6)}`,
     name,
     channels,
-    settings: {},
+    settings: { start: startSettings },
     board: board ? normalizeLoadedState(board) : createInitialBoard(channels),
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
+  syncScenarioStartNode(scenarioItem);
+  return scenarioItem;
 }
 
 function createInitialBoard(channels) {
   const board = {
-    nodes: [node("incoming", "start", 40, 349)],
+    nodes: [node("incoming", "start", 40, 348)],
     edges: [],
     viewport: { x: 0, y: 0, k: 1 },
   };
-  board.nodes[0].subtitle = channels.length ? `Каналы: ${channels.join(", ")}` : "Каналы не выбраны";
+  applyStartTitle(board.nodes[0], createStartSettings({ channels }));
   return board;
+}
+
+function syncScenarioStartNode(scenarioItem) {
+  const startNode = scenarioItem?.board?.nodes?.find((nodeItem) => isStartNode(nodeItem));
+  if (!startNode) return;
+  startNode.x = snapToDragGrid(startNode.x);
+  startNode.y = snapToDragGrid(startNode.y);
+  applyStartTitle(
+    startNode,
+    createStartSettings({
+      ...(scenarioItem.settings?.start || {}),
+      name: scenarioItem.name || "Сценарий обработки чатов №1",
+      channels: Array.isArray(scenarioItem.channels) ? scenarioItem.channels : [],
+    }),
+  );
 }
 
 function normalizeLoadedState(loadedState) {
@@ -3289,7 +5506,12 @@ function normalizeLoadedState(loadedState) {
   loadedState.nodes = loadedState.nodes.map((nodeItem) => {
     const catalogItem = catalog[nodeItem.kind];
     if (!catalogItem) return nodeItem;
-    const normalizedNode = { ...nodeItem, color: catalogItem.color, icon: catalogItem.icon };
+    const normalizedNode = { ...nodeItem, color: catalogItem.color, icon: catalogItem.icon, muted: Boolean(catalogItem.muted) };
+    if (isFinishNode(normalizedNode)) {
+      if (!normalizedNode.customTitle) normalizedNode.title = catalog.finish.title;
+      normalizedNode.subtitle = catalog.finish.subtitle;
+      normalizedNode.settings = {};
+    }
     if (normalizedNode.kind === "form" && !normalizedNode.operationType) {
       normalizedNode.operationType = CONTACT_FORM_OPERATION;
       normalizedNode.settings = { ...(normalizedNode.settings || {}), contactForm: createContactFormSettings(normalizedNode.settings?.contactForm) };
@@ -3301,6 +5523,10 @@ function normalizeLoadedState(loadedState) {
     if (isSegmentNode(normalizedNode)) {
       normalizedNode.settings = { ...(normalizedNode.settings || {}), segment: createSegmentSettings(normalizedNode.settings?.segment) };
       applySegmentTitle(normalizedNode, normalizedNode.settings.segment);
+    }
+    if (isConditionNode(normalizedNode)) {
+      normalizedNode.settings = { ...(normalizedNode.settings || {}), condition: createConditionSettings(normalizedNode.settings?.condition) };
+      applyConditionTitle(normalizedNode, normalizedNode.settings.condition);
     }
     if (isMenuNode(normalizedNode)) {
       normalizedNode.settings = { ...(normalizedNode.settings || {}), menu: createMenuSettings(normalizedNode.settings?.menu) };

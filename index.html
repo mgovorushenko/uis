@@ -4,14 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Сценарии обработки чатов</title>
-    <link rel="stylesheet" href="./src/styles.css?v=2026-05-12-37" />
+    <link rel="stylesheet" href="./src/styles.css?v=2026-05-13-021" />
   </head>
   <body>
     <main class="app-shell">
       <aside class="side-menu" aria-label="Навигация">
         <div class="menu-top">
-          <div class="logo-mark">∿</div>
-          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button is-compact is-subtle" title="Поиск" aria-label="Поиск" data-icon="search"></button>
+          <div class="logo-mark"><img src="./assets/icons/logo-uis_32.svg" alt="UIS" /></div>
+          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button is-compact is-subtle menu-search-button" title="Поиск" aria-label="Поиск" data-icon="menu-search-16"></button>
           <div class="menu-stack" id="menuTop"></div>
         </div>
         <div class="menu-stack" id="menuBottom"></div>
@@ -29,12 +29,17 @@
             <marker id="arrowDanger" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path d="M 0 0 L 10 5 L 0 10 z"></path>
             </marker>
+            <marker id="arrowAccent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z"></path>
+            </marker>
           </defs>
           <g id="viewport">
             <g id="gridLayer"></g>
             <g id="edgeLayer"></g>
+            <g id="connectionPreviewLayer"></g>
             <g id="labelLayer"></g>
             <g id="nodeLayer"></g>
+            <g id="selectionLayer"></g>
           </g>
         </svg>
       </section>
@@ -42,18 +47,30 @@
       <section class="scenario-list-view" id="scenarioListView" aria-label="Список сценариев">
         <div class="scenario-list-inner">
           <header class="scenario-list-header">
-            <div>
-              <h1>Сценарии обработки чатов</h1>
-              <p>Создавайте сценарии и настраивайте операции обработки обращений.</p>
-            </div>
-            <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-primary cmgui-button-fill" id="createScenarioButton">Создать сценарий</button>
+            <h1>Сценарии распределения чатов</h1>
           </header>
-          <div class="scenario-empty-state" id="scenarioEmptyState">
-            <h2>Пока нет сценариев</h2>
-            <p>Создайте первый сценарий, выберите каналы и перейдите к настройке операций.</p>
-            <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-primary cmgui-button-fill" id="createScenarioEmptyButton">Создать сценарий</button>
+          <div class="scenario-list-toolbar" id="scenarioListToolbar">
+            <label class="scenario-search-field">
+              <span class="cmgui-icon" data-icon="search-20"></span>
+              <input id="scenarioSearchInput" type="search" placeholder="Найти сценарий" />
+            </label>
+            <button class="cmgui-button cmgui-button-size-medium cmgui-button-primary cmgui-button-fill scenario-add-button" id="createScenarioButton">
+              <span class="cmgui-icon" data-icon="add-20"></span>
+              <span>Добавить сценарий</span>
+            </button>
           </div>
-          <div class="scenario-list-grid" id="scenarioListGrid"></div>
+          <div class="scenario-empty-state" id="scenarioEmptyState">
+            <img class="scenario-empty-illustration" src="./assets/icons/chat-distribution-scenarios_200.svg" alt="" aria-hidden="true" />
+            <p>Набор правил, по которым обрабатывается чат до момента взятия в работу:<br />кому направить, по какому графику работы, условиям</p>
+            <button class="cmgui-button cmgui-button-size-medium cmgui-button-primary cmgui-button-fill scenario-add-button" id="createScenarioEmptyButton">
+              <span class="cmgui-icon" data-icon="add-20"></span>
+              <span>Добавить сценарий</span>
+            </button>
+          </div>
+          <div class="scenario-list-table-wrap" id="scenarioListTableWrap">
+            <table class="scenario-list-table" id="scenarioListTable" aria-label="Сценарии распределения чатов"></table>
+            <footer class="scenario-table-footer" id="scenarioTableFooter"></footer>
+          </div>
         </div>
       </section>
 
@@ -61,8 +78,9 @@
         <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-outline cmgui-button-round icon-button top-back-button" title="Назад" aria-label="Назад" data-icon="arrow-left"></button>
         <div class="top-title-row">
           <div class="top-title-wrap">
-            <strong>Сценарий обработки чатов №1</strong>
+            <strong id="scenarioTitleText">Сценарий обработки чатов №1</strong>
             <span class="top-title-edit" data-icon="edit"></span>
+            <input class="top-title-input" id="scenarioTitleInput" aria-label="Название сценария" />
           </div>
           <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-primary cmgui-button-fill save-button is-ready" id="saveButton">Сохранено</button>
         </div>
@@ -142,13 +160,13 @@
                   <span class="operation-card-icon is-pink"><span data-icon="info-message"></span></span>
                   <span class="operation-card-content"><span class="operation-card-title">Информационное сообщение</span><span class="operation-card-description">Текстовое сообщение с информацией для клиента</span></span>
                 </button>
-                <button class="operation-card" type="button" data-kind="segment" data-operation="segment-distribution">
+                <button class="operation-card" type="button" data-kind="empty">
                   <span class="operation-card-icon is-pink"><span data-icon="interactions-paths"></span></span>
                   <span class="operation-card-content"><span class="operation-card-title">Связать с операцией</span><span class="operation-card-description">Перевод чата в определенную точку сценария</span></span>
                 </button>
                 <button class="operation-card" type="button" data-kind="finish">
-                  <span class="operation-card-icon is-pink"><span data-icon="fail"></span></span>
-                  <span class="operation-card-content"><span class="operation-card-title">Закрытие обращения</span><span class="operation-card-description">Завершение чата. Чат будет закрыт и отобразится только в отчетах.</span></span>
+                  <span class="operation-card-icon is-pink"><span data-icon="finish"></span></span>
+                  <span class="operation-card-content"><span class="operation-card-title">Закрытие чата</span><span class="operation-card-description">Завершение чата. Чат будет закрыт и отобразится только в отчетах.</span></span>
                 </button>
               </div>
             </section>
@@ -164,21 +182,13 @@
                   <span class="operation-card-icon is-blue"><span data-icon="time-20"></span></span>
                   <span class="operation-card-content"><span class="operation-card-title">Распределение по графику</span><span class="operation-card-description">Чат обрабатывается в зависимости от текущего графика работы</span></span>
                 </button>
-                <button class="operation-card" type="button" data-kind="empty">
+                <button class="operation-card" type="button" data-kind="segment" data-operation="segment-distribution">
                   <span class="operation-card-icon is-blue"><span data-icon="distribution"></span></span>
                   <span class="operation-card-content"><span class="operation-card-title">Распределение по сегментам</span><span class="operation-card-description">Чат обрабатывается в зависимости от сегмента пользователя</span></span>
                 </button>
-                <button class="operation-card" type="button" data-kind="empty">
-                  <span class="operation-card-icon is-blue"><span data-icon="robot"></span></span>
-                  <span class="operation-card-content"><span class="operation-card-title">AI-распределение</span><span class="operation-card-description">Чат обрабатывается с помощью искусственного интеллекта</span></span>
-                </button>
-                <button class="operation-card" type="button" data-kind="empty">
+                <button class="operation-card" type="button" data-kind="condition" data-operation="condition-distribution">
                   <span class="operation-card-icon is-blue"><span data-icon="row-data"></span></span>
-                  <span class="operation-card-content"><span class="operation-card-title">Распределение по данным клиента</span><span class="operation-card-description">Чат обрабатывается по набору параметров клиента</span></span>
-                </button>
-                <button class="operation-card" type="button" data-kind="empty">
-                  <span class="operation-card-icon is-blue"><span data-icon="row-data"></span></span>
-                  <span class="operation-card-content"><span class="operation-card-title">Распределение по данным клиента из CRM</span><span class="operation-card-description">Чат обрабатывается по набору параметров клиента из CRM</span></span>
+                  <span class="operation-card-content"><span class="operation-card-title">Распределение по условиям</span><span class="operation-card-description">Чат обрабатывается в зависимости от условий</span></span>
                 </button>
               </div>
             </section>
@@ -211,27 +221,44 @@
 
       <div class="scenario-create-overlay" id="scenarioCreateModal" aria-hidden="true">
         <form class="scenario-create-modal" id="scenarioCreateForm" role="dialog" aria-modal="true" aria-labelledby="scenarioCreateTitle">
-          <header class="operation-modal-header">
-            <h2 id="scenarioCreateTitle">Создать сценарий</h2>
-            <button class="operation-modal-close" id="scenarioCreateClose" type="button" title="Закрыть" aria-label="Закрыть">
-              <span data-icon="cancel"></span>
+          <header class="scenario-create-header">
+            <h2 id="scenarioCreateTitle">Создание сценария</h2>
+            <button class="scenario-create-close" id="scenarioCreateClose" type="button" title="Закрыть" aria-label="Закрыть">
+              <span class="cmgui-icon" data-icon="cancel"></span>
             </button>
           </header>
           <div class="scenario-create-body">
             <label class="cmgui-text-field">
-              <span class="cmgui-text-field-label">Название</span>
-              <span class="cmgui-text-field-wrapper"><input class="cmgui-text-field-input" id="scenarioNameInput" value="Сценарий обработки чатов №1" required /></span>
+              <span class="cmgui-text-field-wrapper">
+                <span class="cmgui-text-field-label cmgui-text-field-label-active">Название*</span>
+                <input class="cmgui-text-field-input" id="scenarioNameInput" value="Сценарий обработки чатов №1" />
+              </span>
             </label>
-            <fieldset class="scenario-channel-fieldset">
-              <legend>Каналы</legend>
-              <label><input type="checkbox" name="channels" value="Telegram" checked /> Telegram</label>
-              <label><input type="checkbox" name="channels" value="Email" checked /> Email</label>
-              <label><input type="checkbox" name="channels" value="Онлайн-чат" /> Онлайн-чат</label>
-            </fieldset>
+            <div class="cmgui-select-container start-channel-select scenario-create-channel-select">
+              <div class="cmgui-select cmgui-select-size-medium">
+                <button class="cmgui-select-field" type="button" id="scenarioCreateChannelsSelect" aria-expanded="false">
+                  <span class="cmgui-select-label cmgui-select-label-active"><span class="cmgui-select-label-text-active">Каналы для приема сообщений</span></span>
+                  <span class="cmgui-select-field-output" id="scenarioCreateChannelsValue">Email, Telegram</span>
+                  <span class="cmgui-select-field-suffix" data-icon="arrow-list-down"></span>
+                </button>
+              </div>
+              <div class="cmgui-dropdown cmgui-dropdown-placement-bottomLeft node-dropdown start-channel-dropdown scenario-create-channel-dropdown" id="scenarioCreateChannelsDropdown">
+                <div class="cmgui-dropdown-content">
+                  <div class="cmgui-dropdown-inner">
+                    <ul class="cmgui-list cmgui-list-borderless cmgui-dropdown-list">
+                      <li class="cmgui-list-li"><label class="start-channel-option"><input type="checkbox" name="channels" value="Email" checked /><span class="start-channel-checkmark" aria-hidden="true"></span><span class="start-channel-source-icon cmgui-icon" data-icon="source-email-20"></span><span>Email</span></label></li>
+                      <li class="cmgui-list-li"><label class="start-channel-option"><input type="checkbox" name="channels" value="Max" /><span class="start-channel-checkmark" aria-hidden="true"></span><span class="start-channel-source-icon cmgui-icon" data-icon="source-max-20"></span><span>Max</span></label></li>
+                      <li class="cmgui-list-li"><label class="start-channel-option"><input type="checkbox" name="channels" value="Telegram" checked /><span class="start-channel-checkmark" aria-hidden="true"></span><span class="start-channel-source-icon cmgui-icon" data-icon="source-telegram-20"></span><span>Telegram</span></label></li>
+                      <li class="cmgui-list-li"><label class="start-channel-option"><input type="checkbox" name="channels" value="WhatsApp" /><span class="start-channel-checkmark" aria-hidden="true"></span><span class="start-channel-source-icon cmgui-icon" data-icon="source-whatsapp-20"></span><span>WhatsApp</span></label></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
           <footer class="scenario-create-footer">
-            <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-fill" type="button" id="scenarioCreateCancel">Отмена</button>
-            <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-primary cmgui-button-fill" type="submit">Создать</button>
+            <button class="cmgui-button cmgui-button-size-medium cmgui-button-primary cmgui-button-fill" type="submit">Создать</button>
+            <button class="cmgui-button cmgui-button-size-medium cmgui-button-secondary cmgui-button-outline" type="button" id="scenarioCreateCancel">Отменить</button>
           </footer>
         </form>
       </div>
@@ -239,6 +266,6 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
-    <script src="./src/board.js?v=2026-05-12-82"></script>
+    <script src="./src/board.js?v=2026-05-13-081"></script>
   </body>
 </html>
