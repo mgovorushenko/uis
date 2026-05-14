@@ -3593,7 +3593,7 @@ function menuOutputs(nodeItem) {
   return stackOutputs([
     ...settings.buttons.map((button, index) => ({
       key: button.id,
-      label: `${index + 1}. ${button.text || `Кнопка ${index + 1}`}`,
+      label: `${index + 1}. ${normalizeMenuButtonText(button.text)}`,
       tone: "plain",
       placeholder: true,
       icon: "menu",
@@ -4618,6 +4618,12 @@ function updateHoldingMessagesCount() {
   button.classList.toggle("is-disabled", transferCount === 0);
   button.classList.toggle("is-empty", messageCount === 0);
   button.setAttribute("aria-disabled", String(transferCount === 0));
+  button.setAttribute(
+    "data-tooltip",
+    transferCount === 0
+      ? "Удерживающие сообщения. Для настройки добавьте хотя бы одну операцию переадресации"
+      : "Удерживающие сообщения",
+  );
   if (transferCount === 0 && document.body.classList.contains("is-holding-settings-open")) closeHoldingSettings();
 }
 
@@ -5475,7 +5481,7 @@ function wireNodeSettingsSidebar(sidebar, nodeItem, settings) {
   sidebar.querySelector("#addMenuButton")?.addEventListener("click", () => {
     const draft = getNodeSettingsDraft(nodeItem);
     if (draft.buttons.length >= MENU_BUTTON_MAX_COUNT) return;
-    updateNodeSettingsDraft(nodeItem, { buttons: [...draft.buttons, createMenuButton(`Кнопка ${draft.buttons.length + 1}`)] });
+    updateNodeSettingsDraft(nodeItem, { buttons: [...draft.buttons, createMenuButton("Кнопка")] });
     renderNodeSettingsSidebar();
   });
   sidebar.querySelectorAll("[data-menu-button-remove]").forEach((button) => {
@@ -6138,7 +6144,7 @@ function createContactFormSettings(overrides = {}) {
 }
 
 function createMenuSettings(overrides = {}) {
-  const defaultButtons = [createMenuButton("Кнопка 1")];
+  const defaultButtons = [createMenuButton("Кнопка")];
   const settings = {
     messageText: "",
     waitTime: 20,
@@ -6153,9 +6159,14 @@ function createMenuSettings(overrides = {}) {
     ...settings,
     buttons: buttons.slice(0, MENU_BUTTON_MAX_COUNT).map((button, index) => ({
       id: button.id || `menu-button-${Date.now().toString(36)}-${index}`,
-      text: String(button.text || `Кнопка ${index + 1}`).slice(0, MENU_BUTTON_MAX_LENGTH),
+      text: normalizeMenuButtonText(button.text),
     })),
   };
+}
+
+function normalizeMenuButtonText(text = "") {
+  const value = String(text).trim();
+  return (value && !/^Кнопка\s+\d+$/.test(value) ? value : "Кнопка").slice(0, MENU_BUTTON_MAX_LENGTH);
 }
 
 function createMenuButton(text = "") {
