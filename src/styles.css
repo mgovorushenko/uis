@@ -1030,6 +1030,22 @@ body.is-board-panning #scenarioSvg {
   cursor: pointer;
 }
 
+.edge-segment-handle {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 13;
+  marker-end: none;
+  pointer-events: stroke;
+}
+
+.edge-segment-handle.is-horizontal {
+  cursor: ns-resize;
+}
+
+.edge-segment-handle.is-vertical {
+  cursor: ew-resize;
+}
+
 .connection-preview-edge {
   fill: none;
   stroke: var(--cmgui-color-special-21);
@@ -1040,6 +1056,11 @@ body.is-board-panning #scenarioSvg {
 .edge-label-svg {
   pointer-events: all;
   filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.08));
+  cursor: grab;
+}
+
+.edge-label-svg:active {
+  cursor: grabbing;
 }
 
 .edge-label-svg text {

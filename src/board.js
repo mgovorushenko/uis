@@ -12,11 +12,17 @@ const NODE_PORT_RIGHT_COMPACT_X = NODE_W + 11;
 const NODE_PORT_R = 3;
 const NODE_PORT_EDGE_GAP = 8;
 const NODE_PORT_ARROW_GAP = 2;
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 1;
+const ZOOM_DISABLE_EPSILON = 0.005;
 const NODE_CREATE_GAP_X = 80;
 const NODE_DRAG_GRID_STEP = 4;
 const EDGE_LABEL_SIDE_GAP = 60;
 const EDGE_LABEL_PADDING_X = 10;
 const EDGE_LABEL_HOVER_RESERVE_X = 64;
+const EDGE_LABEL_SEGMENT_GAP = 8;
+const EDGE_LABEL_HANDLE_GAP = 32;
+const EDGE_SEGMENT_DRAG_MIN_LENGTH = 28;
 const OUTPUT_STACK_GAP_Y = 112;
 const CHANNEL_OPTIONS = ["Email", "Max", "Telegram", "WhatsApp"];
 const CHANNEL_ICON_BY_CHANNEL = {
@@ -264,6 +270,8 @@ let selectedEdgeId = null;
 let hoveredEdgeId = null;
 let edgeLabelPlacements = new Map();
 let draggedNodeId = null;
+let edgeSegmentDrag = null;
+let edgeLabelDrag = null;
 let connectionDrag = null;
 let pendingSourceId = null;
 let operationSourceId = null;
@@ -305,7 +313,7 @@ const nodeLayer = d3.select("#nodeLayer");
 const selectionLayer = d3.select("#selectionLayer");
 const zoom = d3
   .zoom()
-  .scaleExtent([0.25, 1])
+  .scaleExtent([MIN_ZOOM, MAX_ZOOM])
   .filter((event) => {
     if (event.type === "wheel") return false;
     if (event.type === "mousedown") return event.button === 1 || event.button === 2;
@@ -948,6 +956,9 @@ function renderNodes() {
           d.dragMoved = false;
           draggedNodeId = d.id;
           selectedId = bulkSelectedNodeIds.has(d.id) ? null : d.id;
+          selectedEdgeId = null;
+          hoveredEdgeId = null;
+          selectionLayer.selectAll("*").remove();
           pushHistory();
           renderProperties();
           nodeLayer.selectAll(".scenario-node-svg").classed("is-selected", (nodeItem) => nodeItem.id === selectedId);
@@ -1618,6 +1629,7 @@ function renderEdges() {
       .attr("d", path)
       .attr("stroke", edgeColor(d))
       .attr("marker-end", isEdgeActive(d) ? "url(#arrowAccent)" : "url(#arrowPlain)");
+    renderEdgeSegmentHandles(group, d);
   });
 
   const labels = labelLayer.selectAll(".edge-label-svg").data(state.edges.filter((d) => d.label), (d) => d.id);
@@ -1656,15 +1668,323 @@ function renderEdges() {
         renderEdges();
       })
       .on("click", (event) => {
+        if (event.defaultPrevented || d.__labelDragMoved) {
+          delete d.__labelDragMoved;
+          return;
+        }
         event.stopPropagation();
         clearBulkSelection();
         selectedEdgeId = d.id;
         selectedId = null;
         hoveredEdgeId = d.id;
         render();
-      });
+      })
+      .call(
+        d3
+          .drag()
+          .filter((event) => event.button === 0)
+          .on("start", (event) => startEdgeLabelDrag(event, d))
+          .on("drag", (event) => updateEdgeLabelDrag(event, d))
+          .on("end", (event) => endEdgeLabelDrag(event, d)),
+      );
     delete d.__labelWidth;
   });
+  renderFloatingEdgeSegmentHandles();
+}
+
+function renderEdgeSegmentHandles(group, edgeItem) {
+  const segments = edgeDraggableSegments(edgeItem);
+  const handles = group.selectAll(".edge-segment-handle").data(segments, (segment) => segment.key);
+  handles.exit().remove();
+  handles
+    .enter()
+    .append("path")
+    .attr("class", "edge-segment-handle")
+    .merge(handles)
+    .attr("d", (segment) => `M ${segment.handleA.x} ${segment.handleA.y} L ${segment.handleB.x} ${segment.handleB.y}`)
+    .classed("is-horizontal", (segment) => segment.orientation === "horizontal")
+    .classed("is-vertical", (segment) => segment.orientation === "vertical")
+    .on("mouseenter", () => {
+      hoveredEdgeId = edgeItem.id;
+      renderEdges();
+    })
+    .on("mouseleave", () => {
+      if (hoveredEdgeId === edgeItem.id) hoveredEdgeId = null;
+      renderEdges();
+    })
+    .on("click", (event) => {
+      event.stopPropagation();
+      clearBulkSelection();
+      selectedEdgeId = edgeItem.id;
+      selectedId = null;
+      hoveredEdgeId = edgeItem.id;
+      closeNodeContextMenu();
+      closeOutcomeMenu();
+      render();
+    })
+    .call(
+      d3
+        .drag()
+        .filter((event) => event.button === 0)
+        .on("start", (event, segment) => startEdgeSegmentDrag(event, edgeItem, segment))
+        .on("drag", (event, segment) => updateEdgeSegmentDrag(event, edgeItem, segment))
+        .on("end", (event, segment) => endEdgeSegmentDrag(event, edgeItem, segment)),
+    );
+}
+
+function renderFloatingEdgeSegmentHandles() {
+  const segments = state.edges.flatMap((edgeItem) => edgeDraggableSegments(edgeItem));
+  const handles = labelLayer.selectAll(".edge-segment-handle-floating").data(segments, (segment) => segment.key);
+  handles.exit().remove();
+  handles
+    .enter()
+    .append("path")
+    .attr("class", "edge-segment-handle edge-segment-handle-floating")
+    .merge(handles)
+    .attr("d", (segment) => `M ${segment.handleA.x} ${segment.handleA.y} L ${segment.handleB.x} ${segment.handleB.y}`)
+    .classed("is-horizontal", (segment) => segment.orientation === "horizontal")
+    .classed("is-vertical", (segment) => segment.orientation === "vertical")
+    .on("mouseenter", (event, segment) => {
+      hoveredEdgeId = segment.edgeId;
+      renderEdges();
+    })
+    .on("mouseleave", (event, segment) => {
+      if (hoveredEdgeId === segment.edgeId) hoveredEdgeId = null;
+      renderEdges();
+    })
+    .on("click", (event, segment) => {
+      const edgeItem = getEdge(segment.edgeId);
+      if (!edgeItem) return;
+      event.stopPropagation();
+      clearBulkSelection();
+      selectedEdgeId = edgeItem.id;
+      selectedId = null;
+      hoveredEdgeId = edgeItem.id;
+      closeNodeContextMenu();
+      closeOutcomeMenu();
+      render();
+    })
+    .call(
+      d3
+        .drag()
+        .filter((event) => event.button === 0)
+        .on("start", (event, segment) => {
+          const edgeItem = getEdge(segment.edgeId);
+          if (edgeItem) startEdgeSegmentDrag(event, edgeItem, segment);
+        })
+        .on("drag", (event, segment) => {
+          const edgeItem = getEdge(segment.edgeId);
+          if (edgeItem) updateEdgeSegmentDrag(event, edgeItem, segment);
+        })
+        .on("end", (event, segment) => {
+          const edgeItem = getEdge(segment.edgeId);
+          if (edgeItem) endEdgeSegmentDrag(event, edgeItem);
+        }),
+    );
+}
+
+function edgeDraggableSegments(edgeItem) {
+  const points = edgeVisualPoints(edgeItem);
+  const segments = [];
+  const labelPlacement = edgeItem.label ? edgeLabelPlacements.get(edgeItem.id) : null;
+  for (let index = 0; index < points.length - 1; index += 1) {
+    if (index === 0 || index === points.length - 2) continue;
+    const a = points[index];
+    const b = points[index + 1];
+    const isHorizontal = Math.abs(a.y - b.y) < 0.5;
+    const isVertical = Math.abs(a.x - b.x) < 0.5;
+    if (!isHorizontal && !isVertical) continue;
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+    if (length < EDGE_SEGMENT_DRAG_MIN_LENGTH) continue;
+    const orientation = isHorizontal ? "horizontal" : "vertical";
+    edgeSegmentHandlePieces(a, b, orientation, labelPlacement).forEach((piece, pieceIndex) => {
+      segments.push({ edgeId: edgeItem.id, index, key: `${edgeItem.id}:${index}:${pieceIndex}`, a, b, handleA: piece.a, handleB: piece.b, orientation });
+    });
+  }
+  return segments;
+}
+
+function edgeSegmentHandlePieces(a, b, orientation, labelPlacement) {
+  const base = [{ a, b }];
+  if (!labelPlacement) return base;
+  if (orientation === "horizontal") {
+    const y = a.y;
+    if (y < labelPlacement.y - EDGE_LABEL_HANDLE_GAP || y > labelPlacement.y + labelPlacement.height + EDGE_LABEL_HANDLE_GAP) return base;
+    const minX = Math.min(a.x, b.x);
+    const maxX = Math.max(a.x, b.x);
+    const excludedStart = labelPlacement.x - EDGE_LABEL_HANDLE_GAP;
+    const excludedEnd = labelPlacement.x + labelPlacement.width + EDGE_LABEL_HANDLE_GAP;
+    return splitAxisSegmentForHandle(minX, maxX, excludedStart, excludedEnd).map(([start, end]) => ({
+      a: { x: start, y },
+      b: { x: end, y },
+    }));
+  }
+  const x = a.x;
+  if (x < labelPlacement.x - EDGE_LABEL_HANDLE_GAP || x > labelPlacement.x + labelPlacement.width + EDGE_LABEL_HANDLE_GAP) return base;
+  const minY = Math.min(a.y, b.y);
+  const maxY = Math.max(a.y, b.y);
+  const excludedStart = labelPlacement.y - EDGE_LABEL_HANDLE_GAP;
+  const excludedEnd = labelPlacement.y + labelPlacement.height + EDGE_LABEL_HANDLE_GAP;
+  return splitAxisSegmentForHandle(minY, maxY, excludedStart, excludedEnd).map(([start, end]) => ({
+    a: { x, y: start },
+    b: { x, y: end },
+  }));
+}
+
+function splitAxisSegmentForHandle(minValue, maxValue, excludedStart, excludedEnd) {
+  const pieces = [];
+  const leftEnd = Math.min(maxValue, excludedStart);
+  const rightStart = Math.max(minValue, excludedEnd);
+  if (leftEnd - minValue >= EDGE_SEGMENT_DRAG_MIN_LENGTH) pieces.push([minValue, leftEnd]);
+  if (maxValue - rightStart >= EDGE_SEGMENT_DRAG_MIN_LENGTH) pieces.push([rightStart, maxValue]);
+  if (pieces.length) return pieces;
+  if (maxValue - minValue >= EDGE_SEGMENT_DRAG_MIN_LENGTH && (excludedEnd <= minValue || excludedStart >= maxValue)) return [[minValue, maxValue]];
+  return [];
+}
+
+function edgeLabelSegmentIndexes(edgeItem, points) {
+  const indexes = new Set();
+  const labelPlacement = edgeItem.label ? edgeLabelPlacements.get(edgeItem.id) : null;
+  if (!labelPlacement || points.length < 2) return indexes;
+  const labelCenterY = labelPlacement.y + labelPlacement.height / 2;
+  const labelLeft = labelPlacement.x;
+  const labelRight = labelPlacement.x + labelPlacement.width;
+  points.forEach((point, index) => {
+    if (index >= points.length - 1) return;
+    const next = points[index + 1];
+    if (
+      Math.abs(point.y - labelCenterY) < 0.5 &&
+      Math.abs(next.y - labelCenterY) < 0.5 &&
+      Math.min(point.x, next.x) <= labelRight + 0.5 &&
+      Math.max(point.x, next.x) >= labelLeft - 0.5
+    ) {
+      indexes.add(index);
+    }
+  });
+  return indexes;
+}
+
+function startEdgeSegmentDrag(event, edgeItem, segment) {
+  event.sourceEvent?.stopPropagation();
+  pushHistory();
+  hideEdgeTooltip();
+  clearBulkSelection();
+  selectedEdgeId = edgeItem.id;
+  hoveredEdgeId = edgeItem.id;
+  selectedId = null;
+  closeNodeContextMenu();
+  closeOutcomeMenu();
+  const point = boardPointFromEvent(event.sourceEvent || event);
+  edgeSegmentDrag = {
+    edgeId: edgeItem.id,
+    index: segment.index,
+    orientation: segment.orientation,
+    startPoint: point,
+    startOffset: Number.isFinite(routeOffsetValue(edgeItem.routeOffsets?.[segment.index])) ? routeOffsetValue(edgeItem.routeOffsets?.[segment.index]) : 0,
+    moved: false,
+  };
+  ensureEdgeRouteOffsets(edgeItem);
+  render();
+}
+
+function updateEdgeSegmentDrag(event, edgeItem, segment) {
+  event.sourceEvent?.stopPropagation();
+  const drag = edgeSegmentDrag;
+  if (!drag || drag.edgeId !== edgeItem.id || drag.index !== segment.index) return;
+  const point = boardPointFromEvent(event.sourceEvent || event);
+  const delta = drag.orientation === "horizontal" ? point.y - drag.startPoint.y : point.x - drag.startPoint.x;
+  if (Math.abs(delta) > 0.5) drag.moved = true;
+  const nextOffset = clampEdgeSegmentOffset(edgeItem, drag.index, drag.orientation, snapToDragGrid(drag.startOffset + delta));
+  edgeItem.routeOffsets[drag.index] = { value: nextOffset, orientation: drag.orientation };
+  renderEdges();
+  renderSelectionOverlay();
+  schedulePersistState();
+}
+
+function endEdgeSegmentDrag(event, edgeItem) {
+  event.sourceEvent?.stopPropagation();
+  const wasMoved = Boolean(edgeSegmentDrag?.moved);
+  edgeSegmentDrag = null;
+  pruneEdgeRouteOffsets(edgeItem);
+  if (wasMoved && selectedEdgeId === edgeItem.id) selectedEdgeId = null;
+  render();
+  schedulePersistState();
+}
+
+function startEdgeLabelDrag(event, edgeItem) {
+  event.sourceEvent?.stopPropagation();
+  pushHistory();
+  hideEdgeTooltip();
+  clearBulkSelection();
+  selectedEdgeId = edgeItem.id;
+  hoveredEdgeId = edgeItem.id;
+  selectedId = null;
+  closeNodeContextMenu();
+  closeOutcomeMenu();
+  const pointer = boardPointFromEvent(event.sourceEvent || event);
+  const placement = edgeLabelPlacements.get(edgeItem.id) || edgeLabelRect(edgeItem, estimateEdgeLabelWidth(edgeItem.label));
+  const center = { x: placement.x + placement.width / 2, y: placement.y + placement.height / 2 };
+  edgeLabelDrag = {
+    edgeId: edgeItem.id,
+    startPoint: pointer,
+    offset: { x: pointer.x - center.x, y: pointer.y - center.y },
+    moved: false,
+  };
+  renderSelectionOverlay();
+}
+
+function updateEdgeLabelDrag(event, edgeItem) {
+  event.sourceEvent?.stopPropagation();
+  const drag = edgeLabelDrag;
+  if (!drag || drag.edgeId !== edgeItem.id) return;
+  const pointer = boardPointFromEvent(event.sourceEvent || event);
+  const desiredCenter = { x: pointer.x - drag.offset.x, y: pointer.y - drag.offset.y };
+  const points = edgeVisualPoints(edgeItem, { includeLabel: false });
+  if (points.length < 2) return;
+  drag.latestDesiredCenter = desiredCenter;
+  if (Math.hypot(pointer.x - drag.startPoint.x, pointer.y - drag.startPoint.y) > 0.5) drag.moved = true;
+  const nextPosition = nearestPolylineLocation(points, desiredCenter, { labelWidth: estimateEdgeLabelWidth(edgeItem.label), strictFit: true });
+  if (!nextPosition) {
+    edgeItem.__labelDragMoved = drag.moved;
+    return;
+  }
+  const currentPosition = edgeItem.labelPosition;
+  if (
+    !currentPosition ||
+    currentPosition.segmentIndex !== nextPosition.segmentIndex ||
+    Math.abs((currentPosition.segmentT ?? 0.5) - nextPosition.segmentT) > 0.001 ||
+    Math.abs((currentPosition.ratio ?? edgeItem.labelT ?? 0.5) - nextPosition.ratio) > 0.001
+  ) {
+    drag.moved = true;
+  }
+  edgeItem.labelPosition = nextPosition;
+  edgeItem.labelT = nextPosition.ratio;
+  edgeItem.__labelDragMoved = drag.moved;
+  edgeLabelPlacements = buildEdgeLabelPlacements();
+  renderEdges();
+  renderSelectionOverlay();
+  schedulePersistState();
+}
+
+function endEdgeLabelDrag(event, edgeItem) {
+  event.sourceEvent?.stopPropagation();
+  const wasMoved = Boolean(edgeLabelDrag?.moved);
+  const latestDesiredCenter = edgeLabelDrag?.latestDesiredCenter;
+  edgeLabelDrag = null;
+  if (wasMoved) {
+    if (latestDesiredCenter) {
+      const points = edgeVisualPoints(edgeItem, { includeLabel: false });
+      const nextPosition = nearestPolylineLocation(points, latestDesiredCenter, { labelWidth: estimateEdgeLabelWidth(edgeItem.label) });
+      if (nextPosition) {
+        edgeItem.labelPosition = nextPosition;
+        edgeItem.labelT = nextPosition.ratio;
+      }
+    }
+    edgeItem.__labelDragMoved = true;
+    selectedEdgeId = null;
+  }
+  render();
+  schedulePersistState();
 }
 
 function renderSelectionOverlay() {
@@ -1679,6 +1999,7 @@ function renderSelectionOverlay() {
       .attr("width", rect.width)
       .attr("height", rect.height);
   }
+  if (draggedNodeId || edgeSegmentDrag || edgeLabelDrag) return;
   if (!selectionDrag && (bulkSelectedNodeIds.size || bulkSelectedEdgeIds.size)) renderBulkSelectionMenu();
   if (!selectionDrag && !bulkSelectedNodeIds.size && !bulkSelectedEdgeIds.size && selectedEdgeId) renderSelectedEdgeMenu();
 }
@@ -1729,16 +2050,178 @@ function edgeMenuPoint(edgeItem) {
   return polylineMidpoint(edgeVisualPoints(edgeItem));
 }
 
-function edgeVisualPoints(edgeItem) {
+function hasManualEdgeLabel(edgeItem) {
+  return Boolean(edgeItem?.labelPosition) || Number.isFinite(edgeItem?.labelT) || edgeLabelDrag?.edgeId === edgeItem?.id;
+}
+
+function edgeVisualPoints(edgeItem, options = {}) {
+  const { includeLabel = true, applyCustom = true } = options;
   const source = getNode(edgeItem.source);
   const target = getNode(edgeItem.target);
   if (!source || !target) return [];
   const route = edgeRoute(source, target, edgeItem);
   if (!route) return [];
-  if (route.isBackRoute && route.points) return [...route.points];
-  const labelPlacement = edgeItem.label && edgeItem.source !== edgeItem.target ? edgeLabelPlacements.get(edgeItem.id) : null;
-  if (labelPlacement) return edgePointsThroughLabel(route, labelPlacement);
-  return route.points ? [...route.points] : routeToPoints(route);
+  let points = null;
+  if (route.isBackRoute && route.points) {
+    points = [...route.points];
+    points = normalizePolylinePoints(points);
+    return applyCustom ? applyEdgeRouteOffsets(edgeItem, points) : points;
+  }
+  const labelIsManual = hasManualEdgeLabel(edgeItem);
+  const labelPlacement = includeLabel && !labelIsManual && edgeItem.label && edgeItem.source !== edgeItem.target ? edgeLabelPlacements.get(edgeItem.id) : null;
+  if (labelPlacement) points = edgePointsThroughLabel(route, labelPlacement);
+  else points = route.points ? [...route.points] : routeToPoints(route);
+  points = normalizePolylinePoints(points);
+  return applyCustom ? applyEdgeRouteOffsets(edgeItem, points) : points;
+}
+
+function applyEdgeRouteOffsets(edgeItem, points) {
+  if (!edgeItem?.routeOffsets || !points.length) return points;
+  const next = points.map((point) => ({ ...point }));
+  Object.entries(edgeItem.routeOffsets).forEach(([key, rawValue]) => {
+    const index = Number(key);
+    const value = routeOffsetValue(rawValue);
+    const orientation = routeOffsetOrientation(rawValue);
+    if (!Number.isInteger(index) || !Number.isFinite(value) || !value || index < 0 || index >= points.length - 1) return;
+    if (index === 0 || index === points.length - 2) return;
+    const a = points[index];
+    const b = points[index + 1];
+    const labelPlacement = edgeItem.label ? edgeLabelPlacements.get(edgeItem.id) : null;
+    const safeValue = clampEdgeSegmentOffsetInPoints(points, index, orientation, value, labelPlacement);
+    if (points.length === 2) {
+      applySingleSegmentOffset(next, orientation, safeValue);
+      return;
+    }
+    if (orientation === "horizontal" && Math.abs(a.y - b.y) < 0.5) {
+      if (index > 0) next[index].y += safeValue;
+      if (index + 1 < points.length - 1) next[index + 1].y += safeValue;
+    } else if (orientation === "vertical" && Math.abs(a.x - b.x) < 0.5) {
+      if (index > 0) next[index].x += safeValue;
+      if (index + 1 < points.length - 1) next[index + 1].x += safeValue;
+    }
+  });
+  return orthogonalizePolylinePoints(normalizePolylinePoints(next));
+}
+
+function clampEdgeSegmentOffset(edgeItem, segmentIndex, orientation, value) {
+  const points = edgeVisualPoints(edgeItem, { applyCustom: false });
+  const labelPlacement = edgeItem.label ? edgeLabelPlacements.get(edgeItem.id) : null;
+  return clampEdgeSegmentOffsetInPoints(points, segmentIndex, orientation, value, labelPlacement);
+}
+
+function clampEdgeSegmentOffsetInPoints(points, segmentIndex, orientation, value, labelPlacement = null) {
+  if (segmentIndex <= 0 || segmentIndex >= points.length - 2) return value;
+  const a = points[segmentIndex];
+  const b = points[segmentIndex + 1];
+  const before = points[segmentIndex - 1];
+  const after = points[segmentIndex + 2];
+  if (orientation === "horizontal" && Math.abs(a.y - b.y) < 0.5) {
+    const bothNeighborsAbove = before.y < a.y && after.y < a.y;
+    const bothNeighborsBelow = before.y > a.y && after.y > a.y;
+    const gap = 24;
+    if (bothNeighborsAbove) {
+      const min = Math.max(before.y, after.y) + gap - a.y;
+      if (min < 0) return Math.max(min, value);
+      return value < 0 ? 0 : value;
+    }
+    if (bothNeighborsBelow) {
+      const max = Math.min(before.y, after.y) - gap - a.y;
+      if (max > 0) return Math.min(max, value);
+      return value > 0 ? 0 : value;
+    }
+    const min = Math.min(before.y, after.y) + gap - a.y;
+    const max = Math.max(before.y, after.y) - gap - a.y;
+    if (min <= max) return Math.max(min, Math.min(max, value));
+    return value;
+  }
+  if (orientation === "vertical" && Math.abs(a.x - b.x) < 0.5) {
+    const bothNeighborsLeft = before.x < a.x && after.x < a.x;
+    const bothNeighborsRight = before.x > a.x && after.x > a.x;
+    const gap = 24;
+    if (bothNeighborsLeft) {
+      const min = Math.max(before.x, after.x) + gap - a.x;
+      if (min < 0) return clampVerticalSegmentAroundLabel(a, b, Math.max(min, value), labelPlacement);
+      return clampVerticalSegmentAroundLabel(a, b, value < 0 ? 0 : value, labelPlacement);
+    }
+    if (bothNeighborsRight) {
+      const max = Math.min(before.x, after.x) - gap - a.x;
+      if (max > 0) return clampVerticalSegmentAroundLabel(a, b, Math.min(max, value), labelPlacement);
+      return clampVerticalSegmentAroundLabel(a, b, value > 0 ? 0 : value, labelPlacement);
+    }
+    const min = Math.min(before.x, after.x) + gap - a.x;
+    const max = Math.max(before.x, after.x) - gap - a.x;
+    if (min <= max) return clampVerticalSegmentAroundLabel(a, b, Math.max(min, Math.min(max, value)), labelPlacement);
+    return clampVerticalSegmentAroundLabel(a, b, value, labelPlacement);
+  }
+  return value;
+}
+
+function clampVerticalSegmentAroundLabel(a, b, value, labelPlacement) {
+  if (!labelPlacement) return value;
+  const segmentTop = Math.min(a.y, b.y);
+  const segmentBottom = Math.max(a.y, b.y);
+  const labelTop = labelPlacement.y - 2;
+  const labelBottom = labelPlacement.y + labelPlacement.height + 2;
+  if (!rangesOverlap(segmentTop, segmentBottom, labelTop, labelBottom)) return value;
+  const gap = 8;
+  const nextX = a.x + value;
+  const labelLeft = labelPlacement.x - gap;
+  const labelRight = labelPlacement.x + labelPlacement.width + gap;
+  if (a.x <= labelLeft && nextX > labelLeft) return labelLeft - a.x;
+  if (a.x >= labelRight && nextX < labelRight) return labelRight - a.x;
+  if (a.x >= labelRight && a.x <= labelRight + 40 && nextX > a.x) return 0;
+  return value;
+}
+
+function applySingleSegmentOffset(points, orientation, value) {
+  const start = points[0];
+  const end = points[1];
+  if (orientation === "horizontal" && Math.abs(start.y - end.y) < 0.5) {
+    const midX = start.x + (end.x - start.x) / 2;
+    points.splice(1, 0, { x: midX, y: start.y }, { x: midX, y: start.y + value }, { x: end.x, y: start.y + value });
+  } else if (orientation === "vertical" && Math.abs(start.x - end.x) < 0.5) {
+    const midY = start.y + (end.y - start.y) / 2;
+    points.splice(1, 0, { x: start.x, y: midY }, { x: start.x + value, y: midY }, { x: start.x + value, y: end.y });
+  }
+}
+
+function orthogonalizePolylinePoints(points) {
+  if (points.length < 2) return points;
+  const result = [points[0]];
+  for (let index = 1; index < points.length; index += 1) {
+    const prev = result[result.length - 1];
+    const current = points[index];
+    const isSameX = Math.abs(prev.x - current.x) < 0.5;
+    const isSameY = Math.abs(prev.y - current.y) < 0.5;
+    if (!isSameX && !isSameY) result.push({ x: current.x, y: prev.y });
+    result.push(current);
+  }
+  return normalizePolylinePoints(result);
+}
+
+function ensureEdgeRouteOffsets(edgeItem) {
+  if (!edgeItem.routeOffsets || typeof edgeItem.routeOffsets !== "object") edgeItem.routeOffsets = {};
+  return edgeItem.routeOffsets;
+}
+
+function pruneEdgeRouteOffsets(edgeItem) {
+  if (!edgeItem.routeOffsets || typeof edgeItem.routeOffsets !== "object") return;
+  Object.keys(edgeItem.routeOffsets).forEach((key) => {
+    const value = routeOffsetValue(edgeItem.routeOffsets[key]);
+    const orientation = routeOffsetOrientation(edgeItem.routeOffsets[key]);
+    if (!Number.isFinite(value) || Math.abs(value) < 0.5 || !orientation) delete edgeItem.routeOffsets[key];
+  });
+  if (!Object.keys(edgeItem.routeOffsets).length) delete edgeItem.routeOffsets;
+}
+
+function routeOffsetValue(rawValue) {
+  if (rawValue && typeof rawValue === "object") return Number(rawValue.value);
+  return Number(rawValue);
+}
+
+function routeOffsetOrientation(rawValue) {
+  if (!rawValue || typeof rawValue !== "object") return null;
+  return rawValue.orientation === "horizontal" || rawValue.orientation === "vertical" ? rawValue.orientation : null;
 }
 
 function edgePointsThroughLabel(route, labelPlacement) {
@@ -1828,6 +2311,118 @@ function polylineMidpoint(points) {
   return points[points.length - 1];
 }
 
+function pointOnPolylineRatio(points, ratio = 0.5) {
+  if (!points.length) return null;
+  if (points.length === 1) return points[0];
+  const total = polylineLength(points);
+  if (!total) return points[0];
+  let distance = Math.max(0, Math.min(1, ratio)) * total;
+  for (let index = 1; index < points.length; index += 1) {
+    const prev = points[index - 1];
+    const current = points[index];
+    const length = Math.hypot(current.x - prev.x, current.y - prev.y);
+    if (distance > length) {
+      distance -= length;
+      continue;
+    }
+    const segmentRatio = length ? distance / length : 0;
+    return { x: prev.x + (current.x - prev.x) * segmentRatio, y: prev.y + (current.y - prev.y) * segmentRatio };
+  }
+  return points[points.length - 1];
+}
+
+function pointOnPolylineLocation(points, location, options = {}) {
+  if (!location || typeof location !== "object") return null;
+  const index = Number(location.segmentIndex);
+  if (Number.isInteger(index) && index >= 0 && index < points.length - 1) {
+    const a = points[index];
+    const b = points[index + 1];
+    const tRange = edgeLabelSegmentTRange(a, b, options.labelWidth);
+    if (!tRange) return null;
+    const t = Math.max(tRange.min, Math.min(tRange.max, Number(location.segmentT) || 0));
+    return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+  }
+  if (Number.isFinite(location.ratio)) return pointOnPolylineRatio(points, location.ratio);
+  return null;
+}
+
+function nearestPolylineLocation(points, point, options = {}) {
+  if (!points.length) return { ratio: 0.5, segmentIndex: 0, segmentT: 0.5 };
+  const total = polylineLength(points);
+  if (!total) return { ratio: 0.5, segmentIndex: 0, segmentT: 0.5 };
+  let bestDistance = Infinity;
+  let bestAlong = total / 2;
+  let bestSegmentIndex = 0;
+  let bestSegmentT = 0.5;
+  let foundSegment = false;
+  let bestInvalidDistance = Infinity;
+  let walked = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const a = points[index - 1];
+    const b = points[index];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const length = Math.hypot(dx, dy);
+    if (!length) continue;
+    const tRange = edgeLabelSegmentTRange(a, b, options.labelWidth);
+    const rawProjection = Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / (length * length)));
+    const rawProjectedPoint = { x: a.x + dx * rawProjection, y: a.y + dy * rawProjection };
+    const rawDistance = Math.hypot(point.x - rawProjectedPoint.x, point.y - rawProjectedPoint.y);
+    if (!tRange) {
+      bestInvalidDistance = Math.min(bestInvalidDistance, rawDistance);
+      walked += length;
+      continue;
+    }
+    if (options.strictFit && (rawProjection < tRange.min || rawProjection > tRange.max)) {
+      bestInvalidDistance = Math.min(bestInvalidDistance, rawDistance);
+      walked += length;
+      continue;
+    }
+    const projection = Math.max(tRange.min, Math.min(tRange.max, rawProjection));
+    const projectedPoint = { x: a.x + dx * projection, y: a.y + dy * projection };
+    const distance = Math.hypot(point.x - projectedPoint.x, point.y - projectedPoint.y);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestAlong = walked + length * projection;
+      bestSegmentIndex = index - 1;
+      bestSegmentT = projection;
+      foundSegment = true;
+    }
+    walked += length;
+  }
+  if (options.strictFit && bestInvalidDistance <= bestDistance) return null;
+  if (!foundSegment) return { ratio: 0.5, segmentIndex: 0, segmentT: 0.5 };
+  return {
+    ratio: Math.max(0, Math.min(1, bestAlong / total)),
+    segmentIndex: bestSegmentIndex,
+    segmentT: Math.max(0, Math.min(1, bestSegmentT)),
+  };
+}
+
+function nearestPolylineRatio(points, point) {
+  return nearestPolylineLocation(points, point).ratio;
+}
+
+function edgeLabelSegmentTRange(a, b, labelWidth = 0) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const length = Math.hypot(dx, dy);
+  if (!length) return null;
+  if (Math.abs(dy) < 0.5 && labelWidth > 0) {
+    const reserve = labelWidth / 2 + EDGE_LABEL_SEGMENT_GAP;
+    if (length < reserve * 2) return null;
+    const t = reserve / length;
+    return { min: t, max: 1 - t };
+  }
+  return { min: 0, max: 1 };
+}
+
+function polylineLength(points) {
+  let total = 0;
+  for (let index = 1; index < points.length; index += 1) total += Math.hypot(points[index].x - points[index - 1].x, points[index].y - points[index - 1].y);
+  return total;
+}
+
 function bulkSelectionBounds() {
   const rects = [
     ...state.nodes.filter((nodeItem) => bulkSelectedNodeIds.has(nodeItem.id)).map(nodeBounds),
@@ -1852,6 +2447,10 @@ function buildEdgeLabelPlacements() {
   const regularItems = [];
   labelItems.forEach((item) => {
     if (item.edge.source === item.edge.target) {
+      result.set(item.id, item);
+      return;
+    }
+    if (hasManualEdgeLabel(item.edge)) {
       result.set(item.id, item);
       return;
     }
@@ -2042,25 +2641,7 @@ function edgePath(d) {
   if (!a || !b) return "";
   const route = edgeRoute(a, b, d);
   if (!route) return "";
-  if (route.isBackRoute && route.points) return roundedPolylinePath(route.points, route.radius);
-  const labelPlacement = d.label && d.source !== d.target ? edgeLabelPlacements.get(d.id) : null;
-  if (labelPlacement) return edgePathThroughLabel(route, labelPlacement);
-  if (route.points) return roundedPolylinePath(route.points, route.radius);
-
-  const { x1, y1, x2, y2, layoutX1, layoutX2, midX, radius } = route;
-  if (Math.abs(y2 - y1) < 1) return `M ${x1} ${y1} L ${x2} ${y2}`;
-
-  const directionY = y2 > y1 ? 1 : -1;
-  const commands = [`M ${x1} ${y1}`];
-  if (layoutX1 > x1 + 0.5) commands.push(`L ${layoutX1} ${y1}`);
-  commands.push(
-    `L ${midX - radius} ${y1}`,
-    `Q ${midX} ${y1} ${midX} ${y1 + directionY * radius}`,
-    `L ${midX} ${y2 - directionY * radius}`,
-    `Q ${midX} ${y2} ${midX + radius} ${y2}`,
-    `L ${x2} ${y2}`,
-  );
-  return commands.join(" ");
+  return roundedPolylinePath(edgeVisualPoints(d), route.radius || 18);
 }
 
 function edgePathThroughLabel(route, labelPlacement) {
@@ -2148,6 +2729,21 @@ function edgeLabelPoint(d, labelWidth = EDGE_LABEL_MAX_WIDTH) {
   const a = getNode(d.source);
   const b = getNode(d.target);
   if (!a || !b) return { x: 0, y: 0 };
+  if (d.labelPosition) {
+    const points = edgeVisualPoints(d, { includeLabel: false });
+    const point = pointOnPolylineLocation(points, d.labelPosition, { labelWidth });
+    if (point) return point;
+    const ratioPoint = pointOnPolylineRatio(points, d.labelPosition.ratio ?? d.labelT ?? 0.5);
+    if (ratioPoint) {
+      const fallbackPosition = nearestPolylineLocation(points, ratioPoint, { labelWidth });
+      const fallbackPoint = pointOnPolylineLocation(points, fallbackPosition, { labelWidth });
+      if (fallbackPoint) return fallbackPoint;
+    }
+  }
+  if (Number.isFinite(d.labelT)) {
+    const point = pointOnPolylineRatio(edgeVisualPoints(d, { includeLabel: false }), d.labelT);
+    if (point) return point;
+  }
   if (a.id === b.id) {
     const route = selfLoopRoute(a, d);
     return { x: a.x + NODE_W / 2, y: route.loopY };
@@ -2176,8 +2772,10 @@ function edgeRoute(sourceNode, targetNode, edgeItem = null) {
       direction < 0
         ? Math.min(sourceNode.y, targetNode.y) - 56 - ring * 40
         : Math.max(sourceNode.y + NODE_H, targetNode.y + NODE_H) + 56 + ring * 40;
+    const labelWidth = edgeItem?.label ? estimateEdgeLabelWidth(edgeItem.label) : EDGE_LABEL_MAX_WIDTH;
+    const labelLeftX = targetNode.x - EDGE_LABEL_SIDE_GAP - labelWidth;
     const rightX = Math.max(x1 + 56, sourceNode.x + NODE_W + 56);
-    const leftX = Math.min(x2 - 56, targetNode.x - 56);
+    const leftX = Math.min(x2 - 56, labelLeftX - 40);
     return {
       x1,
       y1,
@@ -2187,7 +2785,7 @@ function edgeRoute(sourceNode, targetNode, edgeItem = null) {
       layoutX2,
       radius: 18,
       isBackRoute: true,
-      labelX: targetNode.x - EDGE_LABEL_SIDE_GAP - (edgeItem?.label ? estimateEdgeLabelWidth(edgeItem.label) : EDGE_LABEL_MAX_WIDTH) / 2,
+      labelX: targetNode.x - EDGE_LABEL_SIDE_GAP - labelWidth / 2,
       labelY: outerY,
       points: [
         { x: x1, y: y1 },
@@ -2237,7 +2835,7 @@ function backEdgeIndex(sourceId, targetId, edgeItem) {
   const backEdges = state.edges.filter((item) => {
     const sourceNode = getNode(item.source);
     const targetNode = getNode(item.target);
-    return sourceNode && targetNode && item.source !== item.target && targetNode.x < sourceNode.x;
+    return sourceNode && targetNode && item.source === sourceId && item.target === targetId && item.source !== item.target && targetNode.x < sourceNode.x;
   });
   return Math.max(0, edgeItem ? backEdges.findIndex((item) => item.id === edgeItem.id) : backEdges.length - 1);
 }
@@ -3012,7 +3610,7 @@ function renderNodeSettingsSidebar() {
         </div>
         <div class="node-settings-card-content">
           <div class="cycle-row">
-            <span>Число циклов, если операция будет зациклена</span>
+            <span>Количество циклов</span>
             ${renderCounter("cycleLimitInput", settings.cycleLimit, { min: 1, max: 9999999 })}
           </div>
           ${renderSettingsAlert("После прохождения максимального количества циклов, сценарий остановится и будет завершен спустя время, установленное в операции «Входящее сообщение»")}
@@ -3073,7 +3671,7 @@ function renderHoldingSettingsSidebar() {
           <span>Основные параметры</span>
         </div>
         ${renderSettingsAlert("Удерживающие сообщения будут отправляться клиенту, пока он ждет переадресацию чата. Сообщения идут по порядку, друг за другом через выбранное время.")}
-        <div class="cmgui-select-container holding-transfer-select ${holdingSettingsErrors.transferNodeIds ? "is-error" : ""}">
+        <div class="cmgui-select-container holding-transfer-select">
           <div class="cmgui-select cmgui-select-size-medium">
             <button class="cmgui-select-field ${settings.transferDropdownOpen ? "cmgui-select-field-active" : ""} ${selectedTitles.length ? "" : "is-empty"}" type="button" id="holdingTransferSelect" aria-expanded="${settings.transferDropdownOpen}">
               ${selectedTitles.length ? `<span class="cmgui-select-label cmgui-select-label-active"><span class="cmgui-select-label-text-active">Операции переадресации</span></span>` : ""}
@@ -3178,7 +3776,6 @@ function wireHoldingSettingsSidebar(sidebar, settings) {
       const id = checkbox.value;
       const transferNodeIds = checkbox.checked ? [...new Set([...draft.transferNodeIds, id])] : draft.transferNodeIds.filter((item) => item !== id);
       holdingSettingsDraft = createHoldingSettings({ ...draft, transferNodeIds, transferDropdownOpen: true });
-      if (transferNodeIds.length) delete holdingSettingsErrors.transferNodeIds;
       renderHoldingSettingsSidebar();
     });
   });
@@ -3304,7 +3901,6 @@ function saveHoldingSettingsFromSidebar() {
 
 function validateHoldingSettings(settings) {
   const errors = {};
-  if (settings.messages.length && !settings.transferNodeIds.length) errors.transferNodeIds = true;
   const messageErrors = {};
   settings.messages.forEach((message) => {
     if (!message.text.trim()) messageErrors[message.id] = { text: true };
@@ -6099,6 +6695,9 @@ function normalizeLoadedState(loadedState) {
     ...edgeItem,
     outputKey: edgeItem.outputKey || "main",
     label: edgeItem.outputKey === "failed" && edgeItem.label === "Переадресация не удалась" ? "Никто не ответил" : edgeItem.label,
+    routeOffsets: normalizeRouteOffsets(edgeItem.routeOffsets),
+    labelPosition: normalizeEdgeLabelPosition(edgeItem.labelPosition),
+    labelT: Number.isFinite(edgeItem.labelT) ? Math.max(0, Math.min(1, edgeItem.labelT)) : undefined,
   }));
   loadedState.nodes = loadedState.nodes.map((nodeItem) => {
     const catalogItem = catalog[nodeItem.kind];
@@ -6141,6 +6740,33 @@ function normalizeLoadedState(loadedState) {
   return loadedState;
 }
 
+function normalizeRouteOffsets(value) {
+  if (!value || typeof value !== "object") return undefined;
+  const result = {};
+  Object.entries(value).forEach(([key, rawValue]) => {
+    const index = Number(key);
+    const offset = routeOffsetValue(rawValue);
+    const orientation = routeOffsetOrientation(rawValue);
+    if (!Number.isInteger(index) || index < 0 || !Number.isFinite(offset) || Math.abs(offset) < 0.5 || !orientation) return;
+    result[index] = { value: offset, orientation };
+  });
+  return Object.keys(result).length ? result : undefined;
+}
+
+function normalizeEdgeLabelPosition(value) {
+  if (!value || typeof value !== "object") return undefined;
+  const segmentIndex = Number(value.segmentIndex);
+  const segmentT = Number(value.segmentT);
+  const ratio = Number(value.ratio);
+  if (!Number.isInteger(segmentIndex) || segmentIndex < 0 || !Number.isFinite(segmentT)) return undefined;
+  const result = {
+    segmentIndex,
+    segmentT: Math.max(0, Math.min(1, segmentT)),
+  };
+  if (Number.isFinite(ratio)) result.ratio = Math.max(0, Math.min(1, ratio));
+  return result;
+}
+
 function pushHistory() {
   history.push(clone(state));
   history = history.slice(-30);
@@ -6176,7 +6802,7 @@ function restoreViewport() {
     return;
   }
   const { x = 0, y = 0, k = 1 } = state.viewport;
-  svg.call(zoom.transform, d3.zoomIdentity.translate(x, y).scale(Math.min(1, Math.max(0.25, k))));
+  svg.call(zoom.transform, d3.zoomIdentity.translate(x, y).scale(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, k))));
 }
 
 function updateHistoryButtons() {
@@ -6205,7 +6831,7 @@ function setZoom100() {
 
 function stepZoom(direction) {
   const currentScale = d3.zoomTransform(svg.node()).k;
-  if ((direction > 0 && currentScale >= 0.999) || (direction < 0 && currentScale <= 0.251)) return;
+  if ((direction > 0 && currentScale >= MAX_ZOOM - ZOOM_DISABLE_EPSILON) || (direction < 0 && currentScale <= MIN_ZOOM + ZOOM_DISABLE_EPSILON)) return;
   const rect = svg.node().getBoundingClientRect();
   const transform = d3.zoomTransform(svg.node());
   const nextScale = direction > 0 ? transform.k * 1.18 : transform.k * 0.84;
@@ -6216,8 +6842,8 @@ function stepZoom(direction) {
 function updateZoomControls(scale = d3.zoomTransform(svg.node()).k) {
   const zoomInButton = document.querySelector("#zoomInButton");
   const zoomOutButton = document.querySelector("#zoomOutButton");
-  if (zoomInButton) zoomInButton.disabled = scale >= 0.999;
-  if (zoomOutButton) zoomOutButton.disabled = scale <= 0.251;
+  if (zoomInButton) zoomInButton.disabled = scale >= MAX_ZOOM - ZOOM_DISABLE_EPSILON;
+  if (zoomOutButton) zoomOutButton.disabled = scale <= MIN_ZOOM + ZOOM_DISABLE_EPSILON;
 }
 
 function crossesZoom100(currentScale, nextScale) {
@@ -6226,6 +6852,10 @@ function crossesZoom100(currentScale, nextScale) {
 
 function getNode(id) {
   return state.nodes.find((nodeItem) => nodeItem.id === id);
+}
+
+function getEdge(id) {
+  return state.edges.find((edgeItem) => edgeItem.id === id);
 }
 
 function colorForTone() {
