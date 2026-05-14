@@ -79,7 +79,7 @@
         <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-outline cmgui-button-round icon-button top-back-button" title="Назад" aria-label="Назад" data-icon="arrow-left"></button>
         <div class="top-title-row">
           <div class="top-title-wrap">
-            <strong id="scenarioTitleText">Сценарий обработки чатов №1</strong>
+            <strong id="scenarioTitleText" data-tooltip-if-clipped>Сценарий обработки чатов №1</strong>
             <span class="top-title-edit" data-icon="edit"></span>
             <input class="top-title-input" id="scenarioTitleInput" aria-label="Название сценария" />
           </div>
@@ -89,31 +89,31 @@
 
       <div class="top-actions">
         <div class="top-action-shell">
-          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost top-action-button top-action-timer" id="holdingMessagesButton" title="Удерживающие сообщения" aria-label="Удерживающие сообщения">
+          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost top-action-button top-action-timer" id="holdingMessagesButton" aria-label="Удерживающие сообщения" data-tooltip="Удерживающие сообщения">
             <span data-icon="message-16"></span>
             <span id="holdingMessagesCount">2</span>
           </button>
         </div>
         <div class="top-action-shell">
-          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button top-action-button" id="scenarioSettingsButton" title="Настройки сценария" aria-label="Настройки сценария" data-icon="settings-20"></button>
+          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button top-action-button" id="scenarioSettingsButton" aria-label="Настройки сценария" data-icon="settings-20" data-tooltip="Настройки сценария"></button>
         </div>
         <div class="top-action-shell">
-          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button top-action-button" title="Помощь" aria-label="Помощь" data-icon="help"></button>
+          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button top-action-button" aria-label="Руководство" data-icon="help" data-tooltip="Руководство"></button>
         </div>
       </div>
 
       <div class="bottom-bar">
         <div class="floating-group">
-          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button" id="undoButton" title="Отменить" aria-label="Отменить" data-icon="undo"></button>
-          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button" id="redoButton" title="Повторить" aria-label="Повторить" data-icon="redo"></button>
+          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button" id="undoButton" aria-label="Отменить" data-icon="undo" data-tooltip="Отменить"></button>
+          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button" id="redoButton" aria-label="Повторить" data-icon="redo" data-tooltip="Повторить"></button>
         </div>
         <div class="floating-group">
-          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button" id="fitButton" title="Показать целиком" aria-label="Показать целиком" data-icon="fullscreen"></button>
+          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button" id="fitButton" aria-label="Показать целиком" data-icon="fullscreen" data-tooltip="Показать целиком"></button>
         </div>
         <div class="floating-group zoom-group">
-          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button" id="zoomOutButton" title="Уменьшить" aria-label="Уменьшить" data-icon="minus"></button>
+          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button" id="zoomOutButton" aria-label="Уменьшить" data-icon="minus" data-tooltip="Уменьшить"></button>
           <span id="zoomLabel">100%</span>
-          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button" id="zoomInButton" title="Увеличить" aria-label="Увеличить" data-icon="plus"></button>
+          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button" id="zoomInButton" aria-label="Увеличить" data-icon="plus" data-tooltip="Увеличить"></button>
         </div>
       </div>
 
@@ -164,7 +164,7 @@
                   <span class="operation-card-icon is-pink"><span data-icon="info-message"></span></span>
                   <span class="operation-card-content"><span class="operation-card-title">Информационное сообщение</span><span class="operation-card-description">Текстовое сообщение с информацией для клиента</span></span>
                 </button>
-                <button class="operation-card" type="button" data-kind="empty">
+                <button class="operation-card" type="button" data-kind="connect" data-operation="connect-operation">
                   <span class="operation-card-icon is-pink"><span data-icon="interactions-paths"></span></span>
                   <span class="operation-card-content"><span class="operation-card-title">Связать с операцией</span><span class="operation-card-description">Перевод чата в определенную точку сценария</span></span>
                 </button>
@@ -197,6 +197,41 @@
               </div>
             </section>
           </div>
+        </section>
+      </div>
+
+      <div class="connect-operation-modal-overlay" id="connectOperationModal" aria-hidden="true">
+        <section class="connect-operation-modal" role="dialog" aria-modal="true" aria-labelledby="connectOperationModalTitle">
+          <header class="operation-modal-header connect-operation-modal-header">
+            <h2 id="connectOperationModalTitle">Связать с операцией</h2>
+            <button class="operation-modal-close" id="connectOperationModalClose" type="button" title="Закрыть" aria-label="Закрыть">
+              <span data-icon="cancel"></span>
+            </button>
+          </header>
+          <div class="connect-operation-body">
+            <aside class="connect-operation-list-panel">
+              <label class="scenario-search-field connect-operation-search-field">
+                <span class="cmgui-icon" data-icon="search-20"></span>
+                <input id="connectOperationSearchInput" type="search" placeholder="Найти операцию" />
+                <button class="scenario-search-clear" id="connectOperationSearchClear" type="button" title="Очистить" aria-label="Очистить" data-icon="cancel" hidden></button>
+              </label>
+              <div class="connect-operation-list" id="connectOperationList" role="listbox" aria-label="Операции сценария"></div>
+            </aside>
+            <section class="connect-operation-map-panel" aria-label="Мини-карта сценария">
+              <svg id="connectOperationMap" class="connect-operation-map" role="application" aria-label="Мини-карта сценария">
+                <defs>
+                  <marker id="connectMapArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                    <path d="M 0 0 L 10 5 L 0 10 z"></path>
+                  </marker>
+                </defs>
+                <g id="connectOperationMapViewport"></g>
+              </svg>
+            </section>
+          </div>
+          <footer class="connect-operation-footer">
+            <button class="cmgui-button cmgui-button-size-medium cmgui-button-primary cmgui-button-fill" type="button" id="connectOperationSave">Сохранить</button>
+            <button class="cmgui-button cmgui-button-size-medium cmgui-button-secondary cmgui-button-outline" type="button" id="connectOperationCancel">Отменить</button>
+          </footer>
         </section>
       </div>
 
@@ -261,7 +296,8 @@
               </div>
             </div>
             <button class="scenario-create-finish-toggle" id="scenarioCreateFinishToggle" type="button" aria-expanded="false">
-              <span id="scenarioCreateFinishToggleText">Настройки завершения сценария</span>
+              <span id="scenarioCreateFinishToggleText">Показать настройки завершения сценария</span>
+              <span class="cmgui-icon scenario-create-finish-toggle-icon" id="scenarioCreateFinishToggleIcon" data-icon="arrow-down-16"></span>
             </button>
             <div class="scenario-create-finish-settings" id="scenarioCreateFinishSettings" hidden></div>
           </div>

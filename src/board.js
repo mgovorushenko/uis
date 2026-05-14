@@ -200,6 +200,8 @@ const designSystemIconFiles = {
   "edit-20": "./assets/icons/edit_20.svg",
   "arrow-down": "./assets/icons/arrow-down_20.svg",
   "arrow-up": "./assets/icons/arrow-up_20.svg",
+  "arrow-down-16": "./assets/icons/arrow-down_16.svg",
+  "arrow-up-16": "./assets/icons/arrow-up_16.svg",
   "arrow-list-down": "./assets/icons/arrow-list-down_20.svg",
   "info-20": "./assets/icons/info_20.svg",
   "search-20": "./assets/icons/search_20.svg",
@@ -277,6 +279,12 @@ let pendingSourceId = null;
 let operationSourceId = null;
 let operationReplaceId = null;
 let operationOutputKey = null;
+let connectModalSourceId = null;
+let connectModalOutputKey = null;
+let connectModalSelectedTargetId = null;
+let connectModalReplaceId = null;
+let connectMapZoom = null;
+let connectModalSearchQuery = "";
 let outcomeMenuSourceId = null;
 let outcomeMenuTargetId = null;
 let contextMenuNodeId = null;
@@ -293,6 +301,8 @@ let suppressNextBoardClick = false;
 let isSettingsCloseConfirmOpen = false;
 let isScenarioTitleEditing = false;
 let scenarioTitleBeforeEdit = "";
+let isSettingsTitleEditing = false;
+let settingsTitleBeforeEdit = "";
 let scenarioSearchQuery = "";
 let scenarioCreateSettings = createStartSettings({ channels: [] });
 let holdingSettingsDraft = null;
@@ -302,8 +312,12 @@ let history = [];
 let future = [];
 let persistTimer = null;
 let hasUnsavedScenarioChanges = false;
+let settingsCloseConfirmAction = null;
+let tooltipTimer = null;
+let tooltipAnchor = null;
 
 const svg = d3.select("#scenarioSvg");
+const boardShell = document.querySelector("#boardShell");
 const viewport = d3.select("#viewport");
 const gridLayer = d3.select("#gridLayer");
 const edgeLayer = d3.select("#edgeLayer");
@@ -328,6 +342,7 @@ const zoom = d3
   })
   .on("zoom", (event) => {
     viewport.attr("transform", event.transform);
+    drawGrid(event.transform);
     document.querySelector("#zoomLabel").textContent = `${Math.round(event.transform.k * 100)}%`;
     state.viewport = { x: event.transform.x, y: event.transform.y, k: event.transform.k };
     updateNodeTitleEditorPosition(event.transform);
@@ -342,10 +357,12 @@ svg.call(zoom).on("dblclick.zoom", null);
 svg.on("contextmenu", (event) => event.preventDefault());
 svg.on("wheel.board", handleTrackpadWheel, { passive: false });
 svg.on("mousedown.selection", startBoardSelection);
+boardShell?.addEventListener("wheel", preventBoardBrowserNavigation, { passive: false, capture: true });
 setupIcons();
+setupTooltips();
 renderMenu();
 wireControls();
-window.addEventListener("beforeunload", flushPendingPersist);
+window.addEventListener("beforeunload", handleBeforeUnload);
 drawGrid();
 render();
 restoreViewport();
@@ -426,7 +443,7 @@ function wireControls() {
     },
     true,
   );
-  document.querySelector(".top-back-button").addEventListener("click", showScenarioList);
+  document.querySelector(".top-back-button").addEventListener("click", requestScenarioList);
   document.querySelector("#scenarioTitleText").addEventListener("click", startScenarioTitleEdit);
   document.querySelector(".top-title-edit").addEventListener("click", startScenarioTitleEdit);
   document.querySelector("#scenarioTitleText").addEventListener("mouseenter", showScenarioTitleTooltip);
@@ -495,6 +512,24 @@ function wireControls() {
     if (event.target.id === "operationModal") closeOperationModal();
   });
   document.querySelector("#operationModalClose").addEventListener("click", closeOperationModal);
+  document.querySelector("#connectOperationModal").addEventListener("click", (event) => {
+    if (event.target.id === "connectOperationModal") closeConnectOperationModal();
+  });
+  document.querySelector("#connectOperationModalClose").addEventListener("click", closeConnectOperationModal);
+  document.querySelector("#connectOperationCancel").addEventListener("click", closeConnectOperationModal);
+  document.querySelector("#connectOperationSave").addEventListener("click", saveConnectOperationModal);
+  document.querySelector("#connectOperationSearchInput").addEventListener("input", (event) => {
+    connectModalSearchQuery = event.target.value;
+    updateConnectOperationSearchClear();
+    renderConnectOperationList();
+  });
+  document.querySelector("#connectOperationSearchClear").addEventListener("click", () => {
+    connectModalSearchQuery = "";
+    const input = document.querySelector("#connectOperationSearchInput");
+    if (input) input.value = "";
+    updateConnectOperationSearchClear();
+    renderConnectOperationList();
+  });
   document.querySelector("#outcomeMenu").addEventListener("click", (event) => {
     const button = event.target.closest("[data-outcome-key]");
     if (!button) return;
@@ -527,8 +562,9 @@ function wireControls() {
   document.querySelector("#nodeSettingsCloseConfirmX").addEventListener("click", closeSettingsCloseConfirm);
   document.querySelector("#nodeSettingsCloseConfirmCancel").addEventListener("click", closeSettingsCloseConfirm);
   document.querySelector("#nodeSettingsCloseConfirmOk").addEventListener("click", () => {
+    const action = settingsCloseConfirmAction || (() => cancelNodeSettings(true));
     closeSettingsCloseConfirm();
-    cancelNodeSettings(true);
+    action();
   });
   document.querySelectorAll(".operation-card").forEach((card) => {
     card.addEventListener("click", () => {
@@ -536,6 +572,20 @@ function wireControls() {
       const replaceId = operationReplaceId;
       const outputKey = operationOutputKey;
       const operationType = card.dataset.operation || null;
+      if (operationType === "connect-operation") {
+        let connectSourceId = sourceId;
+        let connectOutputKey = outputKey;
+        let connectReplaceId = null;
+        if (!connectSourceId && replaceId && isPlaceholderNode(getNode(replaceId))) {
+          const incoming = state.edges.find((edgeItem) => edgeItem.target === replaceId);
+          connectSourceId = incoming?.source || null;
+          connectOutputKey = incoming?.outputKey || null;
+          connectReplaceId = replaceId;
+        }
+        closeOperationModal();
+        if (connectSourceId) openConnectOperationModal(connectSourceId, connectOutputKey, connectReplaceId);
+        return;
+      }
       closeOperationModal();
       const nodeId = replaceId ? replaceNodeFromOperation(replaceId, card.dataset.kind || "empty", operationType) : addNode(card.dataset.kind || "empty", sourceId, operationType, outputKey);
       const nodeItem = getNode(nodeId);
@@ -588,6 +638,46 @@ function wireControls() {
   });
 }
 
+function setupTooltips() {
+  document.addEventListener("mouseover", (event) => {
+    const target = event.target instanceof Element ? event.target.closest("[data-tooltip], [data-tooltip-if-clipped]") : null;
+    if (!target || target.contains(event.relatedTarget)) return;
+    const text = tooltipTextForElement(target);
+    if (!text) return;
+    showEdgeTooltip({ currentTarget: target, target }, text, { immediate: isImmediateTooltipElement(target) });
+  });
+  document.addEventListener("mouseout", (event) => {
+    const target = event.target instanceof Element ? event.target.closest("[data-tooltip], [data-tooltip-if-clipped]") : null;
+    if (!target || target.contains(event.relatedTarget)) return;
+    hideEdgeTooltip();
+  });
+  document.addEventListener("focusin", (event) => {
+    const target = event.target instanceof Element ? event.target.closest("[data-tooltip], [data-tooltip-if-clipped]") : null;
+    if (!target) return;
+    const text = tooltipTextForElement(target);
+    if (text) showEdgeTooltip({ currentTarget: target, target }, text, { immediate: isImmediateTooltipElement(target) });
+  });
+  document.addEventListener("focusout", (event) => {
+    if (event.target instanceof Element && event.target.closest("[data-tooltip], [data-tooltip-if-clipped]")) hideEdgeTooltip();
+  });
+}
+
+function tooltipTextForElement(element) {
+  const explicit = element.getAttribute("data-tooltip");
+  if (explicit) return explicit;
+  if (!element.hasAttribute("data-tooltip-if-clipped") || !isElementTextClipped(element)) return "";
+  return element.getAttribute("data-tooltip-full") || element.textContent || "";
+}
+
+function isImmediateTooltipElement(element) {
+  return element.matches(":disabled, [aria-disabled='true'], .is-disabled, [data-tooltip-mode='disabled']");
+}
+
+function isElementTextClipped(element) {
+  if (element instanceof SVGTextElement) return (element.getAttribute("data-tooltip-clipped") || "") === "true";
+  return element.scrollWidth > element.clientWidth + 1 || element.scrollHeight > element.clientHeight + 1;
+}
+
 function handleTrackpadWheel(event) {
   event.preventDefault();
   const delta = normalizeWheel(event);
@@ -602,6 +692,11 @@ function handleTrackpadWheel(event) {
   const current = d3.zoomTransform(svg.node());
   const next = current.translate(-delta.x / current.k, -delta.y / current.k);
   svg.call(zoom.transform, next);
+}
+
+function preventBoardBrowserNavigation(event) {
+  if (!event.cancelable) return;
+  event.preventDefault();
 }
 
 function isMouseWheelZoom(event) {
@@ -798,12 +893,16 @@ function normalizeWheel(event) {
   };
 }
 
-function drawGrid() {
-  const minX = -2600;
-  const minY = -1800;
-  const maxX = 4200;
-  const maxY = 2600;
+function drawGrid(transform = d3.zoomTransform(svg.node())) {
   const step = 32;
+  const rect = svg.node().getBoundingClientRect();
+  const topLeft = transform.invert([0, 0]);
+  const bottomRight = transform.invert([rect.width, rect.height]);
+  const padding = step * 3;
+  const minX = Math.floor((topLeft[0] - padding) / step) * step;
+  const minY = Math.floor((topLeft[1] - padding) / step) * step;
+  const maxX = Math.ceil((bottomRight[0] + padding) / step) * step;
+  const maxY = Math.ceil((bottomRight[1] + padding) / step) * step;
   const dots = [];
   for (let x = minX; x <= maxX; x += step) {
     for (let y = minY; y <= maxY; y += step) dots.push({ x, y });
@@ -870,9 +969,6 @@ function renderScenarioList() {
     }
   </tbody>`;
   if (footer) footer.innerHTML = "";
-  table.querySelectorAll("[data-scenario-row]").forEach((row) => {
-    row.addEventListener("click", () => openScenario(row.dataset.scenarioRow));
-  });
   table.querySelectorAll("[data-scenario-action]").forEach((button) => {
     button.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -891,15 +987,17 @@ function updateScenarioSearchClear() {
 function renderScenarioTableRow(scenarioItem) {
   const groups = scenarioGroups(scenarioItem);
   const channels = scenarioItem.channels?.length ? scenarioItem.channels.join(", ") : "";
+  const groupOutput = groups || "-";
+  const channelOutput = channels || "-";
   return `<tr data-scenario-row="${escapeAttr(scenarioItem.id)}">
-    <td><span class="scenario-cell-title">${escapeHtml(scenarioItem.name)}</span></td>
-    <td><span>${escapeHtml(groups || "Не выбраны")}</span></td>
-    <td>${channels ? `<span>${escapeHtml(channels)}</span>` : `<span class="scenario-channel-add">${iconSvg("plus", 16)}</span>`}</td>
+    <td><button class="scenario-cell-title scenario-cell-title-button" type="button" data-scenario-action="open" data-scenario-id="${escapeAttr(scenarioItem.id)}" data-tooltip-if-clipped data-tooltip-full="${escapeAttr(scenarioItem.name)}">${escapeHtml(scenarioItem.name)}</button></td>
+    <td><span data-tooltip-if-clipped data-tooltip-full="${escapeAttr(groupOutput)}">${escapeHtml(groupOutput)}</span></td>
+    <td><span data-tooltip-if-clipped data-tooltip-full="${escapeAttr(channelOutput)}">${escapeHtml(channelOutput)}</span></td>
     <td>
       <div class="scenario-row-actions">
-        <button type="button" data-scenario-action="open" data-scenario-id="${escapeAttr(scenarioItem.id)}" title="Настроить" aria-label="Настроить">${iconSvg("settings-20", 20)}</button>
-        <button type="button" data-scenario-action="copy" data-scenario-id="${escapeAttr(scenarioItem.id)}" title="Копировать" aria-label="Копировать">${iconSvg("copy-20", 20)}</button>
-        <button type="button" data-scenario-action="delete" data-scenario-id="${escapeAttr(scenarioItem.id)}" title="Удалить" aria-label="Удалить">${iconSvg("delete-20", 20)}</button>
+        <button type="button" data-scenario-action="open" data-scenario-id="${escapeAttr(scenarioItem.id)}" aria-label="Настроить" data-tooltip="Настроить">${iconSvg("settings-20", 20)}</button>
+        <button type="button" data-scenario-action="copy" data-scenario-id="${escapeAttr(scenarioItem.id)}" aria-label="Копировать" data-tooltip="Копировать">${iconSvg("copy-20", 20)}</button>
+        <button type="button" data-scenario-action="delete" data-scenario-id="${escapeAttr(scenarioItem.id)}" aria-label="Удалить" data-tooltip="Удалить">${iconSvg("delete-20", 20)}</button>
       </div>
     </td>
   </tr>`;
@@ -1678,15 +1776,8 @@ function renderEdges() {
         selectedId = null;
         hoveredEdgeId = d.id;
         render();
-      })
-      .call(
-        d3
-          .drag()
-          .filter((event) => event.button === 0)
-          .on("start", (event) => startEdgeLabelDrag(event, d))
-          .on("drag", (event) => updateEdgeLabelDrag(event, d))
-          .on("end", (event) => endEdgeLabelDrag(event, d)),
-      );
+      });
+    group.on(".drag", null);
     delete d.__labelWidth;
   });
   renderFloatingEdgeSegmentHandles();
@@ -1804,6 +1895,26 @@ function edgeDraggableSegments(edgeItem) {
   return segments;
 }
 
+function edgeSegmentCarriesLabel(a, b, labelPlacement) {
+  if (!labelPlacement) return false;
+  const center = { x: labelPlacement.x + labelPlacement.width / 2, y: labelPlacement.y + labelPlacement.height / 2 };
+  const isHorizontal = Math.abs(a.y - b.y) < 0.5;
+  const isVertical = Math.abs(a.x - b.x) < 0.5;
+  if (isHorizontal) {
+    if (Math.abs(center.y - a.y) >= 1) return false;
+    const labelLeft = labelPlacement.x - EDGE_LABEL_HANDLE_GAP - 2;
+    const labelRight = labelPlacement.x + labelPlacement.width + EDGE_LABEL_HANDLE_GAP + 2;
+    return rangesOverlap(a.x, b.x, labelLeft, labelRight);
+  }
+  if (isVertical) {
+    if (Math.abs(center.x - a.x) >= 1) return false;
+    const labelTop = labelPlacement.y - EDGE_LABEL_HANDLE_GAP - 2;
+    const labelBottom = labelPlacement.y + labelPlacement.height + EDGE_LABEL_HANDLE_GAP + 2;
+    return rangesOverlap(a.y, b.y, labelTop, labelBottom);
+  }
+  return false;
+}
+
 function edgeSegmentHandlePieces(a, b, orientation, labelPlacement) {
   const base = [{ a, b }];
   if (!labelPlacement) return base;
@@ -1875,12 +1986,22 @@ function startEdgeSegmentDrag(event, edgeItem, segment) {
   closeNodeContextMenu();
   closeOutcomeMenu();
   const point = boardPointFromEvent(event.sourceEvent || event);
+  const labelPlacement = edgeItem.label ? edgeLabelPlacements.get(edgeItem.id) : null;
+  const labelMovesWithSegment = edgeSegmentCarriesLabel(segment.a, segment.b, labelPlacement);
+  const labelCenter = labelPlacement ? { x: labelPlacement.x + labelPlacement.width / 2, y: labelPlacement.y + labelPlacement.height / 2 } : null;
   edgeSegmentDrag = {
     edgeId: edgeItem.id,
     index: segment.index,
     orientation: segment.orientation,
     startPoint: point,
     startOffset: Number.isFinite(routeOffsetValue(edgeItem.routeOffsets?.[segment.index])) ? routeOffsetValue(edgeItem.routeOffsets?.[segment.index]) : 0,
+    labelAnchor: labelMovesWithSegment
+      ? {
+          segmentT: segmentTAtPoint(segment.a, segment.b, labelCenter),
+          center: labelCenter,
+          width: labelPlacement.width,
+        }
+      : null,
     moved: false,
   };
   ensureEdgeRouteOffsets(edgeItem);
@@ -1896,6 +2017,23 @@ function updateEdgeSegmentDrag(event, edgeItem, segment) {
   if (Math.abs(delta) > 0.5) drag.moved = true;
   const nextOffset = clampEdgeSegmentOffset(edgeItem, drag.index, drag.orientation, snapToDragGrid(drag.startOffset + delta));
   edgeItem.routeOffsets[drag.index] = { value: nextOffset, orientation: drag.orientation };
+  if (drag.labelAnchor) {
+    const points = edgeVisualPoints(edgeItem, { includeLabel: false });
+    const appliedDelta = nextOffset - drag.startOffset;
+    const desiredCenter =
+      drag.orientation === "horizontal"
+        ? { x: drag.labelAnchor.center.x, y: drag.labelAnchor.center.y + appliedDelta }
+        : { x: drag.labelAnchor.center.x + appliedDelta, y: drag.labelAnchor.center.y };
+    const nextPosition = nearestPolylineLocation(points, desiredCenter, { labelWidth: drag.labelAnchor.width });
+    if (nextPosition) {
+      edgeItem.labelPosition = nextPosition;
+      edgeItem.labelT = nextPosition.ratio;
+    } else if (drag.index >= 0 && drag.index < points.length - 1) {
+      const ratio = polylineLocationRatio(points, drag.index, drag.labelAnchor.segmentT);
+      edgeItem.labelPosition = { segmentIndex: drag.index, segmentT: drag.labelAnchor.segmentT, ratio };
+      edgeItem.labelT = ratio;
+    }
+  }
   renderEdges();
   renderSelectionOverlay();
   schedulePersistState();
@@ -1924,10 +2062,16 @@ function startEdgeLabelDrag(event, edgeItem) {
   const pointer = boardPointFromEvent(event.sourceEvent || event);
   const placement = edgeLabelPlacements.get(edgeItem.id) || edgeLabelRect(edgeItem, estimateEdgeLabelWidth(edgeItem.label));
   const center = { x: placement.x + placement.width / 2, y: placement.y + placement.height / 2 };
+  const labelWidth = estimateEdgeLabelWidth(edgeItem.label);
+  const points = edgeVisualPoints(edgeItem, { includeLabel: false });
+  const currentPosition = nearestPolylineLocation(points, center, { labelWidth });
+  const lockedSegment = Number.isInteger(currentPosition?.segmentIndex) ? edgeLabelDragLockForSegment(points, currentPosition.segmentIndex) : null;
   edgeLabelDrag = {
     edgeId: edgeItem.id,
     startPoint: pointer,
     offset: { x: pointer.x - center.x, y: pointer.y - center.y },
+    lockedSegment,
+    labelWidth,
     moved: false,
   };
   renderSelectionOverlay();
@@ -1943,7 +2087,7 @@ function updateEdgeLabelDrag(event, edgeItem) {
   if (points.length < 2) return;
   drag.latestDesiredCenter = desiredCenter;
   if (Math.hypot(pointer.x - drag.startPoint.x, pointer.y - drag.startPoint.y) > 0.5) drag.moved = true;
-  const nextPosition = nearestPolylineLocation(points, desiredCenter, { labelWidth: estimateEdgeLabelWidth(edgeItem.label), strictFit: true });
+  const nextPosition = edgeLabelDragPosition(points, desiredCenter, drag, true);
   if (!nextPosition) {
     edgeItem.__labelDragMoved = drag.moved;
     return;
@@ -1968,13 +2112,14 @@ function updateEdgeLabelDrag(event, edgeItem) {
 
 function endEdgeLabelDrag(event, edgeItem) {
   event.sourceEvent?.stopPropagation();
-  const wasMoved = Boolean(edgeLabelDrag?.moved);
-  const latestDesiredCenter = edgeLabelDrag?.latestDesiredCenter;
+  const drag = edgeLabelDrag;
+  const wasMoved = Boolean(drag?.moved);
+  const latestDesiredCenter = drag?.latestDesiredCenter;
   edgeLabelDrag = null;
   if (wasMoved) {
     if (latestDesiredCenter) {
       const points = edgeVisualPoints(edgeItem, { includeLabel: false });
-      const nextPosition = nearestPolylineLocation(points, latestDesiredCenter, { labelWidth: estimateEdgeLabelWidth(edgeItem.label) });
+      const nextPosition = edgeLabelDragPosition(points, latestDesiredCenter, drag || { labelWidth: estimateEdgeLabelWidth(edgeItem.label) }, false);
       if (nextPosition) {
         edgeItem.labelPosition = nextPosition;
         edgeItem.labelT = nextPosition.ratio;
@@ -2061,14 +2206,14 @@ function edgeVisualPoints(edgeItem, options = {}) {
   if (!source || !target) return [];
   const route = edgeRoute(source, target, edgeItem);
   if (!route) return [];
+  const labelIsManual = hasManualEdgeLabel(edgeItem);
+  const labelPlacement = includeLabel && !labelIsManual && edgeItem.label && edgeItem.source !== edgeItem.target ? edgeLabelPlacements.get(edgeItem.id) : null;
   let points = null;
   if (route.isBackRoute && route.points) {
-    points = [...route.points];
+    points = labelPlacement ? edgeBackPointsThroughLabel(route, labelPlacement) : [...route.points];
     points = normalizePolylinePoints(points);
     return applyCustom ? applyEdgeRouteOffsets(edgeItem, points) : points;
   }
-  const labelIsManual = hasManualEdgeLabel(edgeItem);
-  const labelPlacement = includeLabel && !labelIsManual && edgeItem.label && edgeItem.source !== edgeItem.target ? edgeLabelPlacements.get(edgeItem.id) : null;
   if (labelPlacement) points = edgePointsThroughLabel(route, labelPlacement);
   else points = route.points ? [...route.points] : routeToPoints(route);
   points = normalizePolylinePoints(points);
@@ -2078,6 +2223,7 @@ function edgeVisualPoints(edgeItem, options = {}) {
 function applyEdgeRouteOffsets(edgeItem, points) {
   if (!edgeItem?.routeOffsets || !points.length) return points;
   const next = points.map((point) => ({ ...point }));
+  const obstacleRects = connectedNodeObstacleRects(edgeItem);
   Object.entries(edgeItem.routeOffsets).forEach(([key, rawValue]) => {
     const index = Number(key);
     const value = routeOffsetValue(rawValue);
@@ -2087,7 +2233,7 @@ function applyEdgeRouteOffsets(edgeItem, points) {
     const a = points[index];
     const b = points[index + 1];
     const labelPlacement = edgeItem.label ? edgeLabelPlacements.get(edgeItem.id) : null;
-    const safeValue = clampEdgeSegmentOffsetInPoints(points, index, orientation, value, labelPlacement);
+    const safeValue = clampEdgeSegmentOffsetInPoints(points, index, orientation, value, labelPlacement, obstacleRects);
     if (points.length === 2) {
       applySingleSegmentOffset(next, orientation, safeValue);
       return;
@@ -2106,32 +2252,16 @@ function applyEdgeRouteOffsets(edgeItem, points) {
 function clampEdgeSegmentOffset(edgeItem, segmentIndex, orientation, value) {
   const points = edgeVisualPoints(edgeItem, { applyCustom: false });
   const labelPlacement = edgeItem.label ? edgeLabelPlacements.get(edgeItem.id) : null;
-  return clampEdgeSegmentOffsetInPoints(points, segmentIndex, orientation, value, labelPlacement);
+  return clampEdgeSegmentOffsetInPoints(points, segmentIndex, orientation, value, labelPlacement, connectedNodeObstacleRects(edgeItem));
 }
 
-function clampEdgeSegmentOffsetInPoints(points, segmentIndex, orientation, value, labelPlacement = null) {
+function clampEdgeSegmentOffsetInPoints(points, segmentIndex, orientation, value, labelPlacement = null, obstacleRects = []) {
   if (segmentIndex <= 0 || segmentIndex >= points.length - 2) return value;
   const a = points[segmentIndex];
   const b = points[segmentIndex + 1];
   const before = points[segmentIndex - 1];
   const after = points[segmentIndex + 2];
   if (orientation === "horizontal" && Math.abs(a.y - b.y) < 0.5) {
-    const bothNeighborsAbove = before.y < a.y && after.y < a.y;
-    const bothNeighborsBelow = before.y > a.y && after.y > a.y;
-    const gap = 24;
-    if (bothNeighborsAbove) {
-      const min = Math.max(before.y, after.y) + gap - a.y;
-      if (min < 0) return Math.max(min, value);
-      return value < 0 ? 0 : value;
-    }
-    if (bothNeighborsBelow) {
-      const max = Math.min(before.y, after.y) - gap - a.y;
-      if (max > 0) return Math.min(max, value);
-      return value > 0 ? 0 : value;
-    }
-    const min = Math.min(before.y, after.y) + gap - a.y;
-    const max = Math.max(before.y, after.y) - gap - a.y;
-    if (min <= max) return Math.max(min, Math.min(max, value));
     return value;
   }
   if (orientation === "vertical" && Math.abs(a.x - b.x) < 0.5) {
@@ -2140,19 +2270,40 @@ function clampEdgeSegmentOffsetInPoints(points, segmentIndex, orientation, value
     const gap = 24;
     if (bothNeighborsLeft) {
       const min = Math.max(before.x, after.x) + gap - a.x;
-      if (min < 0) return clampVerticalSegmentAroundLabel(a, b, Math.max(min, value), labelPlacement);
-      return clampVerticalSegmentAroundLabel(a, b, value < 0 ? 0 : value, labelPlacement);
+      if (min < 0) return clampVerticalSegmentObstacles(a, b, Math.max(min, value), labelPlacement, obstacleRects);
+      return clampVerticalSegmentObstacles(a, b, value < 0 ? 0 : value, labelPlacement, obstacleRects);
     }
     if (bothNeighborsRight) {
       const max = Math.min(before.x, after.x) - gap - a.x;
-      if (max > 0) return clampVerticalSegmentAroundLabel(a, b, Math.min(max, value), labelPlacement);
-      return clampVerticalSegmentAroundLabel(a, b, value > 0 ? 0 : value, labelPlacement);
+      if (max > 0) return clampVerticalSegmentObstacles(a, b, Math.min(max, value), labelPlacement, obstacleRects);
+      return clampVerticalSegmentObstacles(a, b, value > 0 ? 0 : value, labelPlacement, obstacleRects);
     }
     const min = Math.min(before.x, after.x) + gap - a.x;
     const max = Math.max(before.x, after.x) - gap - a.x;
-    if (min <= max) return clampVerticalSegmentAroundLabel(a, b, Math.max(min, Math.min(max, value)), labelPlacement);
-    return clampVerticalSegmentAroundLabel(a, b, value, labelPlacement);
+    if (min <= max) return clampVerticalSegmentObstacles(a, b, Math.max(min, Math.min(max, value)), labelPlacement, obstacleRects);
+    return clampVerticalSegmentObstacles(a, b, value, labelPlacement, obstacleRects);
   }
+  return value;
+}
+
+function connectedNodeObstacleRects(edgeItem) {
+  return [getNode(edgeItem?.source), getNode(edgeItem?.target)].filter(Boolean).map(nodeBounds);
+}
+
+function clampHorizontalSegmentAroundLabel(a, b, value, labelPlacement) {
+  if (!labelPlacement) return value;
+  const segmentLeft = Math.min(a.x, b.x);
+  const segmentRight = Math.max(a.x, b.x);
+  const labelLeft = labelPlacement.x - 8;
+  const labelRight = labelPlacement.x + labelPlacement.width + 8;
+  if (!rangesOverlap(segmentLeft, segmentRight, labelLeft, labelRight)) return value;
+  const labelTop = labelPlacement.y - 6;
+  const labelBottom = labelPlacement.y + labelPlacement.height + 6;
+  const labelCenterY = labelPlacement.y + labelPlacement.height / 2;
+  if (Math.abs(a.y - labelCenterY) < 1) return value;
+  const nextY = a.y + value;
+  if (a.y <= labelTop && nextY > labelTop) return labelTop - a.y;
+  if (a.y >= labelBottom && nextY < labelBottom) return labelBottom - a.y;
   return value;
 }
 
@@ -2170,6 +2321,29 @@ function clampVerticalSegmentAroundLabel(a, b, value, labelPlacement) {
   if (a.x <= labelLeft && nextX > labelLeft) return labelLeft - a.x;
   if (a.x >= labelRight && nextX < labelRight) return labelRight - a.x;
   if (a.x >= labelRight && a.x <= labelRight + 40 && nextX > a.x) return 0;
+  return value;
+}
+
+function clampVerticalSegmentObstacles(a, b, value, labelPlacement, obstacleRects = []) {
+  let nextValue = clampVerticalSegmentAroundLabel(a, b, value, labelPlacement);
+  obstacleRects.forEach((rect) => {
+    nextValue = clampVerticalSegmentAroundRect(a, b, nextValue, rect);
+  });
+  return nextValue;
+}
+
+function clampVerticalSegmentAroundRect(a, b, value, rect) {
+  const segmentTop = Math.min(a.y, b.y);
+  const segmentBottom = Math.max(a.y, b.y);
+  const gap = 8;
+  const rectTop = rect.y - gap;
+  const rectBottom = rect.y + rect.height + gap;
+  if (!rangesOverlap(segmentTop, segmentBottom, rectTop, rectBottom)) return value;
+  const nextX = a.x + value;
+  const left = rect.x - gap;
+  const right = rect.x + rect.width + gap;
+  if (a.x <= left && nextX > left) return left - a.x;
+  if (a.x >= right && nextX < right) return right - a.x;
   return value;
 }
 
@@ -2284,6 +2458,28 @@ function edgePointsThroughLabel(route, labelPlacement) {
   return normalizePolylinePoints(points);
 }
 
+function edgeBackPointsThroughLabel(route, labelPlacement) {
+  const labelY = labelPlacement.y + labelPlacement.height / 2;
+  const labelLeft = labelPlacement.x;
+  const labelRight = labelPlacement.x + labelPlacement.width;
+  const approachX = Math.min(labelPlacement.approachX ?? labelLeft - 56, labelLeft - 40);
+  const afterLabelX = labelExitX(labelRight, route.x2);
+  const points = [
+    { x: route.x1, y: route.y1 },
+    { x: route.points[1].x, y: route.y1 },
+    { x: route.points[1].x, y: route.points[2].y },
+    { x: approachX, y: route.points[2].y },
+    { x: approachX, y: labelY },
+    { x: labelLeft, y: labelY },
+    { x: labelRight, y: labelY },
+  ];
+  if (Math.abs(labelY - route.y2) > 1) {
+    points.push({ x: afterLabelX, y: labelY }, { x: afterLabelX, y: route.y2 });
+  }
+  points.push({ x: route.x2, y: route.y2 });
+  return normalizePolylinePoints(points);
+}
+
 function polylineMidpoint(points) {
   if (!points.length) return null;
   if (points.length === 1) return points[0];
@@ -2329,6 +2525,60 @@ function pointOnPolylineRatio(points, ratio = 0.5) {
     return { x: prev.x + (current.x - prev.x) * segmentRatio, y: prev.y + (current.y - prev.y) * segmentRatio };
   }
   return points[points.length - 1];
+}
+
+function polylineLocationRatio(points, segmentIndex, segmentT = 0.5) {
+  const total = polylineLength(points);
+  if (!total) return 0.5;
+  let walked = 0;
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const a = points[index];
+    const b = points[index + 1];
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+    if (index === segmentIndex) return Math.max(0, Math.min(1, (walked + length * Math.max(0, Math.min(1, segmentT))) / total));
+    walked += length;
+  }
+  return 0.5;
+}
+
+function segmentTAtPoint(a, b, point) {
+  if (!point) return 0.5;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (!lengthSquared) return 0.5;
+  return Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared));
+}
+
+function edgeLabelDragLockForSegment(points, segmentIndex) {
+  const a = points[segmentIndex];
+  const b = points[segmentIndex + 1];
+  if (!a || !b) return null;
+  if (Math.abs(a.x - b.x) < 0.5) return { segmentIndex, orientation: "vertical" };
+  return null;
+}
+
+function edgeLabelDragPosition(points, desiredCenter, drag, strictFit = false) {
+  const labelWidth = drag?.labelWidth || EDGE_LABEL_MAX_WIDTH;
+  const locked = drag?.lockedSegment;
+  if (locked?.orientation === "vertical") {
+    const nextPosition = edgeLabelPositionOnSegment(points, locked.segmentIndex, desiredCenter, labelWidth);
+    if (nextPosition) return nextPosition;
+    return strictFit ? null : nearestPolylineLocation(points, desiredCenter, { labelWidth });
+  }
+  return nearestPolylineLocation(points, desiredCenter, { labelWidth, strictFit });
+}
+
+function edgeLabelPositionOnSegment(points, segmentIndex, desiredCenter, labelWidth) {
+  if (!Number.isInteger(segmentIndex) || segmentIndex < 0 || segmentIndex >= points.length - 1) return null;
+  const a = points[segmentIndex];
+  const b = points[segmentIndex + 1];
+  const tRange = edgeLabelSegmentTRange(a, b, labelWidth);
+  if (!tRange) return null;
+  const rawT = segmentTAtPoint(a, b, desiredCenter);
+  const segmentT = Math.max(tRange.min, Math.min(tRange.max, rawT));
+  const ratio = polylineLocationRatio(points, segmentIndex, segmentT);
+  return { segmentIndex, segmentT, ratio };
 }
 
 function pointOnPolylineLocation(points, location, options = {}) {
@@ -2524,18 +2774,49 @@ function edgeColor(edgeItem) {
   return isEdgeActive(edgeItem) ? "var(--cmgui-color-special-13)" : colorForTone(edgeItem);
 }
 
-function showEdgeTooltip(event, text) {
+function showEdgeTooltip(event, text, options = {}) {
   if (!text) return;
   const tooltip = document.querySelector("#edgeTooltip");
   if (!tooltip) return;
-  tooltip.textContent = text;
-  tooltip.style.left = `${event.clientX + 12}px`;
-  tooltip.style.top = `${event.clientY + 12}px`;
-  tooltip.classList.add("is-open");
+  const anchor = event?.currentTarget instanceof Element ? event.currentTarget : event?.target instanceof Element ? event.target : null;
+  clearTimeout(tooltipTimer);
+  tooltipAnchor = anchor;
+  const open = () => {
+    if (anchor && tooltipAnchor !== anchor) return;
+    tooltip.textContent = text;
+    tooltip.classList.add("is-open");
+    if (anchor) {
+      positionTooltipByAnchor(tooltip, anchor);
+      return;
+    }
+    tooltip.style.left = `${event.clientX + 12}px`;
+    tooltip.style.top = `${event.clientY + 12}px`;
+  };
+  if (options.immediate) open();
+  else tooltipTimer = window.setTimeout(open, 1000);
 }
 
 function hideEdgeTooltip() {
+  clearTimeout(tooltipTimer);
+  tooltipTimer = null;
+  tooltipAnchor = null;
   document.querySelector("#edgeTooltip")?.classList.remove("is-open");
+}
+
+function positionTooltipByAnchor(tooltip, anchor) {
+  const anchorRect = anchor.getBoundingClientRect();
+  const tooltipRect = tooltip.getBoundingClientRect();
+  const gap = 8;
+  const viewportPadding = 8;
+  let left = anchorRect.left + anchorRect.width / 2 - tooltipRect.width / 2;
+  let top = anchorRect.bottom + gap;
+  if (top + tooltipRect.height > window.innerHeight - viewportPadding) {
+    top = anchorRect.top - tooltipRect.height - gap;
+  }
+  left = Math.min(window.innerWidth - tooltipRect.width - viewportPadding, Math.max(viewportPadding, left));
+  top = Math.min(window.innerHeight - tooltipRect.height - viewportPadding, Math.max(viewportPadding, top));
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
 }
 
 function showScenarioTitleTooltip(event) {
@@ -2547,8 +2828,64 @@ function showScenarioTitleTooltip(event) {
 function moveScenarioTitleTooltip(event) {
   const tooltip = document.querySelector("#edgeTooltip");
   if (!tooltip?.classList.contains("is-open")) return;
-  tooltip.style.left = `${event.clientX + 12}px`;
-  tooltip.style.top = `${event.clientY + 12}px`;
+  const anchor = event.currentTarget;
+  if (anchor instanceof Element) positionTooltipByAnchor(tooltip, anchor);
+}
+
+function showNodeSettingsTitleTooltip(event) {
+  const title = event.currentTarget;
+  if (!(title instanceof HTMLElement) || title.scrollWidth <= title.clientWidth + 1) return;
+  showEdgeTooltip(event, title.textContent || "");
+}
+
+function startSettingsTitleEdit(event) {
+  event?.stopPropagation();
+  const nodeItem = getNode(settingsNodeId);
+  if (!nodeItem || isStartNode(nodeItem)) return;
+  hideEdgeTooltip();
+  isSettingsTitleEditing = true;
+  settingsTitleBeforeEdit = nodeItem.title || settingsTitleForNode(nodeItem);
+  const wrap = document.querySelector(".node-settings-title-wrap");
+  const input = document.querySelector("#nodeSettingsTitleInput");
+  wrap?.classList.add("is-editing");
+  if (input) {
+    input.value = settingsTitleBeforeEdit;
+    input.focus();
+    input.select();
+  }
+}
+
+function commitSettingsTitleEdit() {
+  if (!isSettingsTitleEditing) return;
+  const nodeItem = getNode(settingsNodeId);
+  const input = document.querySelector("#nodeSettingsTitleInput");
+  if (!nodeItem || isStartNode(nodeItem) || !input) {
+    closeSettingsTitleEdit();
+    return;
+  }
+  const nextTitle = input.value.trim();
+  const previousTitle = nodeItem.title || "";
+  if (nextTitle && nextTitle !== previousTitle) {
+    pushHistory();
+    nodeItem.title = nextTitle;
+    nodeItem.customTitle = true;
+    renderNodes();
+    schedulePersistState();
+  } else if (!nextTitle) {
+    pushHistory();
+    nodeItem.customTitle = false;
+    applyCurrentAutoTitle(nodeItem);
+    renderNodes();
+    schedulePersistState();
+  }
+  closeSettingsTitleEdit();
+  renderNodeSettingsSidebar();
+}
+
+function closeSettingsTitleEdit() {
+  isSettingsTitleEditing = false;
+  settingsTitleBeforeEdit = "";
+  document.querySelector(".node-settings-title-wrap")?.classList.remove("is-editing");
 }
 
 function startScenarioTitleEdit(event) {
@@ -2595,13 +2932,19 @@ function updateNodeText(groupElement, nodeData, compact) {
   const group = d3.select(groupElement);
   const shouldCompactText = compact && !isStartNode(nodeData);
   const titleWidth = isPlaceholderNode(nodeData) ? 176 : shouldCompactText ? NODE_TEXT_COMPACT_WIDTH : NODE_TEXT_DEFAULT_WIDTH;
-  fitSvgText(group.select(".node-title-svg"), nodeData.title, titleWidth);
+  const titleFit = fitSvgText(group.select(".node-title-svg"), nodeData.title, titleWidth);
+  group
+    .select(".node-title-svg")
+    .attr("data-tooltip-if-clipped", "")
+    .attr("data-tooltip-full", nodeData.title || "")
+    .attr("data-tooltip-clipped", titleFit?.clipped ? "true" : null);
   fitNodeSubtitle(group.select(".node-subtitle-svg"), isPlaceholderNode(nodeData) ? "" : nodeData.subtitle, shouldCompactText ? NODE_TEXT_COMPACT_WIDTH : NODE_TEXT_DEFAULT_WIDTH);
 }
 
 function fitNodeSubtitle(textSelection, value, maxWidth) {
-  fitSvgText(textSelection, value, maxWidth);
+  const fit = fitSvgText(textSelection, value, maxWidth);
   const fittedValue = textSelection.text();
+  textSelection.attr("data-tooltip-if-clipped", "").attr("data-tooltip-full", value || "").attr("data-tooltip-clipped", fit?.clipped ? "true" : null);
   const colonIndex = fittedValue.indexOf(":");
   if (colonIndex < 0 || !fittedValue.slice(colonIndex + 1).trim()) return;
   const labelPart = fittedValue.slice(0, colonIndex + 1);
@@ -2613,10 +2956,10 @@ function fitNodeSubtitle(textSelection, value, maxWidth) {
 
 function fitSvgText(textSelection, value, maxWidth) {
   const textNode = textSelection.node();
-  if (!textNode) return;
+  if (!textNode) return { clipped: false, text: "" };
   const fullValue = value || "";
   textSelection.text(fullValue);
-  if (!fullValue || textNode.getComputedTextLength() <= maxWidth) return;
+  if (!fullValue || textNode.getComputedTextLength() <= maxWidth) return { clipped: false, text: fullValue };
 
   let left = 0;
   let right = fullValue.length;
@@ -2633,6 +2976,7 @@ function fitSvgText(textSelection, value, maxWidth) {
     }
   }
   textSelection.text(result);
+  return { clipped: true, text: result };
 }
 
 function edgePath(d) {
@@ -3213,60 +3557,93 @@ function nodeOutputs(nodeItem) {
   if (isScheduleNode(nodeItem)) return scheduleOutputs(nodeItem);
   if (isSegmentNode(nodeItem)) return segmentOutputs(nodeItem);
   if (isConditionNode(nodeItem)) return conditionOutputs(nodeItem);
-  if (isTransferWithFallbackNode(nodeItem)) return [{ key: "failed", label: "Никто не ответил", tone: "plain", placeholder: true }];
+  if (isTransferWithFallbackNode(nodeItem)) return transferOutputs(nodeItem);
   return [{ key: "main", label: "" }];
+}
+
+function transferOutputs(nodeItem) {
+  if (nodeItem.operationType === "employee-transfer") {
+    return [{ key: "failed", label: "Сотрудник не ответил", tone: "plain", placeholder: true, icon: "fail" }];
+  }
+  if (nodeItem.operationType === "personal-manager-transfer") {
+    return stackOutputs([
+      { key: "failed", label: "Менеджер не ответил", tone: "plain", placeholder: true, icon: "fail" },
+      { key: "manager-not-assigned", label: "Менеджер не закреплен", tone: "plain", placeholder: true, icon: "fail" },
+    ]);
+  }
+  if (nodeItem.operationType === "last-manager-transfer") {
+    return stackOutputs([
+      { key: "failed", label: "Менеджер не ответил", tone: "plain", placeholder: true, icon: "fail" },
+      { key: "manager-not-found", label: "Менеджер не найден", tone: "plain", placeholder: true, icon: "fail" },
+    ]);
+  }
+  return [{ key: "failed", label: "Никто не ответил", tone: "plain", placeholder: true, icon: "fail" }];
+}
+
+function stackOutputs(outputs) {
+  const center = (Math.max(1, outputs.length) - 1) / 2;
+  return outputs.map((output, index) => ({
+    ...output,
+    offsetY: Math.round((index - center) * OUTPUT_STACK_GAP_Y),
+  }));
 }
 
 function menuOutputs(nodeItem) {
   const settings = getMenuSettings(nodeItem);
-  const count = Math.max(1, settings.buttons.length);
-  const center = (count - 1) / 2;
-  return settings.buttons.map((button, index) => ({
-    key: button.id,
-    label: button.text || `Кнопка ${index + 1}`,
-    tone: "plain",
-    placeholder: true,
-    offsetY: Math.round((index - center) * OUTPUT_STACK_GAP_Y),
-  }));
+  return stackOutputs([
+    ...settings.buttons.map((button, index) => ({
+      key: button.id,
+      label: `${index + 1}. ${button.text || `Кнопка ${index + 1}`}`,
+      tone: "plain",
+      placeholder: true,
+      icon: "menu",
+    })),
+    { key: "button-not-clicked", label: "Кнопка не нажата", tone: "plain", placeholder: true, icon: "fail" },
+    { key: "invalid-input", label: "Некорректный ввод", tone: "plain", placeholder: true, icon: "fail" },
+  ]);
 }
 
 function scheduleOutputs(nodeItem) {
   const settings = getScheduleSettings(nodeItem);
-  const count = Math.max(1, settings.schedules.length);
-  const center = (count - 1) / 2;
-  return settings.schedules.map((schedule, index) => ({
-    key: schedule.id,
-    label: schedule.name || `График ${index + 1}`,
-    tone: "plain",
-    placeholder: true,
-    offsetY: Math.round((index - center) * OUTPUT_STACK_GAP_Y),
-  }));
+  return stackOutputs([
+    ...settings.schedules.map((schedule, index) => ({
+      key: schedule.id,
+      label: schedule.name || `График ${index + 1}`,
+      tone: "plain",
+      placeholder: true,
+      icon: "time-20",
+    })),
+    { key: "out-of-schedule", label: "Вне графика", tone: "plain", placeholder: true, icon: "fail" },
+  ]);
 }
 
 function segmentOutputs(nodeItem) {
   const settings = getSegmentSettings(nodeItem);
-  const count = Math.max(1, settings.groups.length);
-  const center = (count - 1) / 2;
-  return settings.groups.map((group, index) => ({
-    key: group.id,
-    label: group.name || `Группа сегментов ${index + 1}`,
-    tone: "plain",
-    placeholder: true,
-    offsetY: Math.round((index - center) * OUTPUT_STACK_GAP_Y),
-  }));
+  return stackOutputs([
+    ...settings.groups.map((group, index) => ({
+      key: group.id,
+      label: group.name || `Группа сегментов ${index + 1}`,
+      tone: "plain",
+      placeholder: true,
+      icon: "distribution",
+    })),
+    { key: "without-segment", label: "Без сегмента", tone: "plain", placeholder: true, icon: "fail" },
+    { key: "other-segments", label: "Остальные сегменты", tone: "plain", placeholder: true, icon: "distribution" },
+  ]);
 }
 
 function conditionOutputs(nodeItem) {
   const settings = getConditionSettings(nodeItem);
-  const count = Math.max(1, settings.groups.length);
-  const center = (count - 1) / 2;
-  return settings.groups.map((group, index) => ({
-    key: group.id,
-    label: group.name || `Группа условий ${index + 1}`,
-    tone: "plain",
-    placeholder: true,
-    offsetY: Math.round((index - center) * OUTPUT_STACK_GAP_Y),
-  }));
+  return stackOutputs([
+    ...settings.groups.map((group, index) => ({
+      key: group.id,
+      label: group.name || `Группа условий ${index + 1}`,
+      tone: "plain",
+      placeholder: true,
+      icon: "row-data",
+    })),
+    { key: "condition-not-matched", label: "Не соответствует условиям", tone: "plain", placeholder: true, icon: "fail" },
+  ]);
 }
 
 function firstFreeOutput(nodeItem) {
@@ -3392,6 +3769,7 @@ function renderOutcomeMenuItem(output, sourceNode) {
 }
 
 function outcomeIconName(output, sourceNode) {
+  if (output.icon) return output.icon;
   if (isDistributionOperationNode(sourceNode)) return sourceNode.icon || "menu";
   if (output.tone === "danger" || output.key === "failed" || output.key === "expired" || /(^|\s)не\s/i.test(output.label || "")) return "fail";
   if (output.tone === "success" || output.key === "completed" || output.key === "delivered") return "success";
@@ -3407,6 +3785,8 @@ function openOperationModal(sourceId = null, replaceId = null, outputKey = null)
   operationOutputKey = outputKey;
   document.body.classList.add("is-operation-modal-open");
   document.querySelector("#operationModal").setAttribute("aria-hidden", "false");
+  const modalBody = document.querySelector("#operationModal .operation-modal-body");
+  if (modalBody) modalBody.scrollTop = 0;
 }
 
 function closeOperationModal() {
@@ -3418,6 +3798,253 @@ function closeOperationModal() {
   selectedId = null;
   hoveredId = null;
   render();
+}
+
+function openConnectOperationModal(sourceId, outputKey = null, replaceId = null) {
+  const sourceNode = getNode(sourceId);
+  if (!sourceNode) return;
+  closeOutcomeMenu();
+  closeNodeContextMenu();
+  closeNodeTitleEditor(false);
+  connectModalSourceId = sourceId;
+  connectModalOutputKey = outputKey;
+  connectModalReplaceId = replaceId;
+  connectModalSearchQuery = "";
+  connectModalSelectedTargetId = firstAvailableConnectTargetId(sourceId, outputKey, replaceId);
+  document.body.classList.add("is-connect-operation-open");
+  document.querySelector("#connectOperationModal").setAttribute("aria-hidden", "false");
+  const searchInput = document.querySelector("#connectOperationSearchInput");
+  if (searchInput) searchInput.value = "";
+  updateConnectOperationSearchClear();
+  delete document.querySelector("#connectOperationMap")?.dataset.hasConnectTransform;
+  renderConnectOperationModal();
+  requestAnimationFrame(() => focusConnectMapOnNode(connectModalSelectedTargetId));
+}
+
+function closeConnectOperationModal() {
+  document.body.classList.remove("is-connect-operation-open");
+  document.querySelector("#connectOperationModal").setAttribute("aria-hidden", "true");
+  connectModalSourceId = null;
+  connectModalOutputKey = null;
+  connectModalReplaceId = null;
+  connectModalSelectedTargetId = null;
+  connectModalSearchQuery = "";
+  hideEdgeTooltip();
+}
+
+function saveConnectOperationModal() {
+  if (!connectModalSourceId || !connectModalSelectedTargetId) return;
+  const targetId = connectModalSelectedTargetId;
+  if (!isConnectModalTargetAvailable(targetId)) return;
+  if (connectModalReplaceId) {
+    const replaceIds = new Set([connectModalReplaceId]);
+    state.edges = state.edges.filter((edgeItem) => !replaceIds.has(edgeItem.source) && !replaceIds.has(edgeItem.target));
+    state.nodes = state.nodes.filter((nodeItem) => !replaceIds.has(nodeItem.id));
+    pendingPlaceholderBackups.delete(connectModalReplaceId);
+  }
+  const sourceId = connectModalSourceId;
+  const outputKey = connectModalOutputKey;
+  closeConnectOperationModal();
+  connectNodesManually(sourceId, targetId, outputKey);
+}
+
+function firstAvailableConnectTargetId(sourceId, outputKey, replaceId = null) {
+  return connectOperationTargets(sourceId, outputKey, replaceId).find((item) => item.available)?.node.id || null;
+}
+
+function connectOperationTargets(sourceId = connectModalSourceId, outputKey = connectModalOutputKey, replaceId = connectModalReplaceId) {
+  return state.nodes
+    .filter((nodeItem) => !isStartNode(nodeItem) && !isPlaceholderNode(nodeItem) && nodeItem.id !== replaceId)
+    .map((nodeItem) => ({ node: nodeItem, ...connectTargetAvailability(sourceId, nodeItem.id, outputKey, replaceId) }));
+}
+
+function connectTargetAvailability(sourceId, targetId, outputKey = null, replaceId = null) {
+  const sourceNode = getNode(sourceId);
+  const targetNode = getNode(targetId);
+  if (!sourceNode || !targetNode) return { available: false, reason: "Операция недоступна" };
+  const allowedOutputs = allowedConnectOutputs(sourceNode, outputKey, replaceId);
+  if (!allowedOutputs.length) return { available: false, reason: "У исходной операции нет свободного выхода" };
+  if (!canReceiveInput(targetNode)) return { available: false, reason: "Вход операции уже занят" };
+  return { available: true, reason: "" };
+}
+
+function allowedConnectOutputs(sourceNode, outputKey = null, replaceId = null) {
+  const outputs = nodeOutputs(sourceNode);
+  const replaceEdge = replaceId ? state.edges.find((edgeItem) => edgeItem.source === sourceNode.id && edgeItem.target === replaceId) : null;
+  return outputs.filter((output) => {
+    if (outputKey && output.key !== outputKey) return false;
+    return !state.edges.some((edgeItem) => edgeItem.source === sourceNode.id && (edgeItem.outputKey || "main") === output.key && edgeItem.id !== replaceEdge?.id);
+  });
+}
+
+function isConnectModalTargetAvailable(targetId) {
+  return connectTargetAvailability(connectModalSourceId, targetId, connectModalOutputKey, connectModalReplaceId).available;
+}
+
+function renderConnectOperationModal() {
+  renderConnectOperationList();
+  renderConnectOperationMap();
+  const save = document.querySelector("#connectOperationSave");
+  if (save) {
+    const disabled = !connectModalSelectedTargetId || !isConnectModalTargetAvailable(connectModalSelectedTargetId);
+    save.disabled = disabled;
+    save.classList.toggle("is-disabled", disabled);
+  }
+}
+
+function updateConnectOperationSearchClear() {
+  const clearButton = document.querySelector("#connectOperationSearchClear");
+  if (!clearButton) return;
+  clearButton.hidden = !connectModalSearchQuery;
+}
+
+function renderConnectOperationList() {
+  const list = document.querySelector("#connectOperationList");
+  if (!list) return;
+  const search = connectModalSearchQuery.trim().toLowerCase();
+  const allTargets = connectOperationTargets();
+  const targets = allTargets.filter(({ node: nodeItem }) => {
+    if (!search) return true;
+    return [nodeItem.title, nodeItem.subtitle].some((value) => String(value || "").toLowerCase().includes(search));
+  });
+  list.innerHTML = targets.length
+    ? targets
+        .map(({ node: nodeItem, available, reason }) => {
+          const isSelected = nodeItem.id === connectModalSelectedTargetId;
+          return `<button class="connect-operation-list-item ${isSelected ? "is-selected" : ""} ${available ? "" : "is-disabled"}" type="button" data-connect-target="${escapeAttr(nodeItem.id)}" ${available ? "" : `data-tooltip="${escapeAttr(reason)}"`} aria-selected="${isSelected}" ${available ? "" : 'aria-disabled="true"'}>
+        <span class="connect-operation-list-icon" style="background:${nodeItem.color || "var(--cmgui-color-bg-main-gray-dark)"}">${iconSvg(nodeItem.icon || "workflow", 20)}</span>
+        <span class="connect-operation-list-text">
+          <span class="connect-operation-list-title" data-tooltip-if-clipped data-tooltip-full="${escapeAttr(nodeItem.title || "Операция")}">${escapeHtml(nodeItem.title || "Операция")}</span>
+          <span class="connect-operation-list-subtitle" data-tooltip-if-clipped data-tooltip-full="${escapeAttr(nodeItem.subtitle || "")}">${escapeHtml(nodeItem.subtitle || "")}</span>
+        </span>
+      </button>`;
+        })
+        .join("")
+    : allTargets.length
+      ? `<div class="connect-operation-list-empty">Ничего не найдено</div>`
+      : `<div class="connect-operation-list-empty is-board-empty">На доске пока нет операций</div>`;
+  list.querySelectorAll("[data-connect-target]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (button.classList.contains("is-disabled")) return;
+      connectModalSelectedTargetId = button.dataset.connectTarget;
+      renderConnectOperationModal();
+      focusConnectMapOnNode(connectModalSelectedTargetId);
+    });
+    button.addEventListener("mouseenter", (event) => {
+      if (button.dataset.tooltip) showEdgeTooltip(event, button.dataset.tooltip, { immediate: true });
+    });
+    button.addEventListener("mouseleave", hideEdgeTooltip);
+  });
+}
+
+function renderConnectOperationMap() {
+  const svgEl = document.querySelector("#connectOperationMap");
+  const viewportEl = document.querySelector("#connectOperationMapViewport");
+  if (!svgEl || !viewportEl) return;
+  const sourceNode = getNode(connectModalSourceId);
+  const targets = new Map(connectOperationTargets().map((item) => [item.node.id, item]));
+  const edgeMarkup = state.edges
+    .map((edgeItem) => `<path class="connect-map-edge" d="${edgePath(edgeItem)}"></path>`)
+    .join("");
+  const gridMarkup = connectMapGridMarkup(scenarioContentBounds());
+  const nodeMarkup = state.nodes
+    .filter((nodeItem) => !isPlaceholderNode(nodeItem))
+    .map((nodeItem) => {
+      const target = targets.get(nodeItem.id);
+      const isSource = nodeItem.id === sourceNode?.id;
+      const isAvailable = Boolean(target?.available);
+      const isSelected = nodeItem.id === connectModalSelectedTargetId;
+      const classes = ["connect-map-node", isSource ? "is-source" : "", isAvailable ? "is-available" : "is-disabled", isSelected ? "is-selected" : ""].filter(Boolean).join(" ");
+      return `<g class="${classes}" data-connect-map-node="${escapeAttr(nodeItem.id)}" ${isAvailable ? "" : 'data-tooltip="Вход операции уже занят"'} transform="translate(${nodeItem.x},${nodeItem.y})">
+        <rect class="connect-map-node-card" width="${NODE_W}" height="${NODE_H}" rx="12"></rect>
+        <rect class="connect-map-node-icon-bg" x="24" y="12" width="36" height="36" rx="10" fill="${nodeItem.color || "var(--cmgui-color-bg-main-gray-dark)"}"></rect>
+        <g class="connect-map-node-icon" transform="translate(32,20)">${iconSvg(nodeItem.icon || "workflow", 20)}</g>
+        <text class="connect-map-node-title" x="76" y="27" data-tooltip-if-clipped data-tooltip-full="${escapeAttr(nodeItem.title || "Операция")}" data-tooltip-clipped="${nodeMapTextClipped(nodeItem.title || "Операция", 34) ? "true" : "false"}">${escapeHtml(truncateNodeMapText(nodeItem.title || "Операция", 34))}</text>
+        <text class="connect-map-node-subtitle" x="76" y="45" data-tooltip-if-clipped data-tooltip-full="${escapeAttr(nodeItem.subtitle || "")}" data-tooltip-clipped="${nodeMapTextClipped(nodeItem.subtitle || "", 40) ? "true" : "false"}">${escapeHtml(truncateNodeMapText(nodeItem.subtitle || "", 40))}</text>
+      </g>`;
+    })
+    .join("");
+  viewportEl.innerHTML = `${gridMarkup}${edgeMarkup}${nodeMarkup}`;
+  ensureConnectMapZoom(svgEl, viewportEl);
+  viewportEl.querySelectorAll("[data-connect-map-node]").forEach((nodeEl) => {
+    nodeEl.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const targetId = nodeEl.dataset.connectMapNode;
+      if (!isConnectModalTargetAvailable(targetId)) return;
+      connectModalSelectedTargetId = targetId;
+      renderConnectOperationModal();
+      focusConnectMapOnNode(targetId);
+    });
+    nodeEl.addEventListener("mouseenter", (event) => {
+      if (nodeEl.classList.contains("is-disabled")) showEdgeTooltip(event, nodeEl.dataset.tooltip || "Вход операции уже занят", { immediate: true });
+    });
+    nodeEl.addEventListener("mouseleave", hideEdgeTooltip);
+  });
+  if (!svgEl.dataset.hasConnectTransform) fitConnectMap();
+}
+
+function connectMapGridMarkup(bounds) {
+  return "";
+}
+
+function ensureConnectMapZoom(svgEl, viewportEl) {
+  if (!connectMapZoom) {
+    connectMapZoom = d3
+      .zoom()
+      .scaleExtent([0.15, 1.4])
+      .filter((event) => event.type !== "dblclick")
+      .on("zoom", (event) => {
+        svgEl.dataset.hasConnectTransform = "true";
+        d3.select(viewportEl).attr("transform", event.transform);
+      });
+  }
+  d3.select(svgEl).call(connectMapZoom);
+}
+
+function fitConnectMap() {
+  const svgEl = document.querySelector("#connectOperationMap");
+  const viewportEl = document.querySelector("#connectOperationMapViewport");
+  if (!svgEl || !viewportEl || !state.nodes.length) return;
+  const rect = svgEl.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  const bounds = scenarioContentBounds();
+  const scale = Math.min(0.75, Math.max(0.18, Math.min((rect.width - 64) / bounds.width, (rect.height - 64) / bounds.height)));
+  const transform = d3.zoomIdentity.translate((rect.width - bounds.width * scale) / 2 - bounds.x * scale, (rect.height - bounds.height * scale) / 2 - bounds.y * scale).scale(scale);
+  ensureConnectMapZoom(svgEl, viewportEl);
+  d3.select(svgEl).call(connectMapZoom.transform, transform);
+  d3.select(viewportEl).attr("transform", transform);
+}
+
+function focusConnectMapOnNode(nodeId) {
+  const nodeItem = getNode(nodeId);
+  const svgEl = document.querySelector("#connectOperationMap");
+  const viewportEl = document.querySelector("#connectOperationMapViewport");
+  if (!nodeItem || !svgEl || !viewportEl) return;
+  const rect = svgEl.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  const scale = Math.max(0.35, Math.min(0.8, d3.zoomTransform(svgEl).k || 0.55));
+  const transform = d3.zoomIdentity.translate(rect.width / 2 - (nodeItem.x + NODE_W / 2) * scale, rect.height / 2 - (nodeItem.y + NODE_H / 2) * scale).scale(scale);
+  ensureConnectMapZoom(svgEl, viewportEl);
+  d3.select(svgEl).transition().duration(180).call(connectMapZoom.transform, transform);
+  d3.select(viewportEl).transition().duration(180).attr("transform", transform);
+}
+
+function scenarioContentBounds() {
+  const nodeBoundsList = state.nodes.map(nodeBounds);
+  const minX = Math.min(...nodeBoundsList.map((item) => item.x), 0) - 80;
+  const minY = Math.min(...nodeBoundsList.map((item) => item.y), 0) - 80;
+  const maxX = Math.max(...nodeBoundsList.map((item) => item.x + item.width), 1) + 80;
+  const maxY = Math.max(...nodeBoundsList.map((item) => item.y + item.height), 1) + 80;
+  return { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+}
+
+function truncateNodeMapText(value, maxLength) {
+  const text = String(value || "");
+  return text.length > maxLength ? `${text.slice(0, Math.max(0, maxLength - 1))}…` : text;
+}
+
+function nodeMapTextClipped(value, maxLength) {
+  return String(value || "").length > maxLength;
 }
 
 function openNodeSettings(nodeId) {
@@ -3440,6 +4067,7 @@ function openScenarioSettings() {
 
 function closeNodeSettings(clearSelection = true) {
   closeSettingsCloseConfirm();
+  closeSettingsTitleEdit();
   if (settingsNodeId) delete settingsDrafts[settingsNodeId];
   if (settingsNodeId) delete settingsErrors[settingsNodeId];
   settingsNodeId = null;
@@ -3458,6 +4086,7 @@ function closeNodeSettings(clearSelection = true) {
 
 function cancelNodeSettings(clearSelection = true) {
   closeSettingsCloseConfirm();
+  closeSettingsTitleEdit();
   closeOutcomeMenu();
   const nodeId = settingsNodeId;
   if (!nodeId || !pendingSettingsNodeIds.has(nodeId)) {
@@ -3522,18 +4151,44 @@ function requestNodeSettingsClose() {
   cancelNodeSettings(true);
 }
 
+function requestScenarioList() {
+  if (settingsNodeId && hasUnsavedNodeSettings(settingsNodeId)) {
+    requestNodeSettingsClose();
+    return;
+  }
+  if (hasUnsavedScenarioChanges) {
+    openSettingsCloseConfirm({
+      title: "Выход из сценария",
+      message: "Внесенные изменения сценария не будут сохранены. Вы уверены что хотите выйти из сценария?",
+      okText: "Выйти",
+      action: () => showScenarioList({ skipUnsavedConfirm: true }),
+    });
+    return;
+  }
+  showScenarioList();
+}
+
 function handleNodeSettingsBackdropClick() {
   requestNodeSettingsClose();
 }
 
-function openSettingsCloseConfirm() {
+function openSettingsCloseConfirm(options = {}) {
   isSettingsCloseConfirmOpen = true;
+  settingsCloseConfirmAction = options.action || (() => cancelNodeSettings(true));
   document.body.classList.add("is-settings-close-confirm-open");
-  document.querySelector("#nodeSettingsCloseConfirm").setAttribute("aria-hidden", "false");
+  const modal = document.querySelector("#nodeSettingsCloseConfirm");
+  modal?.setAttribute("aria-hidden", "false");
+  const title = modal?.querySelector("#nodeSettingsCloseConfirmTitle");
+  const message = modal?.querySelector(".cmgui-modal-main p");
+  const okButton = modal?.querySelector("#nodeSettingsCloseConfirmOk");
+  if (title) title.textContent = options.title || "Выход без сохранения";
+  if (message) message.textContent = options.message || "Внесенные изменения не будут сохранены. Вы уверены что хотите выйти без сохранения?";
+  if (okButton) okButton.textContent = options.okText || "Выйти";
 }
 
 function closeSettingsCloseConfirm() {
   isSettingsCloseConfirmOpen = false;
+  settingsCloseConfirmAction = null;
   document.body.classList.remove("is-settings-close-confirm-open");
   document.querySelector("#nodeSettingsCloseConfirm")?.setAttribute("aria-hidden", "true");
 }
@@ -3545,6 +4200,15 @@ function hasUnsavedNodeSettings(nodeId) {
   const draft = settingsDrafts[nodeId];
   if (!draft) return false;
   return stableStringifySettings(nodeItem, draft) !== stableStringifySettings(nodeItem, getNodeSettings(nodeItem));
+}
+
+function handleBeforeUnload(event) {
+  flushPendingPersist();
+  const hasUnsavedSettings = Boolean(settingsNodeId && hasUnsavedNodeSettings(settingsNodeId));
+  if (!hasUnsavedSettings && !hasUnsavedScenarioChanges) return;
+  event.preventDefault();
+  event.returnValue = "Внесенные изменения не будут сохранены.";
+  return event.returnValue;
 }
 
 function stableStringifySettings(nodeItem, settings) {
@@ -3589,12 +4253,13 @@ function renderNodeSettingsSidebar() {
   const errors = settingsErrors[nodeItem.id] || {};
   const bodyScrollTop = sidebar.querySelector(".node-settings-body")?.scrollTop || 0;
   const title = settingsTitleForNode(nodeItem);
+  const canEditTitle = !isStartNode(nodeItem);
   const showCycleSettings = isTransferOperationNode(nodeItem) && getCycleNodeIds().has(nodeItem.id);
   const showPrimarySettingsHead = showCycleSettings || isMenuNode(nodeItem);
   sidebar.classList.toggle("is-wide", isConditionNode(nodeItem));
   sidebar.innerHTML = `<form class="node-settings-form ${isConditionNode(nodeItem) ? "is-condition-settings" : ""}" id="nodeSettingsForm">
     <header class="node-settings-header">
-      <h2>${escapeHtml(title)}</h2>
+      ${renderNodeSettingsTitle(title, canEditTitle)}
       <button class="node-settings-close" type="button" id="nodeSettingsClose" title="Закрыть" aria-label="Закрыть">
         <span class="cmgui-icon">${iconSvg("cancel", 20)}</span>
       </button>
@@ -3628,6 +4293,17 @@ function renderNodeSettingsSidebar() {
   const body = sidebar.querySelector(".node-settings-body");
   if (body) body.scrollTop = bodyScrollTop;
   positionOpenDropdowns(sidebar);
+}
+
+function renderNodeSettingsTitle(title, canEditTitle) {
+  const classes = ["node-settings-title-wrap"];
+  if (canEditTitle) classes.push("is-editable");
+  if (isSettingsTitleEditing && canEditTitle) classes.push("is-editing");
+  return `<div class="${classes.join(" ")}">
+    <h2 id="nodeSettingsTitleText" class="node-settings-title-text" data-tooltip-if-clipped data-tooltip-full="${escapeAttr(title)}">${escapeHtml(title)}</h2>
+    ${canEditTitle ? `<button class="node-settings-title-edit" id="nodeSettingsTitleEdit" type="button" title="Переименовать" aria-label="Переименовать">${iconSvg("edit", 16)}</button>` : ""}
+    ${canEditTitle ? `<input class="node-settings-title-input" id="nodeSettingsTitleInput" aria-label="Название операции" value="${escapeAttr(title)}" />` : ""}
+  </div>`;
 }
 
 function renderCounter(id, value, { min = 0, max = 9999999 } = {}) {
@@ -3726,12 +4402,13 @@ function renderHoldingTransferDropdown(settings, options) {
 
 function renderHoldingMessageCard(message, index, count) {
   const error = holdingSettingsErrors.messages?.[message.id] || {};
+  const title = `Сообщение ${index + 1}`;
   return `<section class="node-settings-card holding-message-card" draggable="true" data-holding-message-id="${escapeAttr(message.id)}">
     <div class="holding-message-head">
       <span class="holding-message-drag">${iconSvg("drag-and-drop", 20)}</span>
       <span class="order-badge">${index + 1}</span>
-      <strong>Сообщение ${index + 1}</strong>
-      <button class="holding-message-delete" type="button" data-holding-delete="${escapeAttr(message.id)}" title="Удалить" aria-label="Удалить">${iconSvg("delete", 20)}</button>
+      <strong data-tooltip-if-clipped data-tooltip-full="${escapeAttr(title)}">${escapeHtml(title)}</strong>
+      <button class="holding-message-delete" type="button" data-holding-delete="${escapeAttr(message.id)}" aria-label="Удалить" data-tooltip="Удалить">${iconSvg("delete", 20)}</button>
     </div>
     <label class="cmgui-text-field holding-message-textarea">
       <span class="cmgui-text-field-wrapper is-textarea ${error.text ? "is-error" : ""}">
@@ -4019,8 +4696,12 @@ function renderSettingsCardHead(title, showHeader = true) {
 }
 
 function renderFinishCard() {
+  const alertText =
+    "Как только обращение дойдет до данной операции, оно будет закрыто и отобразится для пользователя только в отчетах.\n\nЭта операция необязательна. Без нее сценарий завершится по\u00A0правилу из";
   return `<section class="node-settings-card finish-settings-card">
-    ${renderSettingsAlert("Как только обращение дойдет до данной операции, оно будет закрыто и отобразится для пользователя только в отчетах.")}
+    ${renderSettingsAlert(alertText, {
+      afterHtml: `&nbsp;<button class="settings-alert-link" type="button" data-open-scenario-settings>Настроек сценария</button>.`,
+    })}
   </section>`;
 }
 
@@ -4508,10 +5189,10 @@ function renderDropdownPopup({ id, options, action, width }) {
   </div>`;
 }
 
-function renderSettingsAlert(text) {
+function renderSettingsAlert(text, options = {}) {
   return `<div class="cmgui-alert cmgui-alert-default settings-alert">
     <span class="cmgui-alert-icon cmgui-icon">${iconSvg("info-20", 20)}</span>
-    <span class="cmgui-alert-description">${escapeHtml(text)}</span>
+    <span class="cmgui-alert-description">${escapeHtml(text).replace(/\n/g, "<br>")}${options.afterHtml || ""}</span>
   </div>`;
 }
 
@@ -4552,8 +5233,46 @@ function positionOpenDropdowns(root = document) {
 }
 
 function wireNodeSettingsSidebar(sidebar, nodeItem, settings) {
+  sidebar.querySelector("#nodeSettingsTitleText")?.addEventListener("click", startSettingsTitleEdit);
+  sidebar.querySelector("#nodeSettingsTitleEdit")?.addEventListener("click", startSettingsTitleEdit);
+  sidebar.querySelector("#nodeSettingsTitleText")?.addEventListener("mouseenter", showNodeSettingsTitleTooltip);
+  sidebar.querySelector("#nodeSettingsTitleText")?.addEventListener("mousemove", moveScenarioTitleTooltip);
+  sidebar.querySelector("#nodeSettingsTitleText")?.addEventListener("mouseleave", hideEdgeTooltip);
+  sidebar.querySelector("#nodeSettingsTitleInput")?.addEventListener("blur", commitSettingsTitleEdit);
+  sidebar.querySelector("#nodeSettingsTitleInput")?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      commitSettingsTitleEdit();
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeSettingsTitleEdit();
+      renderNodeSettingsSidebar();
+    }
+  });
   sidebar.querySelector("#nodeSettingsClose")?.addEventListener("click", () => cancelNodeSettings(true));
   sidebar.querySelector("#nodeSettingsCancel")?.addEventListener("click", () => cancelNodeSettings(true));
+  sidebar.querySelector("[data-open-scenario-settings]")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const nextSettings = collectNodeSettings(sidebar, nodeItem, getNodeSettingsDraft(nodeItem));
+    const validationErrors = validateNodeSettings(nodeItem, nextSettings);
+    if (Object.keys(validationErrors).length) {
+      settingsErrors[nodeItem.id] = validationErrors;
+      updateNodeSettingsDraft(nodeItem, closeDropdownPatchForNode(nodeItem));
+      renderNodeSettingsSidebar();
+      return;
+    }
+    pushHistory();
+    saveNodeSettings(nodeItem, nextSettings);
+    delete settingsDrafts[nodeItem.id];
+    delete settingsErrors[nodeItem.id];
+    pendingSettingsNodeIds.delete(nodeItem.id);
+    pendingPlaceholderBackups.delete(nodeItem.id);
+    closeNodeSettings(false);
+    openScenarioSettings();
+    schedulePersistState();
+  });
   sidebar.querySelector("#nodeSettingsForm")?.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && isEditableEventTarget(event.target)) event.preventDefault();
   });
@@ -5795,6 +6514,7 @@ function saveStartSettings(nodeItem, settings) {
 function saveSimpleTransferSettings(nodeItem, settings) {
   nodeItem.settings = { ...(nodeItem.settings || {}), simpleTransfer: createSimpleTransferSettings(nodeItem.operationType, settings) };
   applySimpleTransferTitle(nodeItem, nodeItem.settings.simpleTransfer);
+  syncDynamicOutputEdges(nodeItem);
 }
 
 function saveInfoMessageSettings(nodeItem, settings) {
@@ -5899,6 +6619,10 @@ function isTransferWithFallbackNode(nodeItem) {
 
 function settingsTitleForNode(nodeItem) {
   if (isStartNode(nodeItem)) return "Настройки сценария";
+  return nodeItem.title || defaultSettingsTitleForNode(nodeItem);
+}
+
+function defaultSettingsTitleForNode(nodeItem) {
   if (isFinishNode(nodeItem)) return "Закрытие чата";
   if (isContactFormNode(nodeItem)) return "Форма сбора контактов";
   if (isMenuNode(nodeItem)) return "Меню";
@@ -5907,7 +6631,7 @@ function settingsTitleForNode(nodeItem) {
   if (isConditionNode(nodeItem)) return "Распределение по условиям";
   if (isInfoMessageNode(nodeItem)) return "Информационное сообщение";
   if (isGroupTransferNode(nodeItem)) return "На группу";
-  return SIMPLE_TRANSFER_CONFIG[nodeItem.operationType]?.title || nodeItem.title;
+  return SIMPLE_TRANSFER_CONFIG[nodeItem.operationType]?.title || nodeItem.title || "Операция";
 }
 
 function applySimpleTransferTitle(nodeItem, settings) {
@@ -6189,12 +6913,14 @@ function updateScenarioCreateNameState(options = {}) {
 function renderScenarioCreateFinishSettings() {
   const toggle = document.querySelector("#scenarioCreateFinishToggle");
   const toggleText = document.querySelector("#scenarioCreateFinishToggleText");
+  const toggleIcon = document.querySelector("#scenarioCreateFinishToggleIcon");
   const container = document.querySelector("#scenarioCreateFinishSettings");
   if (!toggle || !container) return;
   const settings = createStartSettings(scenarioCreateSettings);
   toggle.classList.toggle("is-open", settings.finishOpen);
   toggle.setAttribute("aria-expanded", String(settings.finishOpen));
-  if (toggleText) toggleText.textContent = settings.finishOpen ? "Скрыть настройки завершения сценария" : "Настройки завершения сценария";
+  if (toggleText) toggleText.textContent = settings.finishOpen ? "Скрыть настройки завершения сценария" : "Показать настройки завершения сценария";
+  if (toggleIcon) toggleIcon.innerHTML = iconSvg(settings.finishOpen ? "arrow-up-16" : "arrow-down-16", 16);
   container.hidden = !settings.finishOpen;
   if (!settings.finishOpen) {
     container.innerHTML = "";
@@ -6371,7 +7097,11 @@ function openScenario(scenarioId) {
   restoreViewport();
 }
 
-function showScenarioList() {
+function showScenarioList(options = {}) {
+  if (!options.skipUnsavedConfirm && hasUnsavedScenarioChanges) {
+    requestScenarioList();
+    return;
+  }
   syncCurrentScenario();
   appState.currentScenarioId = null;
   selectedId = null;
@@ -6732,9 +7462,13 @@ function normalizeLoadedState(loadedState) {
   });
   loadedState.edges = loadedState.edges.map((edgeItem) => {
     const sourceNode = loadedState.nodes.find((nodeItem) => nodeItem.id === edgeItem.source);
-    if (!isContactFormNode(sourceNode)) return edgeItem;
-    if (edgeItem.label === "Форма заполнена") return { ...edgeItem, outputKey: "completed" };
-    if (edgeItem.label === "Форма не заполнена") return { ...edgeItem, outputKey: "expired" };
+    if (sourceNode?.operationType === "employee-transfer" && edgeItem.outputKey === "failed") return { ...edgeItem, label: "Сотрудник не ответил" };
+    if (sourceNode?.operationType === "personal-manager-transfer" && edgeItem.outputKey === "failed") return { ...edgeItem, label: "Менеджер не ответил" };
+    if (sourceNode?.operationType === "last-manager-transfer" && edgeItem.outputKey === "failed") return { ...edgeItem, label: "Менеджер не ответил" };
+    if (sourceNode?.operationType === "personal-manager-transfer" && edgeItem.outputKey === "manager-not-assigned") return { ...edgeItem, label: "Менеджер не закреплен" };
+    if (sourceNode?.operationType === "last-manager-transfer" && edgeItem.outputKey === "manager-not-found") return { ...edgeItem, label: "Менеджер не найден" };
+    if (isContactFormNode(sourceNode) && edgeItem.label === "Форма заполнена") return { ...edgeItem, outputKey: "completed" };
+    if (isContactFormNode(sourceNode) && edgeItem.label === "Форма не заполнена") return { ...edgeItem, outputKey: "expired" };
     return edgeItem;
   });
   return loadedState;
@@ -6842,8 +7576,16 @@ function stepZoom(direction) {
 function updateZoomControls(scale = d3.zoomTransform(svg.node()).k) {
   const zoomInButton = document.querySelector("#zoomInButton");
   const zoomOutButton = document.querySelector("#zoomOutButton");
-  if (zoomInButton) zoomInButton.disabled = scale >= MAX_ZOOM - ZOOM_DISABLE_EPSILON;
-  if (zoomOutButton) zoomOutButton.disabled = scale <= MIN_ZOOM + ZOOM_DISABLE_EPSILON;
+  const isZoomInDisabled = scale >= MAX_ZOOM - ZOOM_DISABLE_EPSILON;
+  const isZoomOutDisabled = scale <= MIN_ZOOM + ZOOM_DISABLE_EPSILON;
+  if (zoomInButton) {
+    zoomInButton.disabled = isZoomInDisabled;
+    zoomInButton.classList.toggle("is-disabled", isZoomInDisabled);
+  }
+  if (zoomOutButton) {
+    zoomOutButton.disabled = isZoomOutDisabled;
+    zoomOutButton.classList.toggle("is-disabled", isZoomOutDisabled);
+  }
 }
 
 function crossesZoom100(currentScale, nextScale) {
