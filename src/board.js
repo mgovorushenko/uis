@@ -293,6 +293,7 @@ let titleEditingNodeId = null;
 let settingsNodeId = null;
 let settingsDrafts = {};
 let settingsErrors = {};
+let closedInvalidSettingsNodeIds = new Set();
 let autosavedSettingsNodeIds = new Set();
 let pendingSettingsNodeIds = new Set();
 let pendingPlaceholderBackups = new Map();
@@ -4065,6 +4066,7 @@ function openNodeSettings(nodeId) {
   if (settingsNodeId && settingsNodeId !== nodeId) {
     const previousSettingsNodeId = settingsNodeId;
     syncOpenNodeSettingsDraft();
+    markClosedSettingsValidation(previousSettingsNodeId);
     delete settingsDrafts[previousSettingsNodeId];
     delete settingsErrors[previousSettingsNodeId];
     autosavedSettingsNodeIds.delete(previousSettingsNodeId);
@@ -4091,6 +4093,7 @@ function closeNodeSettings(clearSelection = true) {
   closeSettingsCloseConfirm();
   closeSettingsTitleEdit();
   syncOpenNodeSettingsDraft();
+  if (settingsNodeId) markClosedSettingsValidation(settingsNodeId);
   if (settingsNodeId) autosavedSettingsNodeIds.delete(settingsNodeId);
   if (settingsNodeId) pendingSettingsNodeIds.delete(settingsNodeId);
   if (settingsNodeId) pendingPlaceholderBackups.delete(settingsNodeId);
@@ -4110,6 +4113,16 @@ function closeNodeSettings(clearSelection = true) {
   nodeLayer.selectAll(".scenario-node-svg").classed("is-selected", (nodeItem) => nodeItem.id === selectedId);
 }
 
+function markClosedSettingsValidation(nodeId) {
+  const nodeItem = getNode(nodeId);
+  if (!nodeItem || isStartNode(nodeItem) || !isConfigurableNode(nodeItem)) return;
+  if (hasInvalidNodeSettings(nodeItem)) {
+    closedInvalidSettingsNodeIds.add(nodeId);
+  } else {
+    closedInvalidSettingsNodeIds.delete(nodeId);
+  }
+}
+
 function cancelNodeSettings(clearSelection = true) {
   closeNodeSettings(clearSelection);
 }
@@ -4126,6 +4139,7 @@ function cancelPendingNodeSettings(clearSelection = true) {
 
   delete settingsDrafts[nodeId];
   delete settingsErrors[nodeId];
+  closedInvalidSettingsNodeIds.delete(nodeId);
   autosavedSettingsNodeIds.delete(nodeId);
   pendingSettingsNodeIds.delete(nodeId);
   settingsNodeId = null;
@@ -4164,6 +4178,7 @@ function restorePendingPlaceholder(nodeId) {
   outgoingPlaceholderIds.forEach((id) => {
     delete settingsDrafts[id];
     delete settingsErrors[id];
+    closedInvalidSettingsNodeIds.delete(id);
     pendingSettingsNodeIds.delete(id);
     pendingPlaceholderBackups.delete(id);
   });
@@ -4270,7 +4285,7 @@ function renderNodeSettingsSidebar() {
   }
 
   const settings = getNodeSettingsDraft(nodeItem);
-  const errors = settingsErrors[nodeItem.id] || invalidNodeSettingsErrors(nodeItem);
+  const errors = settingsErrors[nodeItem.id] || (closedInvalidSettingsNodeIds.has(nodeItem.id) ? invalidNodeSettingsErrors(nodeItem) : {});
   const bodyScrollTop = sidebar.querySelector(".node-settings-body")?.scrollTop || 0;
   const title = settingsTitleForNode(nodeItem);
   const canEditTitle = !isStartNode(nodeItem);
@@ -6471,9 +6486,12 @@ function autosaveNodeSettingsDraft(nodeItem) {
   if (!draft) return;
   const validationErrors = validateNodeSettings(nodeItem, draft);
   if (Object.keys(validationErrors).length) {
-    settingsErrors[nodeItem.id] = validationErrors;
+    if (settingsErrors[nodeItem.id] || closedInvalidSettingsNodeIds.has(nodeItem.id)) {
+      settingsErrors[nodeItem.id] = validationErrors;
+    }
   } else {
     delete settingsErrors[nodeItem.id];
+    closedInvalidSettingsNodeIds.delete(nodeItem.id);
   }
   const currentComparable = stableStringifySettings(nodeItem, getNodeSettings(nodeItem));
   const draftComparable = stableStringifySettings(nodeItem, draft);
@@ -7254,6 +7272,7 @@ function deleteBulkSelection() {
   nodeIds.forEach((nodeId) => {
     delete settingsDrafts[nodeId];
     delete settingsErrors[nodeId];
+    closedInvalidSettingsNodeIds.delete(nodeId);
     pendingSettingsNodeIds.delete(nodeId);
     pendingPlaceholderBackups.delete(nodeId);
   });
@@ -7279,6 +7298,7 @@ function removeEdgeById(edgeId) {
     placeholderIds.forEach((id) => {
       delete settingsDrafts[id];
       delete settingsErrors[id];
+      closedInvalidSettingsNodeIds.delete(id);
       pendingSettingsNodeIds.delete(id);
       pendingPlaceholderBackups.delete(id);
     });
@@ -7299,6 +7319,7 @@ function removeNodeById(nodeId) {
   state.edges = state.edges.filter((edgeItem) => !nodeIdsToRemove.has(edgeItem.source) && !nodeIdsToRemove.has(edgeItem.target));
   nodeIdsToRemove.forEach((removedId) => delete settingsDrafts[removedId]);
   nodeIdsToRemove.forEach((removedId) => delete settingsErrors[removedId]);
+  nodeIdsToRemove.forEach((removedId) => closedInvalidSettingsNodeIds.delete(removedId));
   nodeIdsToRemove.forEach((removedId) => pendingSettingsNodeIds.delete(removedId));
   nodeIdsToRemove.forEach((removedId) => pendingPlaceholderBackups.delete(removedId));
   if (settingsNodeId && nodeIdsToRemove.has(settingsNodeId)) closeNodeSettings(false);
@@ -7578,6 +7599,7 @@ function undo() {
   state = prev;
   settingsDrafts = {};
   settingsErrors = {};
+  closedInvalidSettingsNodeIds = new Set();
   autosavedSettingsNodeIds = new Set();
   selectedId = null;
   hoveredId = null;
@@ -7592,6 +7614,7 @@ function redo() {
   state = next;
   settingsDrafts = {};
   settingsErrors = {};
+  closedInvalidSettingsNodeIds = new Set();
   autosavedSettingsNodeIds = new Set();
   selectedId = null;
   hoveredId = null;
