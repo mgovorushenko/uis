@@ -192,6 +192,7 @@ const designSystemIconFiles = {
   "last-manager": "./assets/icons/last-manager-20.svg",
   success: "./assets/icons/success-20.svg",
   attention: "./assets/icons/attention-20.svg",
+  "attention-filled-20": "./assets/icons/attention-filled_20.svg",
   finish: "./assets/icons/finish-20.svg",
   "node-connection-line": "./assets/icons/node-connection-line-20.svg",
   add: "./assets/icons/add_16.svg",
@@ -292,6 +293,7 @@ let titleEditingNodeId = null;
 let settingsNodeId = null;
 let settingsDrafts = {};
 let settingsErrors = {};
+let autosavedSettingsNodeIds = new Set();
 let pendingSettingsNodeIds = new Set();
 let pendingPlaceholderBackups = new Map();
 let bulkSelectedNodeIds = new Set();
@@ -1108,6 +1110,7 @@ function renderNodes() {
   enter.append("rect").attr("class", "node-icon-bg").attr("x", 16).attr("y", 14).attr("width", 32).attr("height", 32).attr("rx", 8);
   enter.append("g").attr("class", "node-icon-svg").attr("transform", "translate(22,20)");
   enter.append("g").attr("class", "node-holding-indicator").attr("transform", `translate(${NODE_W - 14},-8)`);
+  enter.append("g").attr("class", "node-required-indicator").attr("transform", `translate(${NODE_W - 14},-8)`);
   const textGroup = enter.append("g").attr("class", "node-text-group");
   textGroup.append("text").attr("class", "node-title-svg").attr("x", 60).attr("y", 27);
   textGroup.append("text").attr("class", "node-subtitle-svg").attr("x", 60).attr("y", 44);
@@ -1138,6 +1141,7 @@ function renderNodes() {
     .classed("is-muted", (d) => d.muted)
     .classed("is-placeholder", (d) => isPlaceholderNode(d))
     .classed("is-outside-scenario", (d) => !reachableNodeIds.has(d.id))
+    .classed("is-settings-invalid", (d) => hasInvalidNodeSettings(d))
     .on("mouseenter", function (event, d) {
       if (draggedNodeId === d.id) return;
       hoveredId = d.id;
@@ -1179,7 +1183,15 @@ function renderNodes() {
   merged.select(".node-icon-svg").html((d) => iconSvg(isPlaceholderNode(d) ? "add-20" : d.icon, 20));
   merged.select(".node-icon-svg").attr("transform", (d) => (isPlaceholderNode(d) ? "translate(22,20)" : "translate(22,20)"));
   merged.select(".node-holding-indicator").html(() => iconSvg("warning-message-filled-20", 20));
+  merged
+    .select(".node-holding-indicator")
+    .attr("transform", (d) => (hasInvalidNodeSettings(d) ? `translate(${NODE_W - 38},-8)` : `translate(${NODE_W - 14},-8)`));
   merged.select(".node-holding-indicator").style("display", (d) => (isHoldingEnabledForTransfer(d.id) ? null : "none"));
+  merged.select(".node-required-indicator").html(() => iconSvg("attention-filled-20", 20));
+  merged
+    .select(".node-required-indicator")
+    .attr("data-tooltip", "В операции не заполнено обязательное поле")
+    .style("display", (d) => (hasInvalidNodeSettings(d) ? null : "none"));
   merged.select(".node-add-icon").html(() => iconSvg("add", 16));
   merged.select(".node-more-graphic").html((d) => iconSvg(isPlaceholderNode(d) ? "delete" : "more", 20));
   merged.select(".node-more-icon").attr("transform", (d) => (isPlaceholderNode(d) ? `translate(${NODE_W - 36},20)` : `translate(${NODE_W - 48},8)`));
@@ -2784,6 +2796,7 @@ function showEdgeTooltip(event, text, options = {}) {
   const open = () => {
     if (anchor && tooltipAnchor !== anchor) return;
     tooltip.textContent = text;
+    tooltip.classList.toggle("is-narrow", anchor?.getAttribute("data-tooltip-size") === "narrow");
     tooltip.classList.add("is-open");
     if (anchor) {
       positionTooltipByAnchor(tooltip, anchor);
@@ -4049,6 +4062,15 @@ function nodeMapTextClipped(value, maxLength) {
 
 function openNodeSettings(nodeId) {
   closeSettingsCloseConfirm();
+  if (settingsNodeId && settingsNodeId !== nodeId) {
+    const previousSettingsNodeId = settingsNodeId;
+    syncOpenNodeSettingsDraft();
+    delete settingsDrafts[previousSettingsNodeId];
+    delete settingsErrors[previousSettingsNodeId];
+    autosavedSettingsNodeIds.delete(previousSettingsNodeId);
+    pendingSettingsNodeIds.delete(previousSettingsNodeId);
+    pendingPlaceholderBackups.delete(previousSettingsNodeId);
+  }
   settingsNodeId = nodeId;
   selectedId = nodeId;
   const nodeItem = getNode(nodeId);
@@ -4068,6 +4090,10 @@ function openScenarioSettings() {
 function closeNodeSettings(clearSelection = true) {
   closeSettingsCloseConfirm();
   closeSettingsTitleEdit();
+  syncOpenNodeSettingsDraft();
+  if (settingsNodeId) autosavedSettingsNodeIds.delete(settingsNodeId);
+  if (settingsNodeId) pendingSettingsNodeIds.delete(settingsNodeId);
+  if (settingsNodeId) pendingPlaceholderBackups.delete(settingsNodeId);
   if (settingsNodeId) delete settingsDrafts[settingsNodeId];
   if (settingsNodeId) delete settingsErrors[settingsNodeId];
   settingsNodeId = null;
@@ -4085,6 +4111,10 @@ function closeNodeSettings(clearSelection = true) {
 }
 
 function cancelNodeSettings(clearSelection = true) {
+  closeNodeSettings(clearSelection);
+}
+
+function cancelPendingNodeSettings(clearSelection = true) {
   closeSettingsCloseConfirm();
   closeSettingsTitleEdit();
   closeOutcomeMenu();
@@ -4096,6 +4126,7 @@ function cancelNodeSettings(clearSelection = true) {
 
   delete settingsDrafts[nodeId];
   delete settingsErrors[nodeId];
+  autosavedSettingsNodeIds.delete(nodeId);
   pendingSettingsNodeIds.delete(nodeId);
   settingsNodeId = null;
   document.body.classList.remove("is-node-settings-open");
@@ -4140,22 +4171,11 @@ function restorePendingPlaceholder(nodeId) {
 
 function requestNodeSettingsClose() {
   if (!settingsNodeId) return;
-  if (pendingSettingsNodeIds.has(settingsNodeId)) {
-    cancelNodeSettings(true);
-    return;
-  }
-  if (hasUnsavedNodeSettings(settingsNodeId)) {
-    openSettingsCloseConfirm();
-    return;
-  }
-  cancelNodeSettings(true);
+  closeNodeSettings(true);
 }
 
 function requestScenarioList() {
-  if (settingsNodeId && hasUnsavedNodeSettings(settingsNodeId)) {
-    requestNodeSettingsClose();
-    return;
-  }
+  if (settingsNodeId) closeNodeSettings(false);
   if (hasUnsavedScenarioChanges) {
     openSettingsCloseConfirm({
       title: "Выход из сценария",
@@ -4250,7 +4270,7 @@ function renderNodeSettingsSidebar() {
   }
 
   const settings = getNodeSettingsDraft(nodeItem);
-  const errors = settingsErrors[nodeItem.id] || {};
+  const errors = settingsErrors[nodeItem.id] || invalidNodeSettingsErrors(nodeItem);
   const bodyScrollTop = sidebar.querySelector(".node-settings-body")?.scrollTop || 0;
   const title = settingsTitleForNode(nodeItem);
   const canEditTitle = !isStartNode(nodeItem);
@@ -4283,10 +4303,6 @@ function renderNodeSettingsSidebar() {
       </section>`
       }
     </div>
-    <footer class="node-settings-footer">
-      <button class="cmgui-button cmgui-button-size-medium cmgui-button-primary cmgui-button-fill" type="submit">Сохранить</button>
-      <button class="cmgui-button cmgui-button-size-medium cmgui-button-secondary cmgui-button-outline" type="button" id="nodeSettingsCancel">Отменить</button>
-    </footer>
   </form>`;
 
   wireNodeSettingsSidebar(sidebar, nodeItem, settings);
@@ -5256,51 +5272,20 @@ function wireNodeSettingsSidebar(sidebar, nodeItem, settings) {
       renderNodeSettingsSidebar();
     }
   });
-  sidebar.querySelector("#nodeSettingsClose")?.addEventListener("click", () => cancelNodeSettings(true));
-  sidebar.querySelector("#nodeSettingsCancel")?.addEventListener("click", () => cancelNodeSettings(true));
+  sidebar.querySelector("#nodeSettingsClose")?.addEventListener("click", () => closeNodeSettings(true));
   sidebar.querySelector("[data-open-scenario-settings]")?.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
-    const nextSettings = collectNodeSettings(sidebar, nodeItem, getNodeSettingsDraft(nodeItem));
-    const validationErrors = validateNodeSettings(nodeItem, nextSettings);
-    if (Object.keys(validationErrors).length) {
-      settingsErrors[nodeItem.id] = validationErrors;
-      updateNodeSettingsDraft(nodeItem, closeDropdownPatchForNode(nodeItem));
-      renderNodeSettingsSidebar();
-      return;
-    }
-    pushHistory();
-    saveNodeSettings(nodeItem, nextSettings);
-    delete settingsDrafts[nodeItem.id];
-    delete settingsErrors[nodeItem.id];
-    pendingSettingsNodeIds.delete(nodeItem.id);
-    pendingPlaceholderBackups.delete(nodeItem.id);
+    syncOpenNodeSettingsDraft();
     closeNodeSettings(false);
     openScenarioSettings();
-    schedulePersistState();
   });
   sidebar.querySelector("#nodeSettingsForm")?.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && isEditableEventTarget(event.target)) event.preventDefault();
   });
   sidebar.querySelector("#nodeSettingsForm")?.addEventListener("submit", (event) => {
     event.preventDefault();
-    const nextSettings = collectNodeSettings(sidebar, nodeItem, getNodeSettingsDraft(nodeItem));
-    const validationErrors = validateNodeSettings(nodeItem, nextSettings);
-    if (Object.keys(validationErrors).length) {
-      settingsErrors[nodeItem.id] = validationErrors;
-      updateNodeSettingsDraft(nodeItem, closeDropdownPatchForNode(nodeItem));
-      renderNodeSettingsSidebar();
-      return;
-    }
-    pushHistory();
-    saveNodeSettings(nodeItem, nextSettings);
-    delete settingsDrafts[nodeItem.id];
-    delete settingsErrors[nodeItem.id];
-    pendingSettingsNodeIds.delete(nodeItem.id);
-    pendingPlaceholderBackups.delete(nodeItem.id);
-    closeNodeSettings(true);
-    render();
-    schedulePersistState();
+    syncOpenNodeSettingsDraft();
   });
   sidebar.querySelector("#startScenarioNameInput")?.addEventListener("input", (event) => {
     const errors = { ...(settingsErrors[nodeItem.id] || {}) };
@@ -5993,6 +5978,20 @@ function validateNodeSettings(nodeItem, settings) {
   return {};
 }
 
+function invalidNodeSettingsErrors(nodeItem) {
+  if (!nodeItem || !isConfigurableNode(nodeItem)) return {};
+  return validateNodeSettings(nodeItem, getNodeSettings(nodeItem));
+}
+
+function hasInvalidNodeSettings(nodeItem) {
+  if (isStartNode(nodeItem)) return false;
+  return Object.keys(invalidNodeSettingsErrors(nodeItem)).length > 0;
+}
+
+function hasInvalidScenarioNodes() {
+  return state.nodes.some((nodeItem) => hasInvalidNodeSettings(nodeItem));
+}
+
 function closeDropdownPatchForNode(nodeItem) {
   if (isStartNode(nodeItem)) return { channelsDropdownOpen: false, employeeDropdownOpen: false, groupDropdownOpen: false };
   if (isFinishNode(nodeItem)) return {};
@@ -6415,45 +6414,85 @@ function getNodeSettingsDraft(nodeItem) {
   return settingsDrafts[nodeItem.id];
 }
 
-function updateNodeSettingsDraft(nodeItem, patch) {
-  const next = { ...getNodeSettingsDraft(nodeItem), ...patch };
+function normalizeSettingsForNode(nodeItem, settings) {
   if (isStartNode(nodeItem)) {
-    settingsDrafts[nodeItem.id] = createStartSettings(next);
-    return;
+    return createStartSettings(settings);
   }
   if (isGroupTransferNode(nodeItem)) {
-    settingsDrafts[nodeItem.id] = createGroupTransferSettings(next);
-    return;
+    return createGroupTransferSettings(settings);
   }
   if (isInfoMessageNode(nodeItem)) {
-    settingsDrafts[nodeItem.id] = createInfoMessageSettings(next);
-    return;
+    return createInfoMessageSettings(settings);
   }
   if (isContactFormNode(nodeItem)) {
-    settingsDrafts[nodeItem.id] = createContactFormSettings(next);
-    return;
+    return createContactFormSettings(settings);
   }
   if (isMenuNode(nodeItem)) {
-    settingsDrafts[nodeItem.id] = createMenuSettings(next);
-    return;
+    return createMenuSettings(settings);
   }
   if (isScheduleNode(nodeItem)) {
-    settingsDrafts[nodeItem.id] = createScheduleSettings(next);
-    return;
+    return createScheduleSettings(settings);
   }
   if (isSegmentNode(nodeItem)) {
-    settingsDrafts[nodeItem.id] = createSegmentSettings(next);
-    return;
+    return createSegmentSettings(settings);
   }
   if (isConditionNode(nodeItem)) {
-    settingsDrafts[nodeItem.id] = createConditionSettings(next);
-    return;
+    return createConditionSettings(settings);
   }
   if (isFinishNode(nodeItem)) {
-    settingsDrafts[nodeItem.id] = {};
+    return {};
+  }
+  return createSimpleTransferSettings(nodeItem.operationType, settings);
+}
+
+function setNodeSettingsDraft(nodeItem, settings) {
+  settingsDrafts[nodeItem.id] = normalizeSettingsForNode(nodeItem, settings);
+  autosaveNodeSettingsDraft(nodeItem);
+}
+
+function updateNodeSettingsDraft(nodeItem, patch) {
+  const next = { ...getNodeSettingsDraft(nodeItem), ...patch };
+  setNodeSettingsDraft(nodeItem, next);
+}
+
+function syncOpenNodeSettingsDraft() {
+  const nodeItem = getNode(settingsNodeId);
+  const sidebar = document.querySelector("#nodeSettingsSidebar");
+  if (!nodeItem || !sidebar || !isConfigurableNode(nodeItem)) return;
+  const form = sidebar.querySelector("#nodeSettingsForm");
+  if (!form) return;
+  const nextSettings = collectNodeSettings(sidebar, nodeItem, getNodeSettingsDraft(nodeItem));
+  setNodeSettingsDraft(nodeItem, nextSettings);
+}
+
+function autosaveNodeSettingsDraft(nodeItem) {
+  if (!nodeItem || !isConfigurableNode(nodeItem)) return;
+  const draft = settingsDrafts[nodeItem.id];
+  if (!draft) return;
+  const validationErrors = validateNodeSettings(nodeItem, draft);
+  if (Object.keys(validationErrors).length) {
+    settingsErrors[nodeItem.id] = validationErrors;
+  } else {
+    delete settingsErrors[nodeItem.id];
+  }
+  const currentComparable = stableStringifySettings(nodeItem, getNodeSettings(nodeItem));
+  const draftComparable = stableStringifySettings(nodeItem, draft);
+  if (currentComparable === draftComparable) {
+    renderNodes();
+    updateSaveButton();
     return;
   }
-  settingsDrafts[nodeItem.id] = createSimpleTransferSettings(nodeItem.operationType, next);
+  if (!autosavedSettingsNodeIds.has(nodeItem.id)) {
+    pushHistory();
+    autosavedSettingsNodeIds.add(nodeItem.id);
+  }
+  saveNodeSettings(nodeItem, draft);
+  pendingSettingsNodeIds.delete(nodeItem.id);
+  pendingPlaceholderBackups.delete(nodeItem.id);
+  renderEdges();
+  renderNodes();
+  updateSaveButton();
+  schedulePersistState();
 }
 
 function saveNodeSettings(nodeItem, settings) {
@@ -7299,6 +7338,10 @@ function collectNodeIdsForRemoval(rootNodeId) {
 }
 
 function saveState() {
+  if (hasInvalidScenarioNodes()) {
+    updateSaveButton();
+    return;
+  }
   persistState();
   hasUnsavedScenarioChanges = false;
   updateSaveButton();
@@ -7307,8 +7350,17 @@ function saveState() {
 function updateSaveButton() {
   const button = document.querySelector("#saveButton");
   if (!button) return;
-  button.classList.toggle("is-ready", !hasUnsavedScenarioChanges);
-  button.setAttribute("aria-disabled", hasUnsavedScenarioChanges ? "false" : "true");
+  const hasInvalidNodes = hasInvalidScenarioNodes();
+  button.classList.toggle("is-ready", !hasUnsavedScenarioChanges && !hasInvalidNodes);
+  button.classList.toggle("is-invalid-disabled", hasInvalidNodes);
+  button.setAttribute("aria-disabled", hasUnsavedScenarioChanges && !hasInvalidNodes ? "false" : "true");
+  if (hasInvalidNodes) {
+    button.setAttribute("data-tooltip", "В сценарии есть операции с незаполненными полями");
+    button.setAttribute("data-tooltip-size", "narrow");
+  } else {
+    button.removeAttribute("data-tooltip");
+    button.removeAttribute("data-tooltip-size");
+  }
   button.textContent = hasUnsavedScenarioChanges ? "Сохранить" : "Сохранено";
 }
 
@@ -7524,6 +7576,9 @@ function undo() {
   if (!prev) return;
   future.unshift(clone(state));
   state = prev;
+  settingsDrafts = {};
+  settingsErrors = {};
+  autosavedSettingsNodeIds = new Set();
   selectedId = null;
   hoveredId = null;
   render();
@@ -7535,6 +7590,9 @@ function redo() {
   if (!next) return;
   history.push(clone(state));
   state = next;
+  settingsDrafts = {};
+  settingsErrors = {};
+  autosavedSettingsNodeIds = new Set();
   selectedId = null;
   hoveredId = null;
   render();

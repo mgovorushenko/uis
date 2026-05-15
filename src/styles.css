@@ -806,6 +806,12 @@ body.is-board-panning #scenarioSvg {
   opacity: 1;
 }
 
+.scenario-node-svg.is-settings-invalid .node-card,
+.scenario-node-svg.is-settings-invalid .node-hover-card {
+  stroke: var(--cmgui-color-border-error);
+  stroke-width: 1;
+}
+
 .node-icon-svg {
   color: var(--cmgui-color-icon-invert);
   pointer-events: none;
@@ -814,7 +820,8 @@ body.is-board-panning #scenarioSvg {
 .node-icon-svg .ds-icon,
 .node-add-icon .ds-icon,
 .node-more-icon .ds-icon,
-.node-holding-indicator .ds-icon {
+.node-holding-indicator .ds-icon,
+.node-required-indicator .ds-icon {
   display: block;
   color: currentColor;
 }
@@ -822,6 +829,11 @@ body.is-board-panning #scenarioSvg {
 .node-holding-indicator {
   color: var(--cmgui-color-icon-accent);
   pointer-events: none;
+}
+
+.node-required-indicator {
+  color: var(--cmgui-color-icon-error);
+  pointer-events: auto;
 }
 
 .node-title-svg {
@@ -1092,6 +1104,10 @@ body.is-board-panning #scenarioSvg {
   pointer-events: none;
 }
 
+.edge-tooltip.is-narrow {
+  max-width: 168px;
+}
+
 .edge-tooltip.is-open {
   display: block;
 }
@@ -1308,6 +1324,14 @@ body.is-board-panning #scenarioSvg {
   border-color: transparent;
   background: var(--cmgui-color-bg-accent-opacity);
   color: var(--cmgui-color-text-accent);
+}
+
+.save-button.is-invalid-disabled,
+.save-button.is-invalid-disabled:hover {
+  border-color: transparent;
+  background: var(--cmgui-color-bg-button-primary-disabled);
+  color: var(--cmgui-color-text-disabled);
+  cursor: default;
 }
 
 .top-actions {
