@@ -225,7 +225,7 @@ const designSystemIconFiles = {
   "menu-info-20": "./assets/icons/menu-info_20.svg",
   "menu-user-20": "./assets/icons/menu-user_20.svg",
   "message-16": "./assets/icons/message_20.svg",
-  "source-email-20": "./assets/icons/source-email_20.svg",
+  "source-email-20": "./assets/icons/source-other_email_20.svg",
   "source-max-20": "./assets/icons/source-max_20.svg",
   "source-telegram-20": "./assets/icons/source-telegram_20.svg",
   "source-whatsapp-20": "./assets/icons/source-whatsapp_20.svg",
