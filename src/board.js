@@ -24,6 +24,10 @@ const EDGE_LABEL_SEGMENT_GAP = 8;
 const EDGE_LABEL_HANDLE_GAP = 32;
 const EDGE_SEGMENT_DRAG_MIN_LENGTH = 28;
 const OUTPUT_STACK_GAP_Y = 112;
+const AUTO_LAYOUT_NODE_GAP_Y = 28;
+const AUTO_LAYOUT_NODE_GAP_X = 16;
+const AUTO_LAYOUT_BRANCH_GAP_Y = 36;
+const AUTO_LAYOUT_BRANCH_GAP_X = 48;
 const CHANNEL_OPTIONS = ["Email", "Max", "Telegram", "WhatsApp"];
 const CHANNEL_ICON_BY_CHANNEL = {
   Email: "source-email-20",
@@ -68,7 +72,7 @@ const SCHEDULE_OPERATION = "schedule-distribution";
 const SEGMENT_OPERATION = "segment-distribution";
 const CONDITION_OPERATION = "condition-distribution";
 const MENU_BUTTON_MAX_LENGTH = 128;
-const MENU_BUTTON_MAX_COUNT = 15;
+const MENU_BUTTON_MAX_COUNT = 20;
 const SCHEDULE_MAX_COUNT = 20;
 const SEGMENT_MAX_COUNT = 20;
 const CONDITION_MAX_COUNT = 20;
@@ -308,6 +312,7 @@ let isSettingsTitleEditing = false;
 let settingsTitleBeforeEdit = "";
 let scenarioSearchQuery = "";
 let scenarioCreateSettings = createStartSettings({ channels: [] });
+let scenarioCreateInitialSettings = null;
 let holdingSettingsDraft = null;
 let holdingSettingsErrors = {};
 let holdingMessageDragId = null;
@@ -479,7 +484,7 @@ function wireControls() {
     input.focus();
   });
   document.querySelector("#scenarioCreateModal").addEventListener("click", (event) => {
-    if (event.target.id === "scenarioCreateModal") closeScenarioCreateModal();
+    if (event.target.id === "scenarioCreateModal" && !isScenarioCreateDirty()) closeScenarioCreateModal();
   });
   document.querySelector("#scenarioCreateClose").addEventListener("click", closeScenarioCreateModal);
   document.querySelector("#scenarioCreateCancel").addEventListener("click", closeScenarioCreateModal);
@@ -1177,6 +1182,15 @@ function renderNodes() {
       if (isConfigurableNode(d)) {
         openNodeSettings(d.id);
       }
+    })
+    .on("contextmenu", (event, d) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (isStartNode(d) || isPlaceholderNode(d)) return;
+      clearBulkSelection();
+      selectedEdgeId = null;
+      hoveredEdgeId = null;
+      openNodeContextMenu(d.id, { x: event.clientX, y: event.clientY });
     });
 
   merged.select(".node-icon-bg").attr("fill", (d) => (reachableNodeIds.has(d.id) ? d.color : "var(--cmgui-color-bg-main-gray-dark)"));
@@ -1272,7 +1286,7 @@ function renderNodes() {
   });
 }
 
-function openNodeContextMenu(nodeId) {
+function openNodeContextMenu(nodeId, position = null) {
   const nodeItem = getNode(nodeId);
   const menu = document.querySelector("#nodeContextMenu");
   if (!nodeItem || !menu) return;
@@ -1287,8 +1301,11 @@ function openNodeContextMenu(nodeId) {
   menu.classList.add("is-open");
   menu.setAttribute("aria-hidden", "false");
   const menuWidth = menu.offsetWidth;
-  menu.style.left = `${Math.round(Math.min(screen[0] + 8, window.innerWidth - menuWidth - 16))}px`;
-  menu.style.top = `${Math.round(screen[1] - 24)}px`;
+  const menuHeight = menu.offsetHeight;
+  const anchorX = position?.x ?? screen[0] + 8;
+  const anchorY = position?.y ?? screen[1] - 24;
+  menu.style.left = `${Math.round(Math.min(anchorX, window.innerWidth - menuWidth - 16))}px`;
+  menu.style.top = `${Math.round(Math.min(anchorY, window.innerHeight - menuHeight - 16))}px`;
   menu.style.visibility = "";
   render();
 }
@@ -1891,8 +1908,10 @@ function edgeDraggableSegments(edgeItem) {
   const points = edgeVisualPoints(edgeItem);
   const segments = [];
   const labelPlacement = edgeItem.label ? edgeLabelPlacements.get(edgeItem.id) : null;
+  const protectedIndexes = edgeProtectedSegmentIndexes(edgeItem, points, labelPlacement);
   for (let index = 0; index < points.length - 1; index += 1) {
     if (index === 0 || index === points.length - 2) continue;
+    if (protectedIndexes.has(index)) continue;
     const a = points[index];
     const b = points[index + 1];
     const isHorizontal = Math.abs(a.y - b.y) < 0.5;
@@ -1906,6 +1925,17 @@ function edgeDraggableSegments(edgeItem) {
     });
   }
   return segments;
+}
+
+function edgeProtectedSegmentIndexes(edgeItem, points, labelPlacement) {
+  const indexes = new Set();
+  if (!labelPlacement || points.length < 2) return indexes;
+  edgeLabelSegmentIndexes(edgeItem, points).forEach((index) => {
+    indexes.add(index);
+    if (index > 0) indexes.add(index - 1);
+    if (index < points.length - 2) indexes.add(index + 1);
+  });
+  return indexes;
 }
 
 function edgeSegmentCarriesLabel(a, b, labelPlacement) {
@@ -2237,15 +2267,17 @@ function applyEdgeRouteOffsets(edgeItem, points) {
   if (!edgeItem?.routeOffsets || !points.length) return points;
   const next = points.map((point) => ({ ...point }));
   const obstacleRects = connectedNodeObstacleRects(edgeItem);
+  const labelPlacement = edgeItem.label ? edgeLabelPlacements.get(edgeItem.id) : null;
+  const protectedIndexes = edgeProtectedSegmentIndexes(edgeItem, points, labelPlacement);
   Object.entries(edgeItem.routeOffsets).forEach(([key, rawValue]) => {
     const index = Number(key);
     const value = routeOffsetValue(rawValue);
     const orientation = routeOffsetOrientation(rawValue);
     if (!Number.isInteger(index) || !Number.isFinite(value) || !value || index < 0 || index >= points.length - 1) return;
     if (index === 0 || index === points.length - 2) return;
+    if (protectedIndexes.has(index)) return;
     const a = points[index];
     const b = points[index + 1];
-    const labelPlacement = edgeItem.label ? edgeLabelPlacements.get(edgeItem.id) : null;
     const safeValue = clampEdgeSegmentOffsetInPoints(points, index, orientation, value, labelPlacement, obstacleRects);
     if (points.length === 2) {
       applySingleSegmentOffset(next, orientation, safeValue);
@@ -3347,6 +3379,7 @@ function addNode(kind, sourceId = null, operationType = null, outputKey = null) 
     state.edges.push(createOutputEdge(sourceNode, id, outputKey));
   }
   createOutputPlaceholdersFor(nextNode);
+  resolveOutputPlaceholderConflicts(nextNode.id);
   selectedId = id;
   render();
   schedulePersistState();
@@ -3362,6 +3395,7 @@ function replacePlaceholderNode(replaceId, kind, operationType = null) {
   target.muted = Boolean(catalog[kind]?.muted);
   configureNodeForOperation(target, operationType);
   createOutputPlaceholdersFor(target);
+  resolveOutputPlaceholderConflicts(target.id);
   selectedId = replaceId;
   render();
   schedulePersistState();
@@ -3393,6 +3427,7 @@ function replaceNodeFromOperation(replaceId, kind, operationType = null) {
   });
   removeDetachedPlaceholderTargets(previousTargets, keptTargetIds);
   createOutputPlaceholdersFor(target);
+  resolveOutputPlaceholderConflicts(target.id);
   selectedId = replaceId;
   render();
   schedulePersistState();
@@ -3519,6 +3554,193 @@ function alignOutputPlaceholdersFor(sourceNode) {
     const position = snappedNodePosition(sourceNode.x + NODE_W + gap, sourceNode.y + (output.offsetY || 0));
     targetNode.x = position.x;
     targetNode.y = position.y;
+  });
+}
+
+function resolveOutputPlaceholderConflicts(sourceNodeId) {
+  const sourceNode = getNode(sourceNodeId);
+  if (!sourceNode) return;
+  const hadSiblingConflicts = resolveSiblingBranchConflicts(sourceNode);
+  if (!hadSiblingConflicts) resolveDirectOutputPlaceholderConflicts(sourceNode);
+  resolveBranchHorizontalConflicts(sourceNode);
+}
+
+function resolveSiblingBranchConflicts(sourceNode) {
+  const parentEdge = state.edges.find((edgeItem) => edgeItem.target === sourceNode.id);
+  if (!parentEdge) return false;
+  const siblingRootIds = state.edges.filter((edgeItem) => edgeItem.source === parentEdge.source).map((edgeItem) => edgeItem.target);
+  if (siblingRootIds.length < 2) return false;
+  let changed = false;
+  const maxPasses = 8;
+  for (let pass = 0; pass < maxPasses; pass += 1) {
+    const zones = siblingRootIds
+      .map((rootId) => branchLayoutZone(rootId))
+      .filter(Boolean)
+      .sort((a, b) => a.centerY - b.centerY || a.bounds.x - b.bounds.x);
+    if (zones.length < 2 || !branchZonesOverlap(zones)) return changed;
+    packBranchZones(zones);
+    changed = true;
+  }
+  return changed;
+}
+
+function branchLayoutZone(rootId) {
+  const rootNode = getNode(rootId);
+  if (!rootNode || isStartNode(rootNode)) return null;
+  const nodeIds = new Set([rootNode.id]);
+  state.edges.forEach((edgeItem) => {
+    if (edgeItem.source !== rootNode.id) return;
+    const targetNode = getNode(edgeItem.target);
+    if (!isPlaceholderNode(targetNode)) return;
+    nodeIds.add(targetNode.id);
+  });
+  const rects = Array.from(nodeIds).map((nodeId) => layoutNodeBounds(getNode(nodeId))).filter(Boolean);
+  if (!rects.length) return null;
+  const bounds = unionRects(rects);
+  return {
+    rootId: rootNode.id,
+    nodeIds,
+    bounds,
+    centerY: bounds.y + bounds.height / 2,
+  };
+}
+
+function branchZonesOverlap(zones) {
+  for (let index = 1; index < zones.length; index += 1) {
+    const previous = zones[index - 1].bounds;
+    const current = zones[index].bounds;
+    if (current.y < previous.y + previous.height + AUTO_LAYOUT_BRANCH_GAP_Y) return true;
+  }
+  return false;
+}
+
+function packBranchZones(zones) {
+  const top = Math.min(...zones.map((zone) => zone.bounds.y));
+  const bottom = Math.max(...zones.map((zone) => zone.bounds.y + zone.bounds.height));
+  const totalHeight =
+    zones.reduce((sum, zone) => sum + zone.bounds.height, 0) + AUTO_LAYOUT_BRANCH_GAP_Y * Math.max(0, zones.length - 1);
+  let cursor = snapToDragGrid((top + bottom - totalHeight) / 2);
+  zones.forEach((zone) => {
+    const dy = snapToDragGrid(cursor - zone.bounds.y);
+    if (dy) moveNodesBy(zone.nodeIds, 0, dy);
+    cursor = snapToDragGrid(cursor + zone.bounds.height + AUTO_LAYOUT_BRANCH_GAP_Y);
+  });
+}
+
+function unionRects(rects) {
+  const minX = Math.min(...rects.map((rect) => rect.x));
+  const minY = Math.min(...rects.map((rect) => rect.y));
+  const maxX = Math.max(...rects.map((rect) => rect.x + rect.width));
+  const maxY = Math.max(...rects.map((rect) => rect.y + rect.height));
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+}
+
+function resolveBranchHorizontalConflicts(sourceNode) {
+  if (!sourceNode) return;
+  const maxPasses = 80;
+  for (let pass = 0; pass < maxPasses; pass += 1) {
+    const zone = branchLayoutZone(sourceNode.id);
+    if (!zone || zone.nodeIds.size <= 1) return;
+    const conflict = findBranchHorizontalConflict(zone, sourceNode);
+    if (!conflict) return;
+    moveNodesBy(conflict.nodeIds, conflict.dx, 0);
+  }
+}
+
+function findBranchHorizontalConflict(zone, sourceNode) {
+  const zoneRect = {
+    x: zone.bounds.x,
+    y: zone.bounds.y,
+    width: zone.bounds.width + AUTO_LAYOUT_BRANCH_GAP_X,
+    height: zone.bounds.height,
+  };
+  const candidates = state.nodes
+    .filter((nodeItem) => {
+      if (zone.nodeIds.has(nodeItem.id) || isStartNode(nodeItem)) return false;
+      if (nodeItem.x <= sourceNode.x) return false;
+      return rectsOverlap(zoneRect, layoutNodeBounds(nodeItem), 0);
+    })
+    .sort((a, b) => a.x - b.x || a.y - b.y);
+  const candidate = candidates[0];
+  if (!candidate) return null;
+  const candidateRect = layoutNodeBounds(candidate);
+  const rawDx = zoneRect.x + zoneRect.width - candidateRect.x + AUTO_LAYOUT_BRANCH_GAP_X;
+  const dx = Math.max(NODE_DRAG_GRID_STEP, snapToDragGrid(rawDx));
+  return { nodeIds: collectRightSideMoveIds(candidate.id, sourceNode.x, zone.nodeIds), dx };
+}
+
+function collectRightSideMoveIds(rootNodeId, minX = -Infinity, blockedIds = new Set()) {
+  const ids = new Set();
+  const queue = [rootNodeId];
+  while (queue.length) {
+    const nodeId = queue.shift();
+    if (ids.has(nodeId)) continue;
+    if (blockedIds.has(nodeId)) continue;
+    const nodeItem = getNode(nodeId);
+    if (!nodeItem || isStartNode(nodeItem) || nodeItem.x < minX) continue;
+    ids.add(nodeId);
+    state.edges.forEach((edgeItem) => {
+      if (edgeItem.source === nodeId && !ids.has(edgeItem.target)) queue.push(edgeItem.target);
+    });
+  }
+  return ids;
+}
+
+function resolveDirectOutputPlaceholderConflicts(sourceNode) {
+  const subjectIds = state.edges
+    .filter((edgeItem) => edgeItem.source === sourceNode.id && isPlaceholderNode(getNode(edgeItem.target)))
+    .map((edgeItem) => edgeItem.target);
+  if (!subjectIds.length) return;
+  const protectedIds = new Set([sourceNode.id, ...subjectIds]);
+  const maxPasses = 80;
+  for (let pass = 0; pass < maxPasses; pass += 1) {
+    const conflict = findOutputPlaceholderConflict(subjectIds, protectedIds, sourceNode);
+    if (!conflict) break;
+    moveNodesBy(new Set(subjectIds), 0, conflict.dy);
+  }
+}
+
+function findOutputPlaceholderConflict(subjectIds, protectedIds, sourceNode) {
+  const subjects = subjectIds
+    .map((id) => getNode(id))
+    .filter(Boolean)
+    .sort((a, b) => a.y - b.y);
+  const candidates = state.nodes
+    .filter((nodeItem) => !protectedIds.has(nodeItem.id) && !isStartNode(nodeItem) && nodeItem.x >= sourceNode.x - NODE_W)
+    .sort((a, b) => a.y - b.y || a.x - b.x);
+  for (const subject of subjects) {
+    const subjectRect = layoutNodeBounds(subject);
+    for (const candidate of candidates) {
+      const candidateRect = layoutNodeBounds(candidate);
+      if (!rectsOverlap(subjectRect, candidateRect, 0)) continue;
+      const rawDy = candidateRect.y + candidateRect.height - subjectRect.y + NODE_DRAG_GRID_STEP;
+      const dy = Math.max(NODE_DRAG_GRID_STEP, snapToDragGrid(rawDy));
+      return { candidate, dy };
+    }
+  }
+  return null;
+}
+
+function layoutNodeBounds(nodeItem) {
+  return {
+    x: nodeItem.x - AUTO_LAYOUT_NODE_GAP_X,
+    y: nodeItem.y - AUTO_LAYOUT_NODE_GAP_Y / 2,
+    width: NODE_W + AUTO_LAYOUT_NODE_GAP_X * 2,
+    height: NODE_H + AUTO_LAYOUT_NODE_GAP_Y,
+  };
+}
+
+function moveNodesBy(nodeIds, dx, dy) {
+  nodeIds.forEach((nodeId) => {
+    const nodeItem = getNode(nodeId);
+    if (!nodeItem) return;
+    nodeItem.x = snapToDragGrid(nodeItem.x + dx);
+    nodeItem.y = snapToDragGrid(nodeItem.y + dy);
   });
 }
 
@@ -3656,7 +3878,7 @@ function conditionOutputs(nodeItem) {
       placeholder: true,
       icon: "row-data",
     })),
-    { key: "condition-not-matched", label: "Не соответствует условиям", tone: "plain", placeholder: true, icon: "fail" },
+    { key: "condition-not-matched", label: "Условия не выполнены", tone: "plain", placeholder: true, icon: "fail" },
   ]);
 }
 
@@ -3862,6 +4084,17 @@ function saveConnectOperationModal() {
   connectNodesManually(sourceId, targetId, outputKey);
 }
 
+function selectConnectOperationTarget(targetId, { save = false } = {}) {
+  if (!isConnectModalTargetAvailable(targetId)) return;
+  connectModalSelectedTargetId = targetId;
+  if (save) {
+    saveConnectOperationModal();
+    return;
+  }
+  renderConnectOperationModal();
+  focusConnectMapOnNode(targetId);
+}
+
 function firstAvailableConnectTargetId(sourceId, outputKey, replaceId = null) {
   return connectOperationTargets(sourceId, outputKey, replaceId).find((item) => item.available)?.node.id || null;
 }
@@ -3938,11 +4171,9 @@ function renderConnectOperationList() {
       ? `<div class="connect-operation-list-empty">Ничего не найдено</div>`
       : `<div class="connect-operation-list-empty is-board-empty">На доске пока нет операций</div>`;
   list.querySelectorAll("[data-connect-target]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", (event) => {
       if (button.classList.contains("is-disabled")) return;
-      connectModalSelectedTargetId = button.dataset.connectTarget;
-      renderConnectOperationModal();
-      focusConnectMapOnNode(connectModalSelectedTargetId);
+      selectConnectOperationTarget(button.dataset.connectTarget, { save: event.detail >= 2 });
     });
     button.addEventListener("mouseenter", (event) => {
       if (button.dataset.tooltip) showEdgeTooltip(event, button.dataset.tooltip, { immediate: true });
@@ -3958,6 +4189,7 @@ function renderConnectOperationMap() {
   const sourceNode = getNode(connectModalSourceId);
   const targets = new Map(connectOperationTargets().map((item) => [item.node.id, item]));
   const edgeMarkup = state.edges
+    .filter((edgeItem) => !isPlaceholderNode(getNode(edgeItem.source)) && !isPlaceholderNode(getNode(edgeItem.target)))
     .map((edgeItem) => `<path class="connect-map-edge" d="${edgePath(edgeItem)}"></path>`)
     .join("");
   const gridMarkup = connectMapGridMarkup(scenarioContentBounds());
@@ -3984,10 +4216,7 @@ function renderConnectOperationMap() {
     nodeEl.addEventListener("click", (event) => {
       event.stopPropagation();
       const targetId = nodeEl.dataset.connectMapNode;
-      if (!isConnectModalTargetAvailable(targetId)) return;
-      connectModalSelectedTargetId = targetId;
-      renderConnectOperationModal();
-      focusConnectMapOnNode(targetId);
+      selectConnectOperationTarget(targetId, { save: event.detail >= 2 });
     });
     nodeEl.addEventListener("mouseenter", (event) => {
       if (nodeEl.classList.contains("is-disabled")) showEdgeTooltip(event, nodeEl.dataset.tooltip || "Вход операции уже занят", { immediate: true });
@@ -5103,7 +5332,7 @@ function renderEmployeesTable(settings) {
             ${showOrder ? `<div class="settings-td is-order"><button class="drag-icon" type="button" data-drag-handle="${index}" title="Перетащить" aria-label="Перетащить">${iconSvg("drag-and-drop", 20)}</button><span class="order-badge">${index + 1}</span></div>` : ""}
             <div class="settings-td">${escapeHtml(employee.name)}</div>
             ${showTimeout ? `<div class="settings-td">${renderCellCounter(`employeeTimeout-${index}`, employee.timeout, index, { min: 1, max: 9999999 })}</div>` : ""}
-            <div class="settings-td is-switch"><button class="cmgui-switcher ${employee.enabled ? "is-active" : ""}" type="button" data-employee-index="${index}" aria-pressed="${employee.enabled}"><span></span></button></div>
+            <div class="settings-td is-switch"><button class="cmgui-switcher ${employee.enabled ? "is-active" : ""}" type="button" data-employee-index="${index}" aria-pressed="${employee.enabled}" data-tooltip="${employee.enabled ? "Сотрудник участвует в операции" : "Чат не будет переадресован этому сотруднику"}"><span></span></button></div>
           </div>`,
         )
         .join("")}
@@ -6844,6 +7073,7 @@ function syncDynamicOutputEdges(nodeItem) {
     if (output) edgeItem.label = output.label;
   });
   createOutputPlaceholdersFor(nodeItem);
+  resolveOutputPlaceholderConflicts(nodeItem.id);
 }
 
 function cssEscape(value) {
@@ -6916,6 +7146,7 @@ function openScenarioCreateModal() {
   });
   closeScenarioCreateDropdowns();
   renderScenarioCreateFinishSettings();
+  scenarioCreateInitialSettings = getScenarioCreateComparableSettings();
   document.body.classList.add("is-scenario-create-open");
   document.querySelector("#scenarioCreateModal").setAttribute("aria-hidden", "false");
   nameInput.focus();
@@ -6923,8 +7154,26 @@ function openScenarioCreateModal() {
 
 function closeScenarioCreateModal() {
   closeScenarioCreateDropdowns();
+  scenarioCreateInitialSettings = null;
   document.body.classList.remove("is-scenario-create-open");
   document.querySelector("#scenarioCreateModal").setAttribute("aria-hidden", "true");
+}
+
+function getScenarioCreateComparableSettings(settings = scenarioCreateSettings) {
+  const name = document.querySelector("#scenarioNameInput")?.value.trim() || "";
+  const normalized = normalizeComparableStartSettings(
+    createStartSettings({
+      ...settings,
+      name,
+      channels: getScenarioCreateSelectedChannels(),
+    })
+  );
+  return { ...normalized, name };
+}
+
+function isScenarioCreateDirty() {
+  if (!scenarioCreateInitialSettings) return false;
+  return JSON.stringify(getScenarioCreateComparableSettings()) !== JSON.stringify(scenarioCreateInitialSettings);
 }
 
 function toggleScenarioCreateChannelsDropdown() {
