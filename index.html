@@ -88,16 +88,20 @@
       </div>
 
       <div class="top-actions">
-        <div class="top-action-shell">
+        <div class="top-action-shell top-action-plate">
           <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost top-action-button top-action-timer" id="holdingMessagesButton" aria-label="Удерживающие сообщения" data-tooltip="Удерживающие сообщения">
             <span data-icon="message-16"></span>
             <span id="holdingMessagesCount">2</span>
           </button>
-        </div>
-        <div class="top-action-shell">
+          <div class="top-action-search" id="boardSearchBox">
+            <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button top-action-button" id="boardSearchToggle" aria-label="Поиск по доске" data-icon="search_16" data-tooltip="Поиск"></button>
+            <input class="top-action-search-input" id="boardSearchInput" type="search" placeholder="Найти операцию" aria-label="Найти операцию" />
+            <button class="top-action-search-clear" id="boardSearchClear" type="button" aria-label="Очистить поиск" title="Очистить" data-icon="cancel" hidden></button>
+            <span class="top-action-search-count" id="boardSearchCount" aria-live="polite" hidden></span>
+            <button class="top-action-search-nav" id="boardSearchPrev" type="button" aria-label="Предыдущее совпадение" data-icon="arrow-left-16" hidden></button>
+            <button class="top-action-search-nav" id="boardSearchNext" type="button" aria-label="Следующее совпадение" data-icon="arrow-right-16" hidden></button>
+          </div>
           <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button top-action-button" id="scenarioSettingsButton" aria-label="Настройки сценария" data-icon="settings-20" data-tooltip="Настройки сценария"></button>
-        </div>
-        <div class="top-action-shell">
           <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button top-action-button" aria-label="Руководство" data-icon="help" data-tooltip="Руководство"></button>
         </div>
       </div>

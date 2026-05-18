@@ -170,6 +170,8 @@ const icons = {
 };
 const designSystemIconFiles = {
   "arrow-left": "./assets/icons/arrow-left-16.svg",
+  "arrow-left-16": "./assets/icons/arrow-left-16.svg",
+  "arrow-right-16": "./assets/icons/arrow-left-16.svg",
   edit: "./assets/icons/edit-16.svg",
   undo: "./assets/icons/node-back-16.svg",
   redo: "./assets/icons/node-forward-16.svg",
@@ -210,6 +212,8 @@ const designSystemIconFiles = {
   "arrow-list-down": "./assets/icons/arrow-list-down_20.svg",
   "info-20": "./assets/icons/info_20.svg",
   "search-20": "./assets/icons/search_20.svg",
+  "search_16": "./assets/icons/search_16.svg",
+  "search-16": "./assets/icons/search_16.svg",
   "math-plus-20": "./assets/icons/math-plus_20.svg",
   "math-minus-20": "./assets/icons/math-minus_20.svg",
   "drag-and-drop": "./assets/icons/drag-and-drop_20.svg",
@@ -311,6 +315,10 @@ let scenarioTitleBeforeEdit = "";
 let isSettingsTitleEditing = false;
 let settingsTitleBeforeEdit = "";
 let scenarioSearchQuery = "";
+let boardSearchQuery = "";
+let isBoardSearchOpen = false;
+let boardSearchFocusedNodeId = null;
+let boardSearchActiveIndex = 0;
 let scenarioCreateSettings = createStartSettings({ channels: [] });
 let scenarioCreateInitialSettings = null;
 let holdingSettingsDraft = null;
@@ -438,6 +446,7 @@ function wireControls() {
       if (outcomeMenuSourceId && !event.target.closest("#outcomeMenu") && !event.target.closest(".node-add-button")) closeOutcomeMenu();
       if (contextMenuNodeId && !event.target.closest("#nodeContextMenu") && !event.target.closest(".node-more-icon")) closeNodeContextMenu();
       if (isScenarioTitleEditing && !event.target.closest(".top-title-wrap")) commitScenarioTitleEdit();
+      if (isBoardSearchOpen && !event.target.closest("#boardSearchBox") && !boardSearchQuery.trim()) closeBoardSearch();
       if (
         document.body.classList.contains("is-scenario-create-open") &&
         !event.target.closest(".scenario-create-channel-select, #scenarioCreateFinishToggle, .scenario-create-finish-settings")
@@ -507,6 +516,38 @@ function wireControls() {
   document.querySelector("#holdingMessagesButton").addEventListener("click", () => {
     if (!transferOperationOptions().length) return;
     openHoldingSettings();
+  });
+  document.querySelector("#boardSearchToggle").addEventListener("click", (event) => {
+    event.stopPropagation();
+    openBoardSearch();
+  });
+  document.querySelector("#boardSearchInput").addEventListener("input", (event) => {
+    boardSearchQuery = event.target.value;
+    boardSearchActiveIndex = 0;
+    updateBoardSearch();
+  });
+  document.querySelector("#boardSearchInput").addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      clearBoardSearch();
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      cycleBoardSearchResult(event.shiftKey ? -1 : 1);
+    }
+  });
+  document.querySelector("#boardSearchClear").addEventListener("click", (event) => {
+    event.stopPropagation();
+    clearBoardSearch(false);
+  });
+  document.querySelector("#boardSearchPrev").addEventListener("click", (event) => {
+    event.stopPropagation();
+    cycleBoardSearchResult(-1);
+  });
+  document.querySelector("#boardSearchNext").addEventListener("click", (event) => {
+    event.stopPropagation();
+    cycleBoardSearchResult(1);
   });
   document.querySelector("#scenarioSettingsButton").addEventListener("click", openScenarioSettings);
   document.querySelector("#holdingSettingsBackdrop").addEventListener("click", closeHoldingSettings);
@@ -953,6 +994,115 @@ function renderAppShell() {
   updateHoldingMessagesCount();
   updateSaveButton();
   updateZoomControls(d3.zoomTransform(svg.node()).k);
+  syncBoardSearchUi();
+}
+
+function openBoardSearch() {
+  isBoardSearchOpen = true;
+  syncBoardSearchUi();
+  requestAnimationFrame(() => document.querySelector("#boardSearchInput")?.focus());
+}
+
+function closeBoardSearch() {
+  isBoardSearchOpen = false;
+  syncBoardSearchUi();
+}
+
+function clearBoardSearch(closeSearch = true) {
+  boardSearchQuery = "";
+  boardSearchFocusedNodeId = null;
+  boardSearchActiveIndex = 0;
+  const input = document.querySelector("#boardSearchInput");
+  if (input) input.value = "";
+  if (closeSearch) closeBoardSearch();
+  else syncBoardSearchUi();
+  renderNodes();
+  if (!closeSearch) requestAnimationFrame(() => input?.focus());
+}
+
+function syncBoardSearchUi() {
+  document.body.classList.toggle("is-board-search-open", isBoardSearchOpen);
+  const box = document.querySelector("#boardSearchBox");
+  const input = document.querySelector("#boardSearchInput");
+  const clearButton = document.querySelector("#boardSearchClear");
+  const count = document.querySelector("#boardSearchCount");
+  const prevButton = document.querySelector("#boardSearchPrev");
+  const nextButton = document.querySelector("#boardSearchNext");
+  const matches = getBoardSearchMatches();
+  const hasQuery = Boolean(boardSearchQuery.trim());
+  if (box) box.classList.toggle("is-open", isBoardSearchOpen);
+  if (input && input.value !== boardSearchQuery) input.value = boardSearchQuery;
+  if (clearButton) {
+    clearButton.hidden = !isBoardSearchOpen;
+    clearButton.disabled = !hasQuery;
+  }
+  if (count) {
+    count.hidden = !hasQuery;
+    count.textContent = hasQuery ? `${matches.length ? getBoardSearchActiveIndex(matches) + 1 : 0}/${matches.length}` : "";
+  }
+  [prevButton, nextButton].forEach((button) => {
+    if (!button) return;
+    button.hidden = !isBoardSearchOpen;
+    button.disabled = matches.length <= 1;
+  });
+}
+
+function updateBoardSearch() {
+  const matches = getBoardSearchMatches();
+  if (!boardSearchQuery.trim()) {
+    boardSearchFocusedNodeId = null;
+    boardSearchActiveIndex = 0;
+    syncBoardSearchUi();
+    renderNodes();
+    return;
+  }
+  if (!matches.length) {
+    boardSearchFocusedNodeId = null;
+    boardSearchActiveIndex = 0;
+    syncBoardSearchUi();
+    renderNodes();
+    return;
+  }
+  boardSearchActiveIndex = getBoardSearchActiveIndex(matches);
+  const activeMatch = matches[boardSearchActiveIndex];
+  const shouldFocus = activeMatch.id !== boardSearchFocusedNodeId;
+  boardSearchFocusedNodeId = activeMatch.id;
+  syncBoardSearchUi();
+  renderNodes();
+  if (shouldFocus) focusBoardOnNode(activeMatch.id);
+}
+
+function cycleBoardSearchResult(direction) {
+  const matches = getBoardSearchMatches();
+  if (!matches.length) return;
+  boardSearchActiveIndex = (getBoardSearchActiveIndex(matches) + direction + matches.length) % matches.length;
+  boardSearchFocusedNodeId = matches[boardSearchActiveIndex].id;
+  syncBoardSearchUi();
+  renderNodes();
+  focusBoardOnNode(boardSearchFocusedNodeId);
+}
+
+function getBoardSearchActiveIndex(matches = getBoardSearchMatches()) {
+  if (!matches.length) return 0;
+  const focusedIndex = matches.findIndex((nodeItem) => nodeItem.id === boardSearchFocusedNodeId);
+  if (focusedIndex >= 0) return focusedIndex;
+  return Math.max(0, Math.min(boardSearchActiveIndex, matches.length - 1));
+}
+
+function getBoardSearchMatches() {
+  const query = normalizeSearchText(boardSearchQuery);
+  if (!query) return [];
+  return state.nodes.filter((nodeItem) => {
+    if (isPlaceholderNode(nodeItem)) return false;
+    const values = [nodeItem.title, nodeItem.subtitle, settingsTitleForNode(nodeItem)];
+    return values.some((value) => normalizeSearchText(value).includes(query));
+  });
+}
+
+function normalizeSearchText(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase();
 }
 
 function renderScenarioList() {
@@ -1034,6 +1184,8 @@ function scenarioGroups(scenarioItem) {
 
 function renderNodes() {
   const reachableNodeIds = getReachableScenarioNodeIds();
+  const boardSearchMatchIds = new Set(getBoardSearchMatches().map((nodeItem) => nodeItem.id));
+  const boardSearchActiveId = boardSearchQuery.trim() ? boardSearchFocusedNodeId : null;
   const nodes = nodeLayer.selectAll(".scenario-node-svg").data(state.nodes, (d) => d.id);
   nodes.exit().remove();
   const enter = nodes
@@ -1148,6 +1300,8 @@ function renderNodes() {
     .classed("is-placeholder", (d) => isPlaceholderNode(d))
     .classed("is-outside-scenario", (d) => !reachableNodeIds.has(d.id))
     .classed("is-settings-invalid", (d) => hasInvalidNodeSettings(d))
+    .classed("is-search-match", (d) => boardSearchMatchIds.has(d.id))
+    .classed("is-search-active", (d) => d.id === boardSearchActiveId)
     .on("mouseenter", function (event, d) {
       if (draggedNodeId === d.id) return;
       hoveredId = d.id;
@@ -3563,6 +3717,7 @@ function resolveOutputPlaceholderConflicts(sourceNodeId) {
   const hadSiblingConflicts = resolveSiblingBranchConflicts(sourceNode);
   if (!hadSiblingConflicts) resolveDirectOutputPlaceholderConflicts(sourceNode);
   resolveBranchHorizontalConflicts(sourceNode);
+  resolveCrossBranchConflicts(sourceNode);
 }
 
 function resolveSiblingBranchConflicts(sourceNode) {
@@ -3587,13 +3742,7 @@ function resolveSiblingBranchConflicts(sourceNode) {
 function branchLayoutZone(rootId) {
   const rootNode = getNode(rootId);
   if (!rootNode || isStartNode(rootNode)) return null;
-  const nodeIds = new Set([rootNode.id]);
-  state.edges.forEach((edgeItem) => {
-    if (edgeItem.source !== rootNode.id) return;
-    const targetNode = getNode(edgeItem.target);
-    if (!isPlaceholderNode(targetNode)) return;
-    nodeIds.add(targetNode.id);
-  });
+  const nodeIds = collectBranchLayoutNodeIds(rootNode);
   const rects = Array.from(nodeIds).map((nodeId) => layoutNodeBounds(getNode(nodeId))).filter(Boolean);
   if (!rects.length) return null;
   const bounds = unionRects(rects);
@@ -3603,6 +3752,27 @@ function branchLayoutZone(rootId) {
     bounds,
     centerY: bounds.y + bounds.height / 2,
   };
+}
+
+function collectBranchLayoutNodeIds(rootNode) {
+  const nodeIds = new Set();
+  const minX = rootNode.x - NODE_W;
+  const queue = [rootNode.id];
+  while (queue.length) {
+    const nodeId = queue.shift();
+    if (nodeIds.has(nodeId)) continue;
+    const nodeItem = getNode(nodeId);
+    if (!nodeItem || isStartNode(nodeItem)) continue;
+    if (nodeItem.x < minX && nodeItem.id !== rootNode.id) continue;
+    nodeIds.add(nodeId);
+    state.edges.forEach((edgeItem) => {
+      if (edgeItem.source !== nodeId || nodeIds.has(edgeItem.target)) return;
+      const targetNode = getNode(edgeItem.target);
+      if (!targetNode || isStartNode(targetNode)) return;
+      queue.push(edgeItem.target);
+    });
+  }
+  return nodeIds;
 }
 
 function branchZonesOverlap(zones) {
@@ -3672,6 +3842,65 @@ function findBranchHorizontalConflict(zone, sourceNode) {
   const rawDx = zoneRect.x + zoneRect.width - candidateRect.x + AUTO_LAYOUT_BRANCH_GAP_X;
   const dx = Math.max(NODE_DRAG_GRID_STEP, snapToDragGrid(rawDx));
   return { nodeIds: collectRightSideMoveIds(candidate.id, sourceNode.x, zone.nodeIds), dx };
+}
+
+function resolveCrossBranchConflicts(sourceNode) {
+  if (!sourceNode || isStartNode(sourceNode)) return;
+  const maxPasses = 80;
+  for (let pass = 0; pass < maxPasses; pass += 1) {
+    const sourceZone = branchLayoutZone(sourceNode.id);
+    if (!sourceZone) return;
+    const conflict = findCrossBranchConflict(sourceZone, sourceNode);
+    if (!conflict) return;
+    moveNodesBy(conflict.nodeIds, 0, conflict.dy);
+  }
+}
+
+function findCrossBranchConflict(sourceZone, sourceNode) {
+  const protectedIds = new Set(sourceZone.nodeIds);
+  collectAncestorNodeIds(sourceNode.id).forEach((nodeId) => protectedIds.add(nodeId));
+  const sourceRect = {
+    x: sourceZone.bounds.x,
+    y: sourceZone.bounds.y,
+    width: sourceZone.bounds.width,
+    height: sourceZone.bounds.height,
+  };
+  const checkedSignatures = new Set();
+  const zones = state.nodes
+    .filter((nodeItem) => !protectedIds.has(nodeItem.id) && !isStartNode(nodeItem))
+    .map((nodeItem) => branchLayoutZone(nodeItem.id))
+    .filter(Boolean)
+    .filter((zone) => {
+      if ([...zone.nodeIds].some((nodeId) => protectedIds.has(nodeId))) return false;
+      const signature = [...zone.nodeIds].sort().join("|");
+      if (checkedSignatures.has(signature)) return false;
+      checkedSignatures.add(signature);
+      return rectsOverlap(sourceRect, zone.bounds, 0);
+    })
+    .sort((a, b) => Math.abs(a.centerY - sourceZone.centerY) - Math.abs(b.centerY - sourceZone.centerY) || a.bounds.x - b.bounds.x);
+  const zone = zones[0];
+  if (!zone) return null;
+  const placeBelow = zone.centerY >= sourceZone.centerY;
+  const rawDy = placeBelow
+    ? sourceZone.bounds.y + sourceZone.bounds.height + AUTO_LAYOUT_BRANCH_GAP_Y - zone.bounds.y
+    : sourceZone.bounds.y - AUTO_LAYOUT_BRANCH_GAP_Y - (zone.bounds.y + zone.bounds.height);
+  const dy = snapToDragGrid(rawDy);
+  if (!dy) return null;
+  return { nodeIds: zone.nodeIds, dy };
+}
+
+function collectAncestorNodeIds(nodeId) {
+  const ancestors = new Set();
+  const queue = [nodeId];
+  while (queue.length) {
+    const currentId = queue.shift();
+    state.edges.forEach((edgeItem) => {
+      if (edgeItem.target !== currentId || ancestors.has(edgeItem.source)) return;
+      ancestors.add(edgeItem.source);
+      queue.push(edgeItem.source);
+    });
+  }
+  return ancestors;
 }
 
 function collectRightSideMoveIds(rootNodeId, minX = -Infinity, blockedIds = new Set()) {
@@ -6784,6 +7013,7 @@ function saveNodeSettings(nodeItem, settings) {
   }
   nodeItem.settings = { ...(nodeItem.settings || {}), groupTransfer: createGroupTransferSettings(settings) };
   applyGroupTransferTitle(nodeItem, nodeItem.settings.groupTransfer);
+  syncDynamicOutputEdges(nodeItem);
 }
 
 function saveStartSettings(nodeItem, settings) {
@@ -7897,6 +8127,18 @@ function fitToContent() {
   const tx = (rect.width - (bounds.maxX + bounds.minX) * scale) / 2;
   const ty = (rect.height - (bounds.maxY + bounds.minY) * scale) / 2;
   svg.transition().duration(280).call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
+}
+
+function focusBoardOnNode(nodeId) {
+  const nodeItem = getNode(nodeId);
+  const svgEl = svg.node();
+  if (!nodeItem || !svgEl) return;
+  const rect = svgEl.getBoundingClientRect();
+  const currentScale = d3.zoomTransform(svgEl).k;
+  const scale = Math.max(0.65, Math.min(1, currentScale || 1));
+  const tx = rect.width / 2 - (nodeItem.x + NODE_W / 2) * scale;
+  const ty = rect.height / 2 - (nodeItem.y + NODE_H / 2) * scale;
+  svg.transition().duration(220).call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
 }
 
 function setZoom100() {
