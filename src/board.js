@@ -3568,6 +3568,7 @@ function replaceNodeFromOperation(replaceId, kind, operationType = null) {
   configureNodeForOperation(nextNode, operationType);
   Object.assign(target, nextNode);
   target.muted = Boolean(catalog[kind]?.muted);
+  pruneExcessIncomingEdgesFor(replaceId);
   const outputsByKey = new Map(nodeOutputs(target).map((output) => [output.key, output]));
   const keptTargetIds = new Set();
   state.edges = state.edges.filter((edgeItem) => {
@@ -3586,6 +3587,20 @@ function replaceNodeFromOperation(replaceId, kind, operationType = null) {
   render();
   schedulePersistState();
   return replaceId;
+}
+
+function pruneExcessIncomingEdgesFor(nodeId) {
+  const targetNode = getNode(nodeId);
+  if (!targetNode || isTransferOperationNode(targetNode)) return;
+  const incomingEdges = state.edges.filter((edgeItem) => edgeItem.target === nodeId);
+  if (incomingEdges.length <= 1) return;
+  const removedEdgeIds = new Set(incomingEdges.slice(1).map((edgeItem) => edgeItem.id));
+  state.edges = state.edges.filter((edgeItem) => !removedEdgeIds.has(edgeItem.id));
+  if (removedEdgeIds.has(selectedEdgeId)) selectedEdgeId = null;
+  if (removedEdgeIds.has(hoveredEdgeId)) hoveredEdgeId = null;
+  bulkSelectedEdgeIds.forEach((edgeId) => {
+    if (removedEdgeIds.has(edgeId)) bulkSelectedEdgeIds.delete(edgeId);
+  });
 }
 
 function removeDetachedPlaceholderTargets(candidateIds, keptIds = new Set()) {
