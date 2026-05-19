@@ -2163,8 +2163,8 @@ function edgeLabelSegmentIndexes(edgeItem, points) {
     if (
       Math.abs(point.y - labelCenterY) < 0.5 &&
       Math.abs(next.y - labelCenterY) < 0.5 &&
-      Math.min(point.x, next.x) <= labelRight + 0.5 &&
-      Math.max(point.x, next.x) >= labelLeft - 0.5
+      Math.min(point.x, next.x) < labelRight - 0.5 &&
+      Math.max(point.x, next.x) > labelLeft + 0.5
     ) {
       indexes.add(index);
     }
