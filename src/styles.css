@@ -766,6 +766,10 @@ body.is-board-panning #scenarioSvg {
   fill: var(--cmgui-color-special-13);
 }
 
+#arrowScheduleActive path {
+  fill: var(--cmgui-color-bg-accent);
+}
+
 .scenario-node-svg {
   cursor: grab;
 }
@@ -889,7 +893,10 @@ body.is-board-panning #scenarioSvg {
   cursor: pointer;
 }
 
-.scenario-node-svg.is-connection-muted {
+.scenario-node-svg.is-connection-muted,
+.scenario-node-svg.is-schedule-filter-muted,
+.scenario-edge-group.is-schedule-filter-muted,
+.edge-label-svg.is-schedule-filter-muted {
   opacity: 0.5;
 }
 
@@ -1578,6 +1585,13 @@ body.is-board-panning #scenarioSvg {
 
 .top-actions .top-action-button.icon-button {
   width: 32px;
+}
+
+.top-actions .top-action-button.is-active,
+.top-actions .top-action-button.is-active:hover {
+  border-radius: 50%;
+  color: var(--cmgui-color-icon-accent);
+  background: var(--cmgui-color-bg-accent-opacity);
 }
 
 .icon-button.is-compact {

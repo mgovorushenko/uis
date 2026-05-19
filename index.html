@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Сценарии обработки чатов</title>
-    <link rel="stylesheet" href="./src/styles.css?v=2026-05-19-001" />
+    <link rel="stylesheet" href="./src/styles.css?v=2026-05-19-003" />
   </head>
   <body>
     <main class="app-shell">
@@ -30,6 +30,9 @@
               <path d="M 0 0 L 10 5 L 0 10 z"></path>
             </marker>
             <marker id="arrowAccent" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z"></path>
+            </marker>
+            <marker id="arrowScheduleActive" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
               <path d="M 0 0 L 10 5 L 0 10 z"></path>
             </marker>
           </defs>
@@ -101,6 +104,7 @@
             <button class="top-action-search-nav" id="boardSearchPrev" type="button" aria-label="Предыдущее совпадение" data-icon="arrow-left-16" hidden></button>
             <button class="top-action-search-nav" id="boardSearchNext" type="button" aria-label="Следующее совпадение" data-icon="arrow-right-16" hidden></button>
           </div>
+          <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button top-action-button" id="inactiveScheduleFilterButton" aria-label="Скрыть операции по неактивному графику" aria-pressed="false" data-icon="filter_20" data-tooltip="Скрыть операции по неактивному графику"></button>
           <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button top-action-button" id="scenarioSettingsButton" aria-label="Настройки сценария" data-icon="settings-20" data-tooltip="Настройки сценария"></button>
           <button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button top-action-button" aria-label="Руководство" data-icon="help" data-tooltip="Руководство"></button>
         </div>
@@ -315,6 +319,6 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
-    <script src="./src/board.js?v=2026-05-19-003"></script>
+    <script src="./src/board.js?v=2026-05-19-006"></script>
   </body>
 </html>

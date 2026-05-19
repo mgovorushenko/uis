@@ -77,6 +77,7 @@ const SCHEDULE_MAX_COUNT = 20;
 const SEGMENT_MAX_COUNT = 20;
 const CONDITION_MAX_COUNT = 20;
 const EDGE_LABEL_MAX_WIDTH = 160;
+const ACTIVE_SCHEDULE_OUTPUT_NAMES = new Set(["Будние дни", "Рабочее время"]);
 const AVAILABLE_SCHEDULES = [
   "Будние дни",
   "Праздники",
@@ -238,6 +239,7 @@ const designSystemIconFiles = {
   "source-max-20": "./assets/icons/source-max_20.svg",
   "source-telegram-20": "./assets/icons/source-telegram_20.svg",
   "source-whatsapp-20": "./assets/icons/source-whatsapp_20.svg",
+  filter_20: "./assets/icons/filter_20.svg",
 };
 const designSystemIcons = {};
 
@@ -319,6 +321,8 @@ let boardSearchQuery = "";
 let isBoardSearchOpen = false;
 let boardSearchFocusedNodeId = null;
 let boardSearchActiveIndex = 0;
+let hideInactiveScheduleBranches = false;
+let inactiveScheduleFilterState = { mutedNodeIds: new Set(), mutedEdgeIds: new Set() };
 let scenarioCreateSettings = createStartSettings({ channels: [] });
 let scenarioCreateInitialSettings = null;
 let holdingSettingsDraft = null;
@@ -548,6 +552,11 @@ function wireControls() {
   document.querySelector("#boardSearchNext").addEventListener("click", (event) => {
     event.stopPropagation();
     cycleBoardSearchResult(1);
+  });
+  document.querySelector("#inactiveScheduleFilterButton")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    hideInactiveScheduleBranches = !hideInactiveScheduleBranches;
+    render();
   });
   document.querySelector("#scenarioSettingsButton").addEventListener("click", openScenarioSettings);
   document.querySelector("#holdingSettingsBackdrop").addEventListener("click", closeHoldingSettings);
@@ -968,6 +977,7 @@ function drawGrid(transform = d3.zoomTransform(svg.node())) {
 }
 
 function render() {
+  inactiveScheduleFilterState = buildInactiveScheduleFilterState();
   renderEdges();
   renderNodes();
   renderSelectionOverlay();
@@ -975,6 +985,7 @@ function render() {
   renderNodeSettingsSidebar();
   renderHoldingSettingsSidebar();
   updateHoldingMessagesCount();
+  updateInactiveScheduleFilterButton();
   updateHistoryButtons();
 }
 
@@ -993,8 +1004,16 @@ function renderAppShell() {
   }
   updateHoldingMessagesCount();
   updateSaveButton();
+  updateInactiveScheduleFilterButton();
   updateZoomControls(d3.zoomTransform(svg.node()).k);
   syncBoardSearchUi();
+}
+
+function updateInactiveScheduleFilterButton() {
+  const button = document.querySelector("#inactiveScheduleFilterButton");
+  if (!button) return;
+  button.classList.toggle("is-active", hideInactiveScheduleBranches);
+  button.setAttribute("aria-pressed", hideInactiveScheduleBranches ? "true" : "false");
 }
 
 function openBoardSearch() {
@@ -1183,6 +1202,7 @@ function scenarioGroups(scenarioItem) {
 }
 
 function renderNodes() {
+  inactiveScheduleFilterState = buildInactiveScheduleFilterState();
   const reachableNodeIds = getReachableScenarioNodeIds();
   const boardSearchMatchIds = new Set(getBoardSearchMatches().map((nodeItem) => nodeItem.id));
   const boardSearchActiveId = boardSearchQuery.trim() ? boardSearchFocusedNodeId : null;
@@ -1294,6 +1314,7 @@ function renderNodes() {
     .classed("is-bulk-selected", (d) => bulkSelectedNodeIds.has(d.id))
     .classed("is-hovered", (d) => d.id === hoveredId)
     .classed("is-connection-muted", (d) => isNodeMutedDuringConnection(d))
+    .classed("is-schedule-filter-muted", (d) => isNodeMutedByInactiveScheduleFilter(d))
     .classed("is-connection-available", (d) => Boolean(connectionDrag && isValidConnectionTarget(d, connectionDrag)))
     .classed("is-connection-target-node", (d) => Boolean(connectionDrag?.targetId === d.id))
     .classed("is-muted", (d) => d.muted)
@@ -1875,6 +1896,7 @@ function snapToDragGrid(value) {
 }
 
 function renderEdges() {
+  inactiveScheduleFilterState = buildInactiveScheduleFilterState();
   edgeLabelPlacements = buildEdgeLabelPlacements();
   const edgeGroups = edgeLayer.selectAll(".scenario-edge-group").data(state.edges, (d) => d.id);
   edgeGroups.exit().remove();
@@ -1884,6 +1906,7 @@ function renderEdges() {
   edgeGroupsEnter.merge(edgeGroups).each(function (d) {
     const group = d3.select(this);
     const path = edgePath(d);
+    group.classed("is-schedule-filter-muted", isEdgeMutedByInactiveScheduleFilter(d));
     group
       .select(".scenario-edge-hitarea")
       .attr("d", path)
@@ -1910,7 +1933,7 @@ function renderEdges() {
       .select(".scenario-edge")
       .attr("d", path)
       .attr("stroke", edgeColor(d))
-      .attr("marker-end", isEdgeActive(d) ? "url(#arrowAccent)" : "url(#arrowPlain)");
+      .attr("marker-end", edgeMarker(d));
     renderEdgeSegmentHandles(group, d);
   });
 
@@ -1936,6 +1959,7 @@ function renderEdges() {
     const width = d.__labelWidth || EDGE_LABEL_MAX_WIDTH;
     const placement = edgeLabelPlacements.get(d.id) || edgeLabelRect(d, width);
     group.attr("transform", `translate(${placement.x},${placement.y})`).attr("class", "edge-label-svg");
+    group.classed("is-schedule-filter-muted", isEdgeMutedByInactiveScheduleFilter(d));
     group.select("rect").attr("width", width).attr("height", 24).attr("fill", edgeColor(d));
     text.attr("x", EDGE_LABEL_PADDING_X).attr("y", 12).attr("fill", "white").attr("font", "var(--cmgui-font-caption)");
     group
@@ -2969,8 +2993,70 @@ function isEdgeActive(edgeItem) {
   return edgeItem.id === selectedEdgeId || edgeItem.id === hoveredEdgeId || bulkSelectedEdgeIds.has(edgeItem.id);
 }
 
+function isNodeMutedByInactiveScheduleFilter(nodeItem) {
+  return inactiveScheduleFilterState.mutedNodeIds.has(nodeItem.id);
+}
+
+function isEdgeMutedByInactiveScheduleFilter(edgeItem) {
+  return inactiveScheduleFilterState.mutedEdgeIds.has(edgeItem.id);
+}
+
+function isActiveScheduleEdge(edgeItem) {
+  const sourceNode = getNode(edgeItem.source);
+  if (!isScheduleNode(sourceNode)) return false;
+  const schedule = getScheduleSettings(sourceNode).schedules.find((item) => item.id === edgeItem.outputKey);
+  return ACTIVE_SCHEDULE_OUTPUT_NAMES.has(schedule?.name || edgeItem.label || "");
+}
+
+function isInactiveScheduleEdge(edgeItem) {
+  const sourceNode = getNode(edgeItem.source);
+  if (!isScheduleNode(sourceNode)) return false;
+  const schedule = getScheduleSettings(sourceNode).schedules.find((item) => item.id === edgeItem.outputKey);
+  return !ACTIVE_SCHEDULE_OUTPUT_NAMES.has(schedule?.name || edgeItem.label || "");
+}
+
+function buildInactiveScheduleFilterState() {
+  const mutedNodeIds = new Set();
+  const mutedEdgeIds = new Set();
+  if (!hideInactiveScheduleBranches) return { mutedNodeIds, mutedEdgeIds };
+
+  const activeReachable = getReachableScenarioNodeIds({ ignoreEdge: isInactiveScheduleEdge });
+  const inactiveEdges = state.edges.filter(isInactiveScheduleEdge);
+  const queue = [];
+
+  inactiveEdges.forEach((edgeItem) => {
+    mutedEdgeIds.add(edgeItem.id);
+    if (!activeReachable.has(edgeItem.target) && !mutedNodeIds.has(edgeItem.target)) {
+      mutedNodeIds.add(edgeItem.target);
+      queue.push(edgeItem.target);
+    }
+  });
+
+  while (queue.length) {
+    const nodeId = queue.shift();
+    state.edges.forEach((edgeItem) => {
+      if (edgeItem.source !== nodeId) return;
+      mutedEdgeIds.add(edgeItem.id);
+      if (!activeReachable.has(edgeItem.target) && !mutedNodeIds.has(edgeItem.target)) {
+        mutedNodeIds.add(edgeItem.target);
+        queue.push(edgeItem.target);
+      }
+    });
+  }
+
+  return { mutedNodeIds, mutedEdgeIds };
+}
+
 function edgeColor(edgeItem) {
-  return isEdgeActive(edgeItem) ? "var(--cmgui-color-special-13)" : colorForTone(edgeItem);
+  if (isEdgeActive(edgeItem)) return "var(--cmgui-color-special-13)";
+  if (isActiveScheduleEdge(edgeItem)) return "var(--cmgui-color-bg-accent)";
+  return colorForTone(edgeItem);
+}
+
+function edgeMarker(edgeItem) {
+  if (isEdgeActive(edgeItem)) return "url(#arrowAccent)";
+  if (isActiveScheduleEdge(edgeItem)) return "url(#arrowScheduleActive)";
+  return "url(#arrowPlain)";
 }
 
 function showEdgeTooltip(event, text, options = {}) {
@@ -4142,7 +4228,8 @@ function isPlaceholderNode(nodeItem) {
   return nodeItem?.kind === "empty";
 }
 
-function getReachableScenarioNodeIds() {
+function getReachableScenarioNodeIds(options = {}) {
+  const ignoreEdge = typeof options.ignoreEdge === "function" ? options.ignoreEdge : null;
   const startNode = state.nodes.find((nodeItem) => isStartNode(nodeItem)) || state.nodes[0];
   const reachable = new Set();
   if (!startNode) return reachable;
@@ -4152,6 +4239,7 @@ function getReachableScenarioNodeIds() {
     if (reachable.has(nodeId)) continue;
     reachable.add(nodeId);
     state.edges.forEach((edgeItem) => {
+      if (ignoreEdge?.(edgeItem)) return;
       if (edgeItem.source === nodeId && !reachable.has(edgeItem.target)) queue.push(edgeItem.target);
     });
   }
