@@ -323,6 +323,7 @@ let boardSearchFocusedNodeId = null;
 let boardSearchActiveIndex = 0;
 let hideInactiveScheduleBranches = false;
 let inactiveScheduleFilterState = { mutedNodeIds: new Set(), mutedEdgeIds: new Set() };
+let activeScheduleBranchEdgeIds = new Set();
 let scenarioCreateSettings = createStartSettings({ channels: [] });
 let scenarioCreateInitialSettings = null;
 let holdingSettingsDraft = null;
@@ -1897,6 +1898,7 @@ function snapToDragGrid(value) {
 
 function renderEdges() {
   inactiveScheduleFilterState = buildInactiveScheduleFilterState();
+  activeScheduleBranchEdgeIds = buildActiveScheduleBranchEdgeIds();
   edgeLabelPlacements = buildEdgeLabelPlacements();
   const edgeGroups = edgeLayer.selectAll(".scenario-edge-group").data(state.edges, (d) => d.id);
   edgeGroups.exit().remove();
@@ -3001,11 +3003,15 @@ function isEdgeMutedByInactiveScheduleFilter(edgeItem) {
   return inactiveScheduleFilterState.mutedEdgeIds.has(edgeItem.id);
 }
 
-function isActiveScheduleEdge(edgeItem) {
+function isDirectActiveScheduleEdge(edgeItem) {
   const sourceNode = getNode(edgeItem.source);
   if (!isScheduleNode(sourceNode)) return false;
   const schedule = getScheduleSettings(sourceNode).schedules.find((item) => item.id === edgeItem.outputKey);
   return ACTIVE_SCHEDULE_OUTPUT_NAMES.has(schedule?.name || edgeItem.label || "");
+}
+
+function isActiveScheduleEdge(edgeItem) {
+  return activeScheduleBranchEdgeIds.has(edgeItem.id);
 }
 
 function isInactiveScheduleEdge(edgeItem) {
@@ -3013,6 +3019,34 @@ function isInactiveScheduleEdge(edgeItem) {
   if (!isScheduleNode(sourceNode)) return false;
   const schedule = getScheduleSettings(sourceNode).schedules.find((item) => item.id === edgeItem.outputKey);
   return !ACTIVE_SCHEDULE_OUTPUT_NAMES.has(schedule?.name || edgeItem.label || "");
+}
+
+function buildActiveScheduleBranchEdgeIds() {
+  const activeEdgeIds = new Set();
+  const queue = [];
+  const visitedNodeIds = new Set();
+
+  state.edges.forEach((edgeItem) => {
+    if (!isDirectActiveScheduleEdge(edgeItem)) return;
+    activeEdgeIds.add(edgeItem.id);
+    queue.push(edgeItem.target);
+  });
+
+  while (queue.length) {
+    const nodeId = queue.shift();
+    if (visitedNodeIds.has(nodeId)) continue;
+    visitedNodeIds.add(nodeId);
+    state.edges.forEach((edgeItem) => {
+      if (edgeItem.source !== nodeId) return;
+      if (isInactiveScheduleEdge(edgeItem)) return;
+      if (!activeEdgeIds.has(edgeItem.id)) {
+        activeEdgeIds.add(edgeItem.id);
+        queue.push(edgeItem.target);
+      }
+    });
+  }
+
+  return activeEdgeIds;
 }
 
 function buildInactiveScheduleFilterState() {
