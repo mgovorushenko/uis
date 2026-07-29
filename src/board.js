@@ -2009,10 +2009,10 @@ function renderEdges() {
     .attr("class", "scenario-edge-wire-flow-mask-trail-animation")
     .attr("attributeName", "stroke-dashoffset")
     .attr("begin", "0s")
-    .attr("dur", "3s")
+    .attr("dur", "2.7s")
     .attr("calcMode", "spline")
     .attr("keyTimes", "0;1")
-    .attr("keySplines", "0.42 0 0.58 1")
+    .attr("keySplines", "0.25 0.8 0.5 1")
     .attr("repeatCount", "indefinite");
   edgeGroupsEnter
     .append("path")
