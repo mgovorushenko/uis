@@ -774,6 +774,25 @@ body.is-board-panning #scenarioSvg {
   cursor: grab;
 }
 
+.node-collapse-stack {
+  display: none;
+  fill: var(--cmgui-color-bg-main-white);
+  stroke: var(--cmgui-color-border-primary);
+  stroke-width: 1;
+  filter: drop-shadow(var(--shadow-node));
+  pointer-events: none;
+}
+
+.scenario-node-svg.is-branch-collapsed .node-collapse-stack {
+  display: block;
+}
+
+.node-collapse-stack-back,
+.node-collapse-stack-middle {
+  fill: var(--cmgui-color-bg-main-white);
+  opacity: 1;
+}
+
 .node-hover-zone {
   fill: transparent;
   pointer-events: all;
@@ -785,6 +804,11 @@ body.is-board-panning #scenarioSvg {
   stroke-width: 1;
   filter: drop-shadow(var(--shadow-node));
   transition: opacity 120ms ease;
+}
+
+.scenario-node-svg.is-branch-collapsed .node-card,
+.scenario-node-svg.is-branch-collapsed .node-hover-card {
+  stroke: var(--cmgui-color-border-primary);
 }
 
 .node-hover-card {
@@ -825,7 +849,7 @@ body.is-board-panning #scenarioSvg {
 
 .scenario-node-svg.is-search-active .node-card,
 .scenario-node-svg.is-search-active .node-hover-card {
-  stroke-width: 2;
+  stroke-width: 3;
 }
 
 .node-icon-svg {
@@ -1033,6 +1057,44 @@ body.is-board-panning #scenarioSvg {
   fill: none;
   stroke-width: 1;
   pointer-events: none;
+}
+
+.scenario-edge-wire-flow {
+  display: none;
+  fill: none;
+  stroke: #79dda9;
+  stroke-width: var(--wire-flow-stroke-width, 3px);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.scenario-edge-group.has-wire-flow .scenario-edge-wire-flow {
+  display: block;
+}
+
+.scenario-edge-group.has-wire-flow.is-edge-active .scenario-edge-wire-flow {
+  stroke: #aebcff;
+}
+
+.scenario-edge-signal-pulse {
+  display: none;
+  fill: #62d99c;
+  filter:
+    drop-shadow(0 0 3px rgba(73, 184, 128, 0.95))
+    drop-shadow(0 0 7px rgba(98, 217, 156, 0.52));
+  pointer-events: none;
+}
+
+.scenario-edge-group.has-active-schedule-signal .scenario-edge-signal-pulse {
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scenario-edge-group.has-wire-flow .scenario-edge-wire-flow,
+  .scenario-edge-group.has-active-schedule-signal .scenario-edge-signal-pulse {
+    display: none;
+  }
 }
 
 .bulk-selection-rect {
@@ -3341,8 +3403,22 @@ body.is-holding-settings-open .holding-settings-sidebar {
   filter: drop-shadow(var(--shadow-node));
 }
 
+.connect-map-node-stack {
+  fill: var(--cmgui-color-bg-main-white);
+  stroke: var(--cmgui-color-border-primary);
+  stroke-width: 1;
+  filter: drop-shadow(var(--shadow-node));
+  pointer-events: none;
+}
+
+.connect-map-node.is-branch-collapsed .connect-map-node-card {
+  stroke: var(--cmgui-color-border-primary);
+  stroke-width: 1;
+}
+
 .connect-map-node.is-selected .connect-map-node-card {
   stroke: var(--cmgui-color-special-13);
+  stroke-width: 2;
 }
 
 .connect-map-node-icon {

@@ -28,6 +28,9 @@ const AUTO_LAYOUT_NODE_GAP_Y = 28;
 const AUTO_LAYOUT_NODE_GAP_X = 16;
 const AUTO_LAYOUT_BRANCH_GAP_Y = 36;
 const AUTO_LAYOUT_BRANCH_GAP_X = 48;
+const ENABLE_ACTIVE_SCHEDULE_SIGNAL_PULSES = false;
+const EDGE_SIGNAL_LAUNCH_INTERVAL = 1.4;
+const EDGE_SIGNAL_SPEED = 250;
 const CHANNEL_OPTIONS = ["Email", "Max", "Telegram", "WhatsApp"];
 const CHANNEL_ICON_BY_CHANNEL = {
   Email: "source-email-20",
@@ -208,6 +211,10 @@ const designSystemIconFiles = {
   "edit-20": "./assets/icons/edit_20.svg",
   "arrow-down": "./assets/icons/arrow-down_20.svg",
   "arrow-up": "./assets/icons/arrow-up_20.svg",
+  "roll-up-20": "./assets/icons/roll-up_20.svg",
+  "external-link-20": "./assets/icons/external-link_20.svg",
+  "show-20": "./assets/icons/show_20.svg",
+  "hide-20": "./assets/icons/hide_20.svg",
   "arrow-down-16": "./assets/icons/arrow-down_16.svg",
   "arrow-up-16": "./assets/icons/arrow-up_16.svg",
   "arrow-list-down": "./assets/icons/arrow-list-down_20.svg",
@@ -323,6 +330,7 @@ let boardSearchFocusedNodeId = null;
 let boardSearchActiveIndex = 0;
 let hideInactiveScheduleBranches = false;
 let inactiveScheduleFilterState = { mutedNodeIds: new Set(), mutedEdgeIds: new Set() };
+let collapsedBranchState = { hiddenNodeIds: new Set(), hiddenEdgeIds: new Set() };
 let activeScheduleBranchEdgeIds = new Set();
 let scenarioCreateSettings = createStartSettings({ channels: [] });
 let scenarioCreateInitialSettings = null;
@@ -336,6 +344,7 @@ let hasUnsavedScenarioChanges = false;
 let settingsCloseConfirmAction = null;
 let tooltipTimer = null;
 let tooltipAnchor = null;
+const edgeSignalAnimationCache = new Map();
 
 const svg = d3.select("#scenarioSvg");
 const boardShell = document.querySelector("#boardShell");
@@ -364,6 +373,7 @@ const zoom = d3
   .on("zoom", (event) => {
     viewport.attr("transform", event.transform);
     drawGrid(event.transform);
+    updateWireFlowStrokeWidth(event.transform.k);
     document.querySelector("#zoomLabel").textContent = `${Math.round(event.transform.k * 100)}%`;
     state.viewport = { x: event.transform.x, y: event.transform.y, k: event.transform.k };
     updateNodeTitleEditorPosition(event.transform);
@@ -384,6 +394,9 @@ setupTooltips();
 renderMenu();
 wireControls();
 window.addEventListener("beforeunload", handleBeforeUnload);
+if (ENABLE_ACTIVE_SCHEDULE_SIGNAL_PULSES) {
+  document.addEventListener("visibilitychange", syncEdgeSignalAnimationPlayback);
+}
 drawGrid();
 render();
 restoreViewport();
@@ -558,6 +571,10 @@ function wireControls() {
     event.stopPropagation();
     hideInactiveScheduleBranches = !hideInactiveScheduleBranches;
     render();
+  });
+  document.querySelector("#inactiveScheduleCollapseButton")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleAllInactiveScheduleBranches();
   });
   document.querySelector("#scenarioSettingsButton").addEventListener("click", openScenarioSettings);
   document.querySelector("#holdingSettingsBackdrop").addEventListener("click", closeHoldingSettings);
@@ -847,11 +864,13 @@ function rectFromPoints(a, b) {
 function updateBulkSelection(selectionRect) {
   bulkSelectedNodeIds = new Set(
     state.nodes
+      .filter((nodeItem) => !collapsedBranchState.hiddenNodeIds.has(nodeItem.id))
       .filter((nodeItem) => !isStartNode(nodeItem) && rectsOverlap(selectionRect, nodeBounds(nodeItem), 0))
       .map((nodeItem) => nodeItem.id),
   );
   bulkSelectedEdgeIds = new Set(
     state.edges
+      .filter((edgeItem) => !collapsedBranchState.hiddenEdgeIds.has(edgeItem.id))
       .filter((edgeItem) => edgeIntersectsSelection(edgeItem, selectionRect))
       .map((edgeItem) => edgeItem.id),
   );
@@ -979,6 +998,7 @@ function drawGrid(transform = d3.zoomTransform(svg.node())) {
 
 function render() {
   inactiveScheduleFilterState = buildInactiveScheduleFilterState();
+  collapsedBranchState = buildCollapsedBranchState();
   renderEdges();
   renderNodes();
   renderSelectionOverlay();
@@ -986,6 +1006,7 @@ function render() {
   renderNodeSettingsSidebar();
   renderHoldingSettingsSidebar();
   updateHoldingMessagesCount();
+  updateInactiveScheduleCollapseButton();
   updateInactiveScheduleFilterButton();
   updateHistoryButtons();
 }
@@ -1005,9 +1026,18 @@ function renderAppShell() {
   }
   updateHoldingMessagesCount();
   updateSaveButton();
+  updateInactiveScheduleCollapseButton();
   updateInactiveScheduleFilterButton();
-  updateZoomControls(d3.zoomTransform(svg.node()).k);
+  const boardScale = d3.zoomTransform(svg.node()).k;
+  updateWireFlowStrokeWidth(boardScale);
+  updateZoomControls(boardScale);
   syncBoardSearchUi();
+}
+
+function updateWireFlowStrokeWidth(scale = 1) {
+  const safeScale = Math.max(scale, MIN_ZOOM);
+  const screenWidth = 1.5 + safeScale * 1.5;
+  svg.style("--wire-flow-stroke-width", `${screenWidth / safeScale}px`);
 }
 
 function updateInactiveScheduleFilterButton() {
@@ -1015,6 +1045,25 @@ function updateInactiveScheduleFilterButton() {
   if (!button) return;
   button.classList.toggle("is-active", hideInactiveScheduleBranches);
   button.setAttribute("aria-pressed", hideInactiveScheduleBranches ? "true" : "false");
+}
+
+function updateInactiveScheduleCollapseButton() {
+  const button = document.querySelector("#inactiveScheduleCollapseButton");
+  if (!button) return;
+  const inactiveState = buildInactiveScheduleBranchState();
+  const hasCollapsedBranches = state.nodes.some(
+    (nodeItem) => nodeItem.branchCollapsed && inactiveState.mutedNodeIds.has(nodeItem.id),
+  );
+  const canCollapseBranches = getInactiveScheduleCollapseRoots(inactiveState).length > 0;
+  const actionLabel = hasCollapsedBranches
+    ? "Развернуть операции неактивных графиков"
+    : "Свернуть операции неактивных графиков";
+  const iconName = hasCollapsedBranches ? "hide-20" : "show-20";
+  button.disabled = !hasCollapsedBranches && !canCollapseBranches;
+  button.dataset.icon = iconName;
+  button.dataset.tooltip = actionLabel;
+  button.setAttribute("aria-label", actionLabel);
+  button.innerHTML = `<span class="cmgui-icon">${iconSvg(iconName, 16)}</span>`;
 }
 
 function openBoardSearch() {
@@ -1113,7 +1162,7 @@ function getBoardSearchMatches() {
   const query = normalizeSearchText(boardSearchQuery);
   if (!query) return [];
   return state.nodes.filter((nodeItem) => {
-    if (isPlaceholderNode(nodeItem)) return false;
+    if (isPlaceholderNode(nodeItem) || collapsedBranchState.hiddenNodeIds.has(nodeItem.id)) return false;
     const values = [nodeItem.title, nodeItem.subtitle, settingsTitleForNode(nodeItem)];
     return values.some((value) => normalizeSearchText(value).includes(query));
   });
@@ -1204,10 +1253,12 @@ function scenarioGroups(scenarioItem) {
 
 function renderNodes() {
   inactiveScheduleFilterState = buildInactiveScheduleFilterState();
+  collapsedBranchState = buildCollapsedBranchState();
   const reachableNodeIds = getReachableScenarioNodeIds();
   const boardSearchMatchIds = new Set(getBoardSearchMatches().map((nodeItem) => nodeItem.id));
   const boardSearchActiveId = boardSearchQuery.trim() ? boardSearchFocusedNodeId : null;
-  const nodes = nodeLayer.selectAll(".scenario-node-svg").data(state.nodes, (d) => d.id);
+  const visibleNodes = state.nodes.filter((nodeItem) => !collapsedBranchState.hiddenNodeIds.has(nodeItem.id));
+  const nodes = nodeLayer.selectAll(".scenario-node-svg").data(visibleNodes, (d) => d.id);
   nodes.exit().remove();
   const enter = nodes
     .enter()
@@ -1221,7 +1272,15 @@ function renderNodes() {
           event.sourceEvent?.stopPropagation();
           const transform = d3.zoomTransform(svg.node());
           const [pointerX, pointerY] = transform.invert(d3.pointer(event, svg.node()));
-          const dragIds = bulkSelectedNodeIds.has(d.id) ? [...bulkSelectedNodeIds] : [d.id];
+          const baseDragIds = bulkSelectedNodeIds.has(d.id) ? [...bulkSelectedNodeIds] : [d.id];
+          const dragIds = [
+            ...new Set(
+              baseDragIds.flatMap((nodeId) => {
+                const nodeItem = getNode(nodeId);
+                return nodeItem?.branchCollapsed ? [nodeId, ...collapsedBranchDescendantIds(nodeId)] : [nodeId];
+              }),
+            ),
+          ];
           if (!bulkSelectedNodeIds.has(d.id)) clearBulkSelection();
           dragIds.forEach((nodeId) => {
             const nodeItem = getNode(nodeId);
@@ -1283,6 +1342,8 @@ function renderNodes() {
         }),
     );
 
+  enter.append("rect").attr("class", "node-collapse-stack node-collapse-stack-back").attr("x", 24).attr("y", 24).attr("width", NODE_W).attr("height", NODE_H).attr("rx", 12);
+  enter.append("rect").attr("class", "node-collapse-stack node-collapse-stack-middle").attr("x", 12).attr("y", 12).attr("width", NODE_W).attr("height", NODE_H).attr("rx", 12);
   enter.append("rect").attr("class", "node-hover-zone").attr("x", NODE_PORT_LEFT_X - NODE_PORT_R).attr("y", -1).attr("width", NODE_PORT_RIGHT_X + NODE_PORT_R - (NODE_PORT_LEFT_X - NODE_PORT_R)).attr("height", NODE_HOVER_H).attr("rx", 12);
   enter.append("rect").attr("class", "node-hover-card").attr("x", 0).attr("y", -1).attr("width", NODE_W).attr("height", NODE_HOVER_H).attr("rx", 12);
   enter.append("rect").attr("class", "node-card").attr("width", NODE_W).attr("height", NODE_H).attr("rx", 12);
@@ -1324,6 +1385,7 @@ function renderNodes() {
     .classed("is-settings-invalid", (d) => hasInvalidNodeSettings(d))
     .classed("is-search-match", (d) => boardSearchMatchIds.has(d.id))
     .classed("is-search-active", (d) => d.id === boardSearchActiveId)
+    .classed("is-branch-collapsed", (d) => Boolean(d.branchCollapsed))
     .on("mouseenter", function (event, d) {
       if (draggedNodeId === d.id) return;
       hoveredId = d.id;
@@ -1487,7 +1549,14 @@ function openNodeContextMenu(nodeId, position = null) {
 }
 
 function renderNodeContextMenu() {
-  return `<button class="node-context-menu-item" type="button" data-node-menu-action="rename">
+  const nodeItem = getNode(contextMenuNodeId);
+  const collapseAction = canCollapseInactiveScheduleBranch(nodeItem)
+    ? `<button class="node-context-menu-item" type="button" data-node-menu-action="toggle-collapse">
+      <span class="cmgui-icon">${iconSvg(nodeItem?.branchCollapsed ? "external-link-20" : "roll-up-20", 20)}</span>
+      <span>${nodeItem?.branchCollapsed ? "Развернуть" : "Свернуть"}</span>
+    </button>`
+    : "";
+  return `${collapseAction}<button class="node-context-menu-item" type="button" data-node-menu-action="rename">
       <span class="cmgui-icon">${iconSvg("edit-20", 20)}</span>
       <span>Переименовать</span>
     </button>
@@ -1577,6 +1646,10 @@ function handleNodeContextMenuClick(event) {
   const nodeId = contextMenuNodeId;
   const action = button.dataset.nodeMenuAction;
   closeNodeContextMenu();
+  if (action === "toggle-collapse") {
+    toggleCollapsedBranch(nodeId);
+    return;
+  }
   if (action === "rename") {
     startNodeTitleEdit(nodeId);
     return;
@@ -1844,6 +1917,7 @@ function connectionTargetPortPoint(nodeItem, direction) {
 
 function isValidConnectionTarget(nodeItem, dragState = connectionDrag) {
   if (!nodeItem || !dragState) return false;
+  if (collapsedBranchState.hiddenNodeIds.has(nodeItem.id)) return false;
   if (dragState.direction === "input") return hasFreeOutputs(nodeItem) && !isPlaceholderNode(nodeItem);
   return canReceiveInput(nodeItem);
 }
@@ -1898,17 +1972,67 @@ function snapToDragGrid(value) {
 
 function renderEdges() {
   inactiveScheduleFilterState = buildInactiveScheduleFilterState();
+  collapsedBranchState = buildCollapsedBranchState();
   activeScheduleBranchEdgeIds = buildActiveScheduleBranchEdgeIds();
   edgeLabelPlacements = buildEdgeLabelPlacements();
-  const edgeGroups = edgeLayer.selectAll(".scenario-edge-group").data(state.edges, (d) => d.id);
-  edgeGroups.exit().remove();
+  const visibleEdges = state.edges.filter((edgeItem) => !collapsedBranchState.hiddenEdgeIds.has(edgeItem.id));
+  const edgeGroups = edgeLayer.selectAll(".scenario-edge-group").data(visibleEdges, (d) => d.id);
+  edgeGroups.exit().each((d) => edgeSignalAnimationCache.delete(d.id)).remove();
   const edgeGroupsEnter = edgeGroups.enter().append("g").attr("class", "scenario-edge-group");
   edgeGroupsEnter.append("path").attr("class", "scenario-edge-hitarea").attr("marker-end", null);
   edgeGroupsEnter.append("path").attr("class", "scenario-edge");
+  const wireFlowDefs = edgeGroupsEnter.append("defs");
+  wireFlowDefs
+    .append("filter")
+    .attr("class", "scenario-edge-wire-flow-filter")
+    .attr("filterUnits", "userSpaceOnUse")
+    .attr("primitiveUnits", "userSpaceOnUse")
+    .attr("color-interpolation-filters", "sRGB")
+    .append("feGaussianBlur")
+    .attr("stdDeviation", 5);
+  const wireFlowMask = wireFlowDefs
+    .append("mask")
+    .attr("class", "scenario-edge-wire-flow-mask")
+    .attr("maskUnits", "userSpaceOnUse")
+    .attr("maskContentUnits", "userSpaceOnUse");
+  wireFlowMask
+    .append("path")
+    .attr("class", "scenario-edge-wire-flow-mask-path scenario-edge-wire-flow-mask-trail")
+    .attr("fill", "none")
+    .attr("stroke", "white")
+    .attr("stroke-width", 24)
+    .attr("stroke-linecap", "round")
+    .attr("stroke-linejoin", "round");
+  wireFlowMask
+    .select(".scenario-edge-wire-flow-mask-trail")
+    .append("animate")
+    .attr("class", "scenario-edge-wire-flow-mask-trail-animation")
+    .attr("attributeName", "stroke-dashoffset")
+    .attr("begin", "0s")
+    .attr("dur", "3s")
+    .attr("calcMode", "spline")
+    .attr("keyTimes", "0;1")
+    .attr("keySplines", "0.42 0 0.58 1")
+    .attr("repeatCount", "indefinite");
+  edgeGroupsEnter
+    .append("path")
+    .attr("class", "scenario-edge-wire-flow")
+    .attr("marker-end", null);
   edgeGroupsEnter.merge(edgeGroups).each(function (d) {
     const group = d3.select(this);
     const path = edgePath(d);
+    const hasActiveSignal =
+      ENABLE_ACTIVE_SCHEDULE_SIGNAL_PULSES &&
+      isActiveScheduleEdge(d) &&
+      !isEdgeActive(d);
+    group.classed("is-edge-active", isEdgeActive(d));
     group.classed("is-schedule-filter-muted", isEdgeMutedByInactiveScheduleFilter(d));
+    group.classed("has-active-schedule-signal", hasActiveSignal);
+    group.classed(
+      "has-wire-flow",
+      isActiveScheduleEdge(d) &&
+        !isEdgeMutedByInactiveScheduleFilter(d),
+    );
     group
       .select(".scenario-edge-hitarea")
       .attr("d", path)
@@ -1931,15 +2055,22 @@ function renderEdges() {
         closeOutcomeMenu();
         render();
       });
-    group
+    const edgePathElement = group
       .select(".scenario-edge")
+      .attr("id", edgeSignalPathId(d.id))
       .attr("d", path)
       .attr("stroke", edgeColor(d))
       .attr("marker-end", edgeMarker(d));
+    group
+      .select(".scenario-edge-wire-flow")
+      .attr("d", path)
+      .attr("mask", `url(#${edgeWireFlowMaskId(d.id)})`);
+    configureEdgeWireFlowMask(group, edgePathElement, d);
+    renderEdgeSignalPulses(group, edgePathElement, d, path, hasActiveSignal);
     renderEdgeSegmentHandles(group, d);
   });
 
-  const labels = labelLayer.selectAll(".edge-label-svg").data(state.edges.filter((d) => d.label), (d) => d.id);
+  const labels = labelLayer.selectAll(".edge-label-svg").data(visibleEdges.filter((d) => d.label), (d) => d.id);
   labels.exit().remove();
   const enter = labels.enter().append("g").attr("class", "edge-label-svg");
   enter.append("rect").attr("rx", 4);
@@ -1993,6 +2124,121 @@ function renderEdges() {
   renderFloatingEdgeSegmentHandles();
 }
 
+function edgeSignalPathId(edgeId) {
+  return `scenario-edge-signal-path-${String(edgeId).replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+}
+
+function edgeWireFlowMaskId(edgeId) {
+  return `scenario-edge-wire-flow-mask-${String(edgeId).replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+}
+
+function edgeWireFlowFilterId(edgeId) {
+  return `scenario-edge-wire-flow-filter-${String(edgeId).replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+}
+
+function configureEdgeWireFlowMask(group, edgePathElement, edgeItem) {
+  const pathNode = edgePathElement.node();
+  if (!pathNode) return;
+  const bounds = pathNode.getBBox();
+  const pathLength = Math.max(pathNode.getTotalLength(), 1);
+  const pulseLength = Math.min(320, Math.max(24, pathLength * 0.42));
+  const padding = 28;
+  const mask = group
+    .select(".scenario-edge-wire-flow-mask")
+    .attr("id", edgeWireFlowMaskId(edgeItem.id))
+    .attr("x", bounds.x - padding)
+    .attr("y", bounds.y - padding)
+    .attr("width", Math.max(bounds.width, 1) + padding * 2)
+    .attr("height", Math.max(bounds.height, 1) + padding * 2);
+  group
+    .select(".scenario-edge-wire-flow-filter")
+    .attr("id", edgeWireFlowFilterId(edgeItem.id))
+    .attr("x", bounds.x - padding)
+    .attr("y", bounds.y - padding)
+    .attr("width", Math.max(bounds.width, 1) + padding * 2)
+    .attr("height", Math.max(bounds.height, 1) + padding * 2);
+  const trail = mask.select(".scenario-edge-wire-flow-mask-trail");
+  trail
+    .style("display", null)
+    .attr("d", edgePathElement.attr("d"))
+    .attr("filter", `url(#${edgeWireFlowFilterId(edgeItem.id)})`)
+    .attr("stroke-dasharray", `${pulseLength} ${pathLength + pulseLength}`);
+  const animation = trail.select(".scenario-edge-wire-flow-mask-trail-animation");
+  animation
+    .attr("values", `${pulseLength};${-pathLength}`)
+    .attr("begin", "0s");
+}
+
+function renderEdgeSignalPulses(group, edgePathElement, edgeItem, path, hasActiveSignal) {
+  const cached = edgeSignalAnimationCache.get(edgeItem.id);
+  const renderedPulseCount = group.selectAll(".scenario-edge-signal-pulse").size();
+  if (!hasActiveSignal) {
+    if (renderedPulseCount) group.selectAll(".scenario-edge-signal-pulse").remove();
+    edgeSignalAnimationCache.delete(edgeItem.id);
+    return;
+  }
+  if (cached?.path === path && renderedPulseCount === cached.pulseCount) return;
+
+  const pathLength = edgePathElement.node()?.getTotalLength?.() || 0;
+  const travelDuration = Math.max(pathLength / EDGE_SIGNAL_SPEED, 0.1);
+  const pulseCount = Math.max(1, Math.ceil(travelDuration / EDGE_SIGNAL_LAUNCH_INTERVAL) + 1);
+  const pulseCycleDuration = pulseCount * EDGE_SIGNAL_LAUNCH_INTERVAL;
+  const arrivalTime = travelDuration / pulseCycleDuration;
+  const fadeStartTime = Math.max(0, (travelDuration - 0.012) / pulseCycleDuration);
+  const duration = `${pulseCycleDuration.toFixed(3)}s`;
+  const signalClock = svg.node()?.getCurrentTime?.() || 0;
+  const nextSignalLaunch =
+    Math.ceil((signalClock + 0.1) / EDGE_SIGNAL_LAUNCH_INTERVAL) * EDGE_SIGNAL_LAUNCH_INTERVAL;
+  const pathReference = `#${edgeSignalPathId(edgeItem.id)}`;
+  const pulses = group.selectAll(".scenario-edge-signal-pulse").data(d3.range(pulseCount));
+  pulses.exit().remove();
+  const pulsesEnter = pulses
+    .enter()
+    .append("circle")
+    .attr("class", "scenario-edge-signal-pulse")
+    .attr("r", 4)
+    .attr("opacity", 0);
+  const motionEnter = pulsesEnter
+    .append("animateMotion")
+    .attr("class", "scenario-edge-signal-motion")
+    .attr("repeatCount", "indefinite")
+    .attr("keyPoints", "0;1;1")
+    .attr("calcMode", "spline")
+    .attr("keySplines", "0.18 0.42 0.8 0.9;0 0 1 1");
+  motionEnter.append("mpath").attr("href", pathReference).attr("xlink:href", pathReference);
+  pulsesEnter
+    .append("animate")
+    .attr("class", "scenario-edge-signal-opacity")
+    .attr("attributeName", "opacity")
+    .attr("repeatCount", "indefinite")
+    .attr("values", "1;1;0;0");
+  pulsesEnter.merge(pulses).each(function (pulseIndex) {
+    const pulse = d3.select(this);
+    const motion = pulse.select(".scenario-edge-signal-motion");
+    const begin =
+      motion.attr("begin") ||
+      `${(nextSignalLaunch + pulseIndex * EDGE_SIGNAL_LAUNCH_INTERVAL).toFixed(3)}s`;
+    motion
+      .attr("begin", begin)
+      .attr("dur", duration)
+      .attr("keyTimes", `0;${arrivalTime.toFixed(5)};1`);
+    motion.select("mpath").attr("href", pathReference).attr("xlink:href", pathReference);
+    pulse
+      .select(".scenario-edge-signal-opacity")
+      .attr("begin", begin)
+      .attr("dur", duration)
+      .attr("keyTimes", `0;${fadeStartTime.toFixed(5)};${arrivalTime.toFixed(5)};1`);
+  });
+  edgeSignalAnimationCache.set(edgeItem.id, { path, pulseCount });
+}
+
+function syncEdgeSignalAnimationPlayback() {
+  const svgElement = svg.node();
+  if (!svgElement) return;
+  if (document.hidden) svgElement.pauseAnimations?.();
+  else svgElement.unpauseAnimations?.();
+}
+
 function renderEdgeSegmentHandles(group, edgeItem) {
   const segments = edgeDraggableSegments(edgeItem);
   const handles = group.selectAll(".edge-segment-handle").data(segments, (segment) => segment.key);
@@ -2034,7 +2280,9 @@ function renderEdgeSegmentHandles(group, edgeItem) {
 }
 
 function renderFloatingEdgeSegmentHandles() {
-  const segments = state.edges.flatMap((edgeItem) => edgeDraggableSegments(edgeItem));
+  const segments = state.edges
+    .filter((edgeItem) => !collapsedBranchState.hiddenEdgeIds.has(edgeItem.id))
+    .flatMap((edgeItem) => edgeDraggableSegments(edgeItem));
   const handles = labelLayer.selectAll(".edge-segment-handle-floating").data(segments, (segment) => segment.key);
   handles.exit().remove();
   handles
@@ -2914,6 +3162,7 @@ function bulkSelectionBounds() {
 function buildEdgeLabelPlacements() {
   const result = new Map();
   const labelItems = state.edges
+    .filter((edgeItem) => !collapsedBranchState.hiddenEdgeIds.has(edgeItem.id))
     .filter((edgeItem) => edgeItem.label)
     .map((edgeItem) => {
       const width = estimateEdgeLabelWidth(edgeItem.label);
@@ -3003,15 +3252,12 @@ function isEdgeMutedByInactiveScheduleFilter(edgeItem) {
   return inactiveScheduleFilterState.mutedEdgeIds.has(edgeItem.id);
 }
 
-function isDirectActiveScheduleEdge(edgeItem) {
-  const sourceNode = getNode(edgeItem.source);
-  if (!isScheduleNode(sourceNode)) return false;
-  const schedule = getScheduleSettings(sourceNode).schedules.find((item) => item.id === edgeItem.outputKey);
-  return ACTIVE_SCHEDULE_OUTPUT_NAMES.has(schedule?.name || edgeItem.label || "");
+function isActiveScheduleEdge(edgeItem) {
+  return isCompletedScenarioEdge(edgeItem) && activeScheduleBranchEdgeIds.has(edgeItem.id);
 }
 
-function isActiveScheduleEdge(edgeItem) {
-  return activeScheduleBranchEdgeIds.has(edgeItem.id);
+function isCompletedScenarioEdge(edgeItem) {
+  return Boolean(edgeItem && !isPlaceholderNode(getNode(edgeItem.target)));
 }
 
 function isInactiveScheduleEdge(edgeItem) {
@@ -3023,36 +3269,38 @@ function isInactiveScheduleEdge(edgeItem) {
 
 function buildActiveScheduleBranchEdgeIds() {
   const activeEdgeIds = new Set();
-  const queue = [];
+  const startNode = state.nodes.find((nodeItem) => isStartNode(nodeItem)) || state.nodes[0];
+  if (!startNode) return activeEdgeIds;
+
   const visitedNodeIds = new Set();
-
-  state.edges.forEach((edgeItem) => {
-    if (!isDirectActiveScheduleEdge(edgeItem)) return;
-    activeEdgeIds.add(edgeItem.id);
-    queue.push(edgeItem.target);
-  });
-
+  const queue = [startNode.id];
   while (queue.length) {
     const nodeId = queue.shift();
     if (visitedNodeIds.has(nodeId)) continue;
     visitedNodeIds.add(nodeId);
+
+    const nodeItem = getNode(nodeId);
+    if (!nodeItem || hasInvalidNodeSettings(nodeItem)) continue;
+
     state.edges.forEach((edgeItem) => {
-      if (edgeItem.source !== nodeId) return;
-      if (isInactiveScheduleEdge(edgeItem)) return;
-      if (!activeEdgeIds.has(edgeItem.id)) {
-        activeEdgeIds.add(edgeItem.id);
-        queue.push(edgeItem.target);
+      if (
+        edgeItem.source !== nodeId ||
+        !isCompletedScenarioEdge(edgeItem) ||
+        isInactiveScheduleEdge(edgeItem)
+      ) {
+        return;
       }
+      activeEdgeIds.add(edgeItem.id);
+      if (!visitedNodeIds.has(edgeItem.target)) queue.push(edgeItem.target);
     });
   }
 
   return activeEdgeIds;
 }
 
-function buildInactiveScheduleFilterState() {
+function buildInactiveScheduleBranchState() {
   const mutedNodeIds = new Set();
   const mutedEdgeIds = new Set();
-  if (!hideInactiveScheduleBranches) return { mutedNodeIds, mutedEdgeIds };
 
   const activeReachable = getReachableScenarioNodeIds({ ignoreEdge: isInactiveScheduleEdge });
   const inactiveEdges = state.edges.filter(isInactiveScheduleEdge);
@@ -3079,6 +3327,137 @@ function buildInactiveScheduleFilterState() {
   }
 
   return { mutedNodeIds, mutedEdgeIds };
+}
+
+function buildInactiveScheduleFilterState() {
+  if (!hideInactiveScheduleBranches) return { mutedNodeIds: new Set(), mutedEdgeIds: new Set() };
+  return buildInactiveScheduleBranchState();
+}
+
+function canCollapseInactiveScheduleBranch(nodeItem) {
+  if (!nodeItem || isStartNode(nodeItem) || isPlaceholderNode(nodeItem)) return false;
+  if (nodeItem.branchCollapsed) return true;
+  return buildInactiveScheduleBranchState().mutedNodeIds.has(nodeItem.id) && collapsedBranchDescendantIds(nodeItem.id).length > 0;
+}
+
+function collapsedBranchDescendantIds(rootNodeId) {
+  const reachable = new Set();
+  const queue = state.edges.filter((edgeItem) => edgeItem.source === rootNodeId && edgeItem.target !== rootNodeId).map((edgeItem) => edgeItem.target);
+  while (queue.length) {
+    const nodeId = queue.shift();
+    if (nodeId === rootNodeId || reachable.has(nodeId)) continue;
+    reachable.add(nodeId);
+    state.edges.forEach((edgeItem) => {
+      if (edgeItem.source === nodeId && edgeItem.target !== rootNodeId && !reachable.has(edgeItem.target)) queue.push(edgeItem.target);
+    });
+  }
+
+  const sharedBoundaryIds = new Set(
+    [...reachable].filter((nodeId) =>
+      state.edges.some(
+        (edgeItem) =>
+          edgeItem.target === nodeId &&
+          edgeItem.source !== rootNodeId &&
+          !reachable.has(edgeItem.source),
+      ),
+    ),
+  );
+  const protectedIds = new Set();
+  const protectedQueue = [...sharedBoundaryIds];
+  while (protectedQueue.length) {
+    const nodeId = protectedQueue.shift();
+    if (protectedIds.has(nodeId)) continue;
+    protectedIds.add(nodeId);
+    state.edges.forEach((edgeItem) => {
+      if (edgeItem.source === nodeId && reachable.has(edgeItem.target) && !protectedIds.has(edgeItem.target)) protectedQueue.push(edgeItem.target);
+    });
+  }
+  return [...reachable].filter((nodeId) => !protectedIds.has(nodeId));
+}
+
+function buildCollapsedBranchState() {
+  const hiddenNodeIds = new Set();
+  state.nodes.forEach((nodeItem) => {
+    if (!nodeItem.branchCollapsed) return;
+    collapsedBranchDescendantIds(nodeItem.id).forEach((nodeId) => hiddenNodeIds.add(nodeId));
+  });
+  const hiddenEdgeIds = new Set(
+    state.edges
+      .filter((edgeItem) => hiddenNodeIds.has(edgeItem.source) || hiddenNodeIds.has(edgeItem.target))
+      .map((edgeItem) => edgeItem.id),
+  );
+  return { hiddenNodeIds, hiddenEdgeIds };
+}
+
+function getInactiveScheduleCollapseRoots(inactiveState = buildInactiveScheduleBranchState()) {
+  const roots = new Map();
+  const visited = new Set();
+  const queue = state.edges
+    .filter(isInactiveScheduleEdge)
+    .map((edgeItem) => edgeItem.target);
+  while (queue.length) {
+    const nodeId = queue.shift();
+    if (visited.has(nodeId)) continue;
+    visited.add(nodeId);
+    const nodeItem = getNode(nodeId);
+    if (
+      nodeItem &&
+      !nodeItem.branchCollapsed &&
+      inactiveState.mutedNodeIds.has(nodeId) &&
+      canCollapseInactiveScheduleBranch(nodeItem)
+    ) {
+      roots.set(nodeId, nodeItem);
+      continue;
+    }
+    state.edges.forEach((edgeItem) => {
+      if (
+        edgeItem.source === nodeId &&
+        inactiveState.mutedNodeIds.has(edgeItem.target) &&
+        !visited.has(edgeItem.target)
+      ) {
+        queue.push(edgeItem.target);
+      }
+    });
+  }
+  return [...roots.values()];
+}
+
+function clearSelectionHiddenByCollapsedBranches() {
+  collapsedBranchState = buildCollapsedBranchState();
+  if (collapsedBranchState.hiddenNodeIds.has(selectedId)) selectedId = null;
+  if (collapsedBranchState.hiddenNodeIds.has(hoveredId)) hoveredId = null;
+  if (collapsedBranchState.hiddenEdgeIds.has(selectedEdgeId)) selectedEdgeId = null;
+  if (collapsedBranchState.hiddenEdgeIds.has(hoveredEdgeId)) hoveredEdgeId = null;
+  clearBulkSelection();
+}
+
+function toggleAllInactiveScheduleBranches() {
+  const inactiveState = buildInactiveScheduleBranchState();
+  const collapsedNodes = state.nodes.filter(
+    (nodeItem) => nodeItem.branchCollapsed && inactiveState.mutedNodeIds.has(nodeItem.id),
+  );
+  const nodesToToggle = collapsedNodes.length
+    ? collapsedNodes
+    : getInactiveScheduleCollapseRoots(inactiveState);
+  if (!nodesToToggle.length) return;
+  pushHistory();
+  const shouldCollapse = collapsedNodes.length === 0;
+  nodesToToggle.forEach((nodeItem) => {
+    nodeItem.branchCollapsed = shouldCollapse;
+  });
+  clearSelectionHiddenByCollapsedBranches();
+  render();
+  schedulePersistState();
+}
+
+function toggleCollapsedBranch(nodeId) {
+  const nodeItem = getNode(nodeId);
+  if (!nodeItem || (!nodeItem.branchCollapsed && !canCollapseInactiveScheduleBranch(nodeItem))) return;
+  pushHistory();
+  nodeItem.branchCollapsed = !nodeItem.branchCollapsed;
+  clearSelectionHiddenByCollapsedBranches();
+  render();
+  schedulePersistState();
 }
 
 function edgeColor(edgeItem) {
@@ -4466,8 +4845,15 @@ function firstAvailableConnectTargetId(sourceId, outputKey, replaceId = null) {
 }
 
 function connectOperationTargets(sourceId = connectModalSourceId, outputKey = connectModalOutputKey, replaceId = connectModalReplaceId) {
+  const hiddenNodeIds = buildCollapsedBranchState().hiddenNodeIds;
   return state.nodes
-    .filter((nodeItem) => !isStartNode(nodeItem) && !isPlaceholderNode(nodeItem) && nodeItem.id !== replaceId)
+    .filter(
+      (nodeItem) =>
+        !isStartNode(nodeItem) &&
+        !isPlaceholderNode(nodeItem) &&
+        nodeItem.id !== replaceId &&
+        !hiddenNodeIds.has(nodeItem.id),
+    )
     .map((nodeItem) => ({ node: nodeItem, ...connectTargetAvailability(sourceId, nodeItem.id, outputKey, replaceId) }));
 }
 
@@ -4553,21 +4939,30 @@ function renderConnectOperationMap() {
   const viewportEl = document.querySelector("#connectOperationMapViewport");
   if (!svgEl || !viewportEl) return;
   const sourceNode = getNode(connectModalSourceId);
+  const collapseState = buildCollapsedBranchState();
+  const visibleNodes = state.nodes.filter((nodeItem) => !collapseState.hiddenNodeIds.has(nodeItem.id));
   const targets = new Map(connectOperationTargets().map((item) => [item.node.id, item]));
   const edgeMarkup = state.edges
-    .filter((edgeItem) => !isPlaceholderNode(getNode(edgeItem.source)) && !isPlaceholderNode(getNode(edgeItem.target)))
+    .filter(
+      (edgeItem) =>
+        !collapseState.hiddenEdgeIds.has(edgeItem.id) &&
+        !isPlaceholderNode(getNode(edgeItem.source)) &&
+        !isPlaceholderNode(getNode(edgeItem.target)),
+    )
     .map((edgeItem) => `<path class="connect-map-edge" d="${edgePath(edgeItem)}"></path>`)
     .join("");
-  const gridMarkup = connectMapGridMarkup(scenarioContentBounds());
-  const nodeMarkup = state.nodes
+  const gridMarkup = connectMapGridMarkup(scenarioContentBounds(visibleNodes));
+  const nodeMarkup = visibleNodes
     .filter((nodeItem) => !isPlaceholderNode(nodeItem))
     .map((nodeItem) => {
       const target = targets.get(nodeItem.id);
       const isSource = nodeItem.id === sourceNode?.id;
       const isAvailable = Boolean(target?.available);
       const isSelected = nodeItem.id === connectModalSelectedTargetId;
-      const classes = ["connect-map-node", isSource ? "is-source" : "", isAvailable ? "is-available" : "is-disabled", isSelected ? "is-selected" : ""].filter(Boolean).join(" ");
+      const classes = ["connect-map-node", isSource ? "is-source" : "", isAvailable ? "is-available" : "is-disabled", isSelected ? "is-selected" : "", nodeItem.branchCollapsed ? "is-branch-collapsed" : ""].filter(Boolean).join(" ");
       return `<g class="${classes}" data-connect-map-node="${escapeAttr(nodeItem.id)}" ${isAvailable ? "" : 'data-tooltip="Вход операции уже занят"'} transform="translate(${nodeItem.x},${nodeItem.y})">
+        ${nodeItem.branchCollapsed ? `<rect class="connect-map-node-stack connect-map-node-stack-back" x="24" y="24" width="${NODE_W}" height="${NODE_H}" rx="12"></rect>
+        <rect class="connect-map-node-stack connect-map-node-stack-middle" x="12" y="12" width="${NODE_W}" height="${NODE_H}" rx="12"></rect>` : ""}
         <rect class="connect-map-node-card" width="${NODE_W}" height="${NODE_H}" rx="12"></rect>
         <rect class="connect-map-node-icon-bg" x="24" y="12" width="36" height="36" rx="10" fill="${nodeItem.color || "var(--cmgui-color-bg-main-gray-dark)"}"></rect>
         <g class="connect-map-node-icon" transform="translate(32,20)">${iconSvg(nodeItem.icon || "workflow", 20)}</g>
@@ -4616,7 +5011,8 @@ function fitConnectMap() {
   if (!svgEl || !viewportEl || !state.nodes.length) return;
   const rect = svgEl.getBoundingClientRect();
   if (!rect.width || !rect.height) return;
-  const bounds = scenarioContentBounds();
+  const collapseState = buildCollapsedBranchState();
+  const bounds = scenarioContentBounds(state.nodes.filter((nodeItem) => !collapseState.hiddenNodeIds.has(nodeItem.id)));
   const scale = Math.min(0.75, Math.max(0.18, Math.min((rect.width - 64) / bounds.width, (rect.height - 64) / bounds.height)));
   const transform = d3.zoomIdentity.translate((rect.width - bounds.width * scale) / 2 - bounds.x * scale, (rect.height - bounds.height * scale) / 2 - bounds.y * scale).scale(scale);
   ensureConnectMapZoom(svgEl, viewportEl);
@@ -4638,8 +5034,13 @@ function focusConnectMapOnNode(nodeId) {
   d3.select(viewportEl).transition().duration(180).attr("transform", transform);
 }
 
-function scenarioContentBounds() {
-  const nodeBoundsList = state.nodes.map(nodeBounds);
+function scenarioContentBounds(nodes = state.nodes) {
+  const nodeBoundsList = nodes.map((nodeItem) => {
+    const bounds = nodeBounds(nodeItem);
+    const stackOffset = nodeItem.branchCollapsed ? 24 : 0;
+    return { ...bounds, width: bounds.width + stackOffset, height: bounds.height + stackOffset };
+  });
+  if (!nodeBoundsList.length) return { x: -80, y: -80, width: 160, height: 160 };
   const minX = Math.min(...nodeBoundsList.map((item) => item.x), 0) - 80;
   const minY = Math.min(...nodeBoundsList.map((item) => item.y), 0) - 80;
   const maxX = Math.max(...nodeBoundsList.map((item) => item.x + item.width), 1) + 80;
