@@ -8436,17 +8436,25 @@ function syncCurrentScenario() {
 function loadAppState() {
   try {
     const raw = localStorage.getItem(APP_STORAGE_KEY);
-    if (raw) return normalizeAppState(JSON.parse(raw));
+    if (raw) {
+      const normalizedState = normalizeAppState(JSON.parse(raw));
+      if (normalizedState.scenarios.length || normalizedState.demoSeeded) return normalizedState;
+      const demoState = createDemoAppState();
+      localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(demoState));
+      return demoState;
+    }
     const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
     if (legacyRaw) {
       const legacyBoard = normalizeLoadedState(JSON.parse(legacyRaw));
       const migratedScenario = createScenario({ name: "Сценарий обработки чатов №1", channels: ["Email", "Telegram"], board: legacyBoard });
-      return { scenarios: [migratedScenario], currentScenarioId: migratedScenario.id };
+      return { scenarios: [migratedScenario], currentScenarioId: migratedScenario.id, demoSeeded: true };
     }
   } catch {
-    return { scenarios: [], currentScenarioId: null };
+    return { scenarios: [], currentScenarioId: null, demoSeeded: true };
   }
-  return { scenarios: [], currentScenarioId: null };
+  const demoState = createDemoAppState();
+  localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(demoState));
+  return demoState;
 }
 
 function normalizeAppState(value) {
@@ -8472,6 +8480,7 @@ function normalizeAppState(value) {
         })
       : [],
     currentScenarioId: value.currentScenarioId || null,
+    demoSeeded: Boolean(value.demoSeeded) || Boolean(value.scenarios?.length),
   };
 }
 
@@ -8502,6 +8511,22 @@ function createInitialBoard(channels) {
   };
   applyStartTitle(board.nodes[0], createStartSettings({ channels }));
   return board;
+}
+
+function createDemoAppState() {
+  const scenarioItem = createDemoScenario();
+  return {
+    scenarios: [scenarioItem],
+    currentScenarioId: scenarioItem.id,
+    demoSeeded: true,
+  };
+}
+
+function createDemoScenario() {
+  if (!window.DEFAULT_SCENARIO_DATA) {
+    throw new Error("Default scenario data is unavailable");
+  }
+  return structuredClone(window.DEFAULT_SCENARIO_DATA);
 }
 
 function syncScenarioStartNode(scenarioItem) {

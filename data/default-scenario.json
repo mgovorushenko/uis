@@ -1,0 +1,2416 @@
+{
+  "id": "scenario-mp56cqny-0913",
+  "name": "Сценарий №1",
+  "channels": [
+    "Email",
+    "Max",
+    "Telegram",
+    "WhatsApp"
+  ],
+  "settings": {
+    "start": {
+      "name": "koko",
+      "channels": [
+        "Email",
+        "Max",
+        "Telegram",
+        "WhatsApp"
+      ],
+      "finishAfterHours": 72,
+      "finishAfterUnit": "hours",
+      "completionTarget": "all",
+      "employeeName": "",
+      "groupName": "",
+      "channelsDropdownOpen": false,
+      "employeeDropdownOpen": false,
+      "groupDropdownOpen": false,
+      "finishOpen": false
+    },
+    "holding": {
+      "transferNodeIds": [],
+      "transferDropdownOpen": false,
+      "messages": []
+    }
+  },
+  "board": {
+    "nodes": [
+      {
+        "id": "incoming",
+        "kind": "start",
+        "x": 40,
+        "y": 348,
+        "title": "Входящее сообщение",
+        "subtitle": "Каналы: Email, Max, Telegram, WhatsApp",
+        "color": "var(--cmgui-color-special-1)",
+        "icon": "start",
+        "muted": false,
+        "settings": {
+          "start": {
+            "finishAfterHours": 72,
+            "finishAfterUnit": "hours",
+            "completionTarget": "all",
+            "employeeName": "",
+            "groupName": ""
+          }
+        }
+      },
+      {
+        "id": "empty-mpcg50x7-0c07",
+        "kind": "schedule",
+        "x": 1740,
+        "y": 568,
+        "title": "Распределение по графику",
+        "subtitle": "График: Рабочее время, Праздники, Будние дни, Нерабочее время, Выходные дни, Ночная смена, VIP-линия, Дежурная группа, Обеденный перерыв, Регион Москва, Регион Санкт-Петербург",
+        "color": "var(--cmgui-color-special-13)",
+        "icon": "time-20",
+        "muted": false,
+        "operationType": "schedule-distribution",
+        "settings": {
+          "schedule": {
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "schedules": [
+              {
+                "id": "schedule-mpcg6mx2-d5ab",
+                "name": "Рабочее время",
+                "dropdownOpen": false
+              },
+              {
+                "id": "schedule-mpcg6ojj-f999",
+                "name": "Праздники",
+                "dropdownOpen": false
+              },
+              {
+                "id": "schedule-mpchwr96-cd10",
+                "name": "Будние дни",
+                "dropdownOpen": false
+              },
+              {
+                "id": "schedule-mpchwrnt-6a19",
+                "name": "Нерабочее время",
+                "dropdownOpen": false
+              },
+              {
+                "id": "schedule-mpchws77-aedd",
+                "name": "Выходные дни",
+                "dropdownOpen": false
+              },
+              {
+                "id": "schedule-ms7940py-b82d",
+                "name": "Ночная смена",
+                "dropdownOpen": false
+              },
+              {
+                "id": "schedule-ms7941ju-2a47",
+                "name": "VIP-линия",
+                "dropdownOpen": false
+              },
+              {
+                "id": "schedule-ms7942a8-50b4",
+                "name": "Дежурная группа",
+                "dropdownOpen": false
+              },
+              {
+                "id": "schedule-ms79450g-07ad",
+                "name": "Обеденный перерыв",
+                "dropdownOpen": false
+              },
+              {
+                "id": "schedule-ms7945v0-d8f7",
+                "name": "Регион Москва",
+                "dropdownOpen": false
+              },
+              {
+                "id": "schedule-ms7946vz-e992",
+                "name": "Регион Санкт-Петербург",
+                "dropdownOpen": false
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "empty-mpcg6mx2-67f8",
+        "kind": "transfer",
+        "x": 3024,
+        "y": -292,
+        "title": "На группу: Отдел продаж",
+        "subtitle": "Ожидание ответа: 1 мин.",
+        "color": "var(--cmgui-color-special-2)",
+        "icon": "last-manager",
+        "muted": false,
+        "operationType": "group-transfer",
+        "settings": {
+          "groupTransfer": {
+            "groupName": "Отдел продаж",
+            "distribution": "all",
+            "responseTimeout": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "groupDropdownOpen": false,
+            "distributionDropdownOpen": false,
+            "employees": [
+              {
+                "name": "Лемаева Юлия",
+                "enabled": true,
+                "timeout": 15
+              },
+              {
+                "name": "Васнецов Николай",
+                "enabled": true,
+                "timeout": 15
+              },
+              {
+                "name": "Смирнова Алина",
+                "enabled": true,
+                "timeout": 15
+              },
+              {
+                "name": "Орлов Денис",
+                "enabled": true,
+                "timeout": 1500
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "empty-mpcg6mx3-7dcd",
+        "kind": "segment",
+        "x": 2888,
+        "y": 516,
+        "title": "Распределение по сегментам",
+        "subtitle": "Группа сегментов: Сегмент 1, Сегмент 2, Сегмент 3, Сегмент 4",
+        "color": "var(--cmgui-color-special-13)",
+        "icon": "distribution",
+        "muted": false,
+        "operationType": "segment-distribution",
+        "settings": {
+          "segment": {
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "groups": [
+              {
+                "id": "segment-group-mpchkdfs-7ba7",
+                "name": "Сегмент 1",
+                "dropdownOpen": false
+              },
+              {
+                "id": "segment-group-mpchke4p-9922",
+                "name": "Сегмент 2",
+                "dropdownOpen": false
+              },
+              {
+                "id": "segment-group-mpchkei5-9148",
+                "name": "Сегмент 3",
+                "dropdownOpen": false
+              },
+              {
+                "id": "segment-group-mpchkewv-1f94",
+                "name": "Сегмент 4",
+                "dropdownOpen": false
+              }
+            ]
+          }
+        },
+        "branchCollapsed": true
+      },
+      {
+        "id": "empty-mpcg6ojk-d162",
+        "kind": "form",
+        "x": 3052,
+        "y": -768,
+        "title": "Форма сбора контактов",
+        "subtitle": "Ожидание контактов: 1 мин.",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "form",
+        "muted": false,
+        "operationType": "contact-form",
+        "settings": {
+          "contactForm": {
+            "messageText": "Заполните ваши контактные данные и мы свяжемся с вами в течение 15 минут",
+            "namePlaceholder": "Ваше имя",
+            "phonePlaceholder": "Ваш телефон",
+            "emailPlaceholder": "Ваш Email",
+            "contactWait": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false
+          }
+        },
+        "branchCollapsed": true
+      },
+      {
+        "id": "empty-mpchjwze-8ff0",
+        "kind": "transfer",
+        "x": 3632,
+        "y": -880,
+        "title": "На персонального менеджера",
+        "subtitle": "Ожидание ответа: 1 мин.",
+        "color": "var(--cmgui-color-special-2)",
+        "icon": "last-manager",
+        "muted": false,
+        "operationType": "personal-manager-transfer",
+        "settings": {
+          "simpleTransfer": {
+            "operationType": "personal-manager-transfer",
+            "employeeName": "",
+            "responseTimeout": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "employeeDropdownOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-mpchjwzf-4c8f",
+        "kind": "transfer",
+        "x": 3648,
+        "y": -684,
+        "title": "На последнего менеджера",
+        "subtitle": "Ожидание ответа: 1 мин.",
+        "color": "var(--cmgui-color-special-2)",
+        "icon": "last-manager",
+        "muted": false,
+        "operationType": "last-manager-transfer",
+        "settings": {
+          "simpleTransfer": {
+            "operationType": "last-manager-transfer",
+            "employeeName": "",
+            "responseTimeout": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "employeeDropdownOpen": false
+          }
+        }
+      },
+      {
+        "id": "menuNode-mpchtpjs",
+        "kind": "menuNode",
+        "x": 3620,
+        "y": -296,
+        "title": "Меню",
+        "subtitle": "Ожидание нажатия кнопки: 20 сек.",
+        "color": "var(--cmgui-color-special-13)",
+        "icon": "menu",
+        "operationType": "menu-operation",
+        "settings": {
+          "menu": {
+            "messageText": "укукук",
+            "waitTime": 20,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "buttons": [
+              {
+                "id": "menu-button-mpchtpjs-adbd",
+                "text": "Кнопка"
+              },
+              {
+                "id": "menu-button-mpchtqks-3f1a",
+                "text": "Кнопка"
+              },
+              {
+                "id": "menu-button-mpchtqyc-a5c0",
+                "text": "Кнопка"
+              }
+            ]
+          }
+        },
+        "muted": false
+      },
+      {
+        "id": "empty-mpchtpjt-a9dc",
+        "kind": "message",
+        "x": 4308,
+        "y": -560,
+        "title": "Информационное сообщение",
+        "subtitle": "Следующая операция через: 1 сек.",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "info-message",
+        "muted": false,
+        "operationType": "info-message",
+        "settings": {
+          "infoMessage": {
+            "messageText": "укк",
+            "transitionDelay": 1,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-mpchtpjt-960c",
+        "kind": "transfer",
+        "x": 4872,
+        "y": -296,
+        "title": "На последнего менеджера",
+        "subtitle": "Ожидание ответа: 1 мин.",
+        "color": "var(--cmgui-color-special-2)",
+        "icon": "last-manager",
+        "muted": false,
+        "operationType": "last-manager-transfer",
+        "settings": {
+          "simpleTransfer": {
+            "operationType": "last-manager-transfer",
+            "employeeName": "",
+            "responseTimeout": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "employeeDropdownOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-mpchtpjt-36d0",
+        "kind": "transfer",
+        "x": 4328,
+        "y": -296,
+        "title": "На персонального менеджера",
+        "subtitle": "Ожидание ответа: 1 мин.",
+        "color": "var(--cmgui-color-special-2)",
+        "icon": "last-manager",
+        "muted": false,
+        "operationType": "personal-manager-transfer",
+        "settings": {
+          "simpleTransfer": {
+            "operationType": "personal-manager-transfer",
+            "employeeName": "",
+            "responseTimeout": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "employeeDropdownOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-mpchtqkt-8c9a",
+        "kind": "finish",
+        "x": 4312,
+        "y": -436,
+        "title": "Закрытие чата",
+        "subtitle": "",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "finish",
+        "muted": false,
+        "operationType": "fallback-placeholder",
+        "settings": {}
+      },
+      {
+        "id": "empty-mpchtqyc-d4ec",
+        "kind": "form",
+        "x": 4304,
+        "y": -60,
+        "title": "Форма сбора контактов",
+        "subtitle": "Ожидание контактов: 1 мин.",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "form",
+        "muted": false,
+        "operationType": "contact-form",
+        "settings": {
+          "contactForm": {
+            "messageText": "Заполните ваши контактные данные и мы свяжемся с вами в течение 15 минут",
+            "namePlaceholder": "Ваше имя",
+            "phonePlaceholder": "Ваш телефон",
+            "emailPlaceholder": "Ваш Email",
+            "contactWait": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-mpchwr98-b73a",
+        "kind": "form",
+        "x": 2280,
+        "y": 1612,
+        "title": "Форма сбора контактов",
+        "subtitle": "Ожидание контактов: 1 мин.",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "form",
+        "muted": false,
+        "operationType": "contact-form",
+        "settings": {
+          "contactForm": {
+            "messageText": "Заполните ваши контактные данные и мы свяжемся с вами в течение 15 минут",
+            "namePlaceholder": "Ваше имя",
+            "phonePlaceholder": "Ваш телефон",
+            "emailPlaceholder": "Ваш Email",
+            "contactWait": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-mpchwrnu-6e3d",
+        "kind": "transfer",
+        "x": 2288,
+        "y": 1032,
+        "title": "На персонального менеджера",
+        "subtitle": "Ожидание ответа: 1 мин.",
+        "color": "var(--cmgui-color-special-2)",
+        "icon": "last-manager",
+        "muted": false,
+        "operationType": "personal-manager-transfer",
+        "settings": {
+          "simpleTransfer": {
+            "operationType": "personal-manager-transfer",
+            "employeeName": "",
+            "responseTimeout": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "employeeDropdownOpen": false
+          }
+        },
+        "branchCollapsed": true
+      },
+      {
+        "id": "empty-mpchws77-3ae6",
+        "kind": "transfer",
+        "x": 2296,
+        "y": 1440,
+        "title": "На персонального менеджера",
+        "subtitle": "Ожидание ответа: 1 мин.",
+        "color": "var(--cmgui-color-special-2)",
+        "icon": "last-manager",
+        "muted": false,
+        "operationType": "personal-manager-transfer",
+        "settings": {
+          "simpleTransfer": {
+            "operationType": "personal-manager-transfer",
+            "employeeName": "",
+            "responseTimeout": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "employeeDropdownOpen": false
+          }
+        },
+        "branchCollapsed": false
+      },
+      {
+        "id": "empty-mpchxf6r-bcf9",
+        "kind": "schedule",
+        "x": 4848,
+        "y": 1028,
+        "title": "Распределение по графику",
+        "subtitle": "График: Будние дни, Праздники",
+        "color": "var(--cmgui-color-special-13)",
+        "icon": "time-20",
+        "muted": false,
+        "operationType": "schedule-distribution",
+        "settings": {
+          "schedule": {
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "schedules": [
+              {
+                "id": "schedule-ms6iqw8b-76c3",
+                "name": "Будние дни",
+                "dropdownOpen": false
+              },
+              {
+                "id": "schedule-ms6iqx69-01dd",
+                "name": "Праздники",
+                "dropdownOpen": false
+              }
+            ]
+          }
+        },
+        "branchCollapsed": false
+      },
+      {
+        "id": "transfer-mpchxudv",
+        "kind": "transfer",
+        "x": 2956,
+        "y": 1680,
+        "title": "На персонального менеджера",
+        "subtitle": "Ожидание ответа: 1 мин.",
+        "color": "var(--cmgui-color-special-2)",
+        "icon": "last-manager",
+        "operationType": "personal-manager-transfer",
+        "settings": {
+          "simpleTransfer": {
+            "operationType": "personal-manager-transfer",
+            "employeeName": "",
+            "responseTimeout": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "employeeDropdownOpen": false
+          }
+        },
+        "muted": false
+      },
+      {
+        "id": "transfer-ms6k7ghb",
+        "kind": "transfer",
+        "x": 3592,
+        "y": 696,
+        "title": "На персонального менеджера",
+        "subtitle": "Ожидание ответа: 1 мин.",
+        "color": "var(--cmgui-color-special-2)",
+        "icon": "last-manager",
+        "operationType": "personal-manager-transfer",
+        "settings": {
+          "simpleTransfer": {
+            "operationType": "personal-manager-transfer",
+            "employeeName": "",
+            "responseTimeout": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "employeeDropdownOpen": false
+          }
+        },
+        "muted": false
+      },
+      {
+        "id": "transfer-ms6kdw5s",
+        "kind": "transfer",
+        "x": 3588,
+        "y": 1680,
+        "title": "На группу: Служба поддержки",
+        "subtitle": "Ожидание ответа: 1 мин.",
+        "color": "var(--cmgui-color-special-2)",
+        "icon": "last-manager",
+        "operationType": "group-transfer",
+        "settings": {
+          "groupTransfer": {
+            "groupName": "Служба поддержки",
+            "distribution": "all",
+            "responseTimeout": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "groupDropdownOpen": false,
+            "distributionDropdownOpen": false,
+            "employees": [
+              {
+                "name": "Кузнецова Мария",
+                "enabled": true,
+                "timeout": 15
+              },
+              {
+                "name": "Павлов Игорь",
+                "enabled": true,
+                "timeout": 15
+              },
+              {
+                "name": "Романова Елена",
+                "enabled": true,
+                "timeout": 15
+              },
+              {
+                "name": "Фомин Артем",
+                "enabled": true,
+                "timeout": 15
+              },
+              {
+                "name": "Громова Дарья",
+                "enabled": true,
+                "timeout": 15
+              },
+              {
+                "name": "Соколов Кирилл",
+                "enabled": true,
+                "timeout": 1500
+              }
+            ]
+          }
+        },
+        "muted": false
+      },
+      {
+        "id": "transfer-ms6muldl",
+        "kind": "transfer",
+        "x": 4340,
+        "y": 1692,
+        "title": "На группу: VIP-клиенты",
+        "subtitle": "Ожидание ответа: 1 мин.",
+        "color": "var(--cmgui-color-special-2)",
+        "icon": "last-manager",
+        "operationType": "group-transfer",
+        "settings": {
+          "groupTransfer": {
+            "groupName": "VIP-клиенты",
+            "distribution": "all",
+            "responseTimeout": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "groupDropdownOpen": false,
+            "distributionDropdownOpen": false,
+            "employees": [
+              {
+                "name": "Белова Кристина",
+                "enabled": true,
+                "timeout": 15
+              },
+              {
+                "name": "Егоров Михаил",
+                "enabled": true,
+                "timeout": 15
+              },
+              {
+                "name": "Зайцева Полина",
+                "enabled": true,
+                "timeout": 1500
+              }
+            ]
+          }
+        },
+        "muted": false
+      },
+      {
+        "id": "empty-ms6muldl-061e",
+        "kind": "transfer",
+        "x": 4848,
+        "y": 1696,
+        "title": "На персонального менеджера",
+        "subtitle": "Ожидание ответа: 1 мин.",
+        "color": "var(--cmgui-color-special-2)",
+        "icon": "last-manager",
+        "muted": false,
+        "operationType": "personal-manager-transfer",
+        "settings": {
+          "simpleTransfer": {
+            "operationType": "personal-manager-transfer",
+            "employeeName": "",
+            "responseTimeout": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "employeeDropdownOpen": false
+          }
+        }
+      },
+      {
+        "id": "condition-ms795s90",
+        "kind": "condition",
+        "x": 4844,
+        "y": -60,
+        "title": "Распределение по условиям",
+        "subtitle": "Группа условий: Группа условий 1, Группа условий 2, Группа условий 3",
+        "color": "var(--cmgui-color-special-13)",
+        "icon": "row-data",
+        "operationType": "condition-distribution",
+        "settings": {
+          "condition": {
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "groups": [
+              {
+                "id": "condition-group-ms795s91-9043",
+                "name": "Группа условий 1",
+                "open": true,
+                "conditions": [
+                  {
+                    "id": "condition-ms795s91-0073",
+                    "parameter": "Канал",
+                    "operator": "notEquals",
+                    "value": "Email",
+                    "parameterDropdownOpen": false,
+                    "operatorDropdownOpen": false,
+                    "valueDropdownOpen": false
+                  }
+                ]
+              },
+              {
+                "id": "condition-group-ms795xhz-0b3e",
+                "name": "Группа условий 2",
+                "open": true,
+                "conditions": [
+                  {
+                    "id": "condition-ms795xhz-8656",
+                    "parameter": "Тип клиента",
+                    "operator": "equals",
+                    "value": "Физическое лицо",
+                    "parameterDropdownOpen": false,
+                    "operatorDropdownOpen": false,
+                    "valueDropdownOpen": false
+                  }
+                ]
+              },
+              {
+                "id": "condition-group-ms79603z-3396",
+                "name": "Группа условий 3",
+                "open": true,
+                "conditions": [
+                  {
+                    "id": "condition-ms79603z-8322",
+                    "parameter": "Регион",
+                    "operator": "equals",
+                    "value": "Центр",
+                    "parameterDropdownOpen": false,
+                    "operatorDropdownOpen": false,
+                    "valueDropdownOpen": false
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "empty-ms795s91-3405",
+        "kind": "transfer",
+        "x": 5676,
+        "y": -56,
+        "title": "На сотрудника: Васнецов Николай",
+        "subtitle": "Ожидание ответа: 1 мин.",
+        "color": "var(--cmgui-color-special-2)",
+        "icon": "user-20",
+        "muted": false,
+        "operationType": "employee-transfer",
+        "settings": {
+          "simpleTransfer": {
+            "operationType": "employee-transfer",
+            "employeeName": "Васнецов Николай",
+            "responseTimeout": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "employeeDropdownOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-ms795s91-fc71",
+        "kind": "finish",
+        "x": 5676,
+        "y": 432,
+        "title": "Закрытие чата",
+        "subtitle": "",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "finish",
+        "muted": false,
+        "operationType": "fallback-placeholder"
+      },
+      {
+        "id": "empty-ms795xhz-b6f7",
+        "kind": "transfer",
+        "x": 5676,
+        "y": 68,
+        "title": "На группу: Служба поддержки",
+        "subtitle": "Ожидание ответа: 1 мин.",
+        "color": "var(--cmgui-color-special-2)",
+        "icon": "last-manager",
+        "muted": false,
+        "operationType": "group-transfer",
+        "settings": {
+          "groupTransfer": {
+            "groupName": "Служба поддержки",
+            "distribution": "all",
+            "responseTimeout": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "groupDropdownOpen": false,
+            "distributionDropdownOpen": false,
+            "employees": [
+              {
+                "name": "Кузнецова Мария",
+                "enabled": true,
+                "timeout": 15
+              },
+              {
+                "name": "Павлов Игорь",
+                "enabled": true,
+                "timeout": 15
+              },
+              {
+                "name": "Романова Елена",
+                "enabled": true,
+                "timeout": 15
+              },
+              {
+                "name": "Фомин Артем",
+                "enabled": true,
+                "timeout": 15
+              },
+              {
+                "name": "Громова Дарья",
+                "enabled": true,
+                "timeout": 15
+              },
+              {
+                "name": "Соколов Кирилл",
+                "enabled": true,
+                "timeout": 1500
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "empty-ms79603z-c317",
+        "kind": "form",
+        "x": 5676,
+        "y": 304,
+        "title": "Форма сбора контактов",
+        "subtitle": "Ожидание контактов: 1 мин.",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "form",
+        "muted": false,
+        "operationType": "contact-form",
+        "settings": {
+          "contactForm": {
+            "messageText": "Заполните ваши контактные данные и мы свяжемся с вами в течение 15 минут",
+            "namePlaceholder": "Ваше имя",
+            "phonePlaceholder": "Ваш телефон",
+            "emailPlaceholder": "Ваш Email",
+            "contactWait": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-ms796sxo-9553",
+        "kind": "finish",
+        "x": 6232,
+        "y": -56,
+        "title": "Закрытие чата",
+        "subtitle": "",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "finish",
+        "muted": false,
+        "operationType": "fallback-placeholder"
+      },
+      {
+        "id": "empty-ms796yqb-eff5",
+        "kind": "message",
+        "x": 6228,
+        "y": 72,
+        "title": "Информационное сообщение",
+        "subtitle": "Следующая операция через: 1 сек.",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "info-message",
+        "muted": false,
+        "operationType": "info-message",
+        "settings": {
+          "infoMessage": {
+            "messageText": "вцвццвц",
+            "transitionDelay": 1,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-ms7972n8-0c26",
+        "kind": "message",
+        "x": 6240,
+        "y": 220,
+        "title": "Информационное сообщение",
+        "subtitle": "Следующая операция через: 1 сек.",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "info-message",
+        "muted": false,
+        "operationType": "info-message",
+        "settings": {
+          "infoMessage": {
+            "messageText": "ццв",
+            "transitionDelay": 1,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-ms7972n8-034b",
+        "kind": "finish",
+        "x": 6232,
+        "y": 368,
+        "title": "Закрытие чата",
+        "subtitle": "",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "finish",
+        "muted": false,
+        "operationType": "fallback-placeholder"
+      },
+      {
+        "id": "empty-mpchtpjt-a9dc-copy-ms798p87-0ae5",
+        "kind": "message",
+        "x": 2892,
+        "y": 624,
+        "title": "Информационное сообщение",
+        "subtitle": "Следующая операция через: 1 сек.",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "info-message",
+        "muted": false,
+        "operationType": "info-message",
+        "settings": {
+          "infoMessage": {
+            "messageText": "укк",
+            "transitionDelay": 1,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-mpchtpjt-36d0-copy-ms798p87-07c4",
+        "kind": "transfer",
+        "x": 2888,
+        "y": 736,
+        "title": "На персонального менеджера",
+        "subtitle": "Ожидание ответа: 1 мин.",
+        "color": "var(--cmgui-color-special-2)",
+        "icon": "last-manager",
+        "muted": false,
+        "operationType": "personal-manager-transfer",
+        "settings": {
+          "simpleTransfer": {
+            "operationType": "personal-manager-transfer",
+            "employeeName": "",
+            "responseTimeout": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "employeeDropdownOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-mpchtqkt-8c9a-copy-ms798p87-fc66",
+        "kind": "finish",
+        "x": 2900,
+        "y": 376,
+        "title": "Закрытие чата",
+        "subtitle": "",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "finish",
+        "muted": false,
+        "operationType": "fallback-placeholder",
+        "settings": {}
+      },
+      {
+        "id": "empty-mpchtqyc-d4ec-copy-ms798p87-e0c5",
+        "kind": "form",
+        "x": 2292,
+        "y": 840,
+        "title": "Форма сбора контактов",
+        "subtitle": "Ожидание контактов: 1 мин.",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "form",
+        "muted": false,
+        "operationType": "contact-form",
+        "settings": {
+          "contactForm": {
+            "messageText": "Заполните ваши контактные данные и мы свяжемся с вами в течение 15 минут",
+            "namePlaceholder": "Ваше имя",
+            "phonePlaceholder": "Ваш телефон",
+            "emailPlaceholder": "Ваш Email",
+            "contactWait": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false
+          }
+        },
+        "branchCollapsed": true
+      },
+      {
+        "id": "condition-ms795s90-copy-ms798p87-c1b0",
+        "kind": "condition",
+        "x": 2888,
+        "y": 840,
+        "title": "Распределение по условиям",
+        "subtitle": "Группа условий: Группа условий 1, Группа условий 2, Группа условий 3",
+        "color": "var(--cmgui-color-special-13)",
+        "icon": "row-data",
+        "operationType": "condition-distribution",
+        "settings": {
+          "condition": {
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "groups": [
+              {
+                "id": "condition-group-ms795s91-9043",
+                "name": "Группа условий 1",
+                "open": true,
+                "conditions": [
+                  {
+                    "id": "condition-ms795s91-0073",
+                    "parameter": "Канал",
+                    "operator": "equals",
+                    "value": "Email",
+                    "parameterDropdownOpen": false,
+                    "operatorDropdownOpen": false,
+                    "valueDropdownOpen": false
+                  }
+                ]
+              },
+              {
+                "id": "condition-group-ms795xhz-0b3e",
+                "name": "Группа условий 2",
+                "open": true,
+                "conditions": [
+                  {
+                    "id": "condition-ms795xhz-8656",
+                    "parameter": "Тип клиента",
+                    "operator": "equals",
+                    "value": "Физическое лицо",
+                    "parameterDropdownOpen": false,
+                    "operatorDropdownOpen": false,
+                    "valueDropdownOpen": false
+                  }
+                ]
+              },
+              {
+                "id": "condition-group-ms79603z-3396",
+                "name": "Группа условий 3",
+                "open": true,
+                "conditions": [
+                  {
+                    "id": "condition-ms79603z-8322",
+                    "parameter": "Регион",
+                    "operator": "notEquals",
+                    "value": "Центр",
+                    "parameterDropdownOpen": false,
+                    "operatorDropdownOpen": false,
+                    "valueDropdownOpen": false
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "empty-ms795s91-3405-copy-ms798p87-bbfe",
+        "kind": "transfer",
+        "x": 3592,
+        "y": 784,
+        "title": "На сотрудника: Васнецов Николай",
+        "subtitle": "Ожидание ответа: 1 мин.",
+        "color": "var(--cmgui-color-special-2)",
+        "icon": "user-20",
+        "muted": false,
+        "operationType": "employee-transfer",
+        "settings": {
+          "simpleTransfer": {
+            "operationType": "employee-transfer",
+            "employeeName": "Васнецов Николай",
+            "responseTimeout": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "employeeDropdownOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-ms795s91-fc71-copy-ms798p87-e6f9",
+        "kind": "finish",
+        "x": 4844,
+        "y": 756,
+        "title": "Закрытие чата",
+        "subtitle": "",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "finish",
+        "muted": false,
+        "operationType": "fallback-placeholder"
+      },
+      {
+        "id": "empty-ms795xhz-b6f7-copy-ms798p87-e92e",
+        "kind": "transfer",
+        "x": 3576,
+        "y": 968,
+        "title": "На группу: Служба поддержки",
+        "subtitle": "Ожидание ответа: 1 мин.",
+        "color": "var(--cmgui-color-special-2)",
+        "icon": "last-manager",
+        "muted": false,
+        "operationType": "group-transfer",
+        "settings": {
+          "groupTransfer": {
+            "groupName": "Служба поддержки",
+            "distribution": "all",
+            "responseTimeout": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "groupDropdownOpen": false,
+            "distributionDropdownOpen": false,
+            "employees": [
+              {
+                "name": "Кузнецова Мария",
+                "enabled": true,
+                "timeout": 15
+              },
+              {
+                "name": "Павлов Игорь",
+                "enabled": true,
+                "timeout": 15
+              },
+              {
+                "name": "Романова Елена",
+                "enabled": true,
+                "timeout": 15
+              },
+              {
+                "name": "Фомин Артем",
+                "enabled": true,
+                "timeout": 15
+              },
+              {
+                "name": "Громова Дарья",
+                "enabled": true,
+                "timeout": 15
+              },
+              {
+                "name": "Соколов Кирилл",
+                "enabled": true,
+                "timeout": 1500
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "empty-ms79603z-c317-copy-ms798p87-feef",
+        "kind": "form",
+        "x": 4848,
+        "y": 916,
+        "title": "Форма сбора контактов",
+        "subtitle": "Ожидание контактов: 1 мин.",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "form",
+        "muted": false,
+        "operationType": "contact-form",
+        "settings": {
+          "contactForm": {
+            "messageText": "Заполните ваши контактные данные и мы свяжемся с вами в течение 15 минут",
+            "namePlaceholder": "Ваше имя",
+            "phonePlaceholder": "Ваш телефон",
+            "emailPlaceholder": "Ваш Email",
+            "contactWait": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-ms796sxo-9553-copy-ms798p87-1270",
+        "kind": "finish",
+        "x": 4120,
+        "y": 784,
+        "title": "Закрытие чата",
+        "subtitle": "",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "finish",
+        "muted": false,
+        "operationType": "fallback-placeholder"
+      },
+      {
+        "id": "empty-ms796yqb-eff5-copy-ms798p87-6c3c",
+        "kind": "message",
+        "x": 4128,
+        "y": 972,
+        "title": "Информационное сообщение",
+        "subtitle": "Следующая операция через: 1 сек.",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "info-message",
+        "muted": false,
+        "operationType": "info-message",
+        "settings": {
+          "infoMessage": {
+            "messageText": "вцвццвц",
+            "transitionDelay": 1,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-ms7972n8-0c26-copy-ms798p87-fda4",
+        "kind": "message",
+        "x": 5412,
+        "y": 832,
+        "title": "Информационное сообщение",
+        "subtitle": "Следующая операция через: 1 сек.",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "info-message",
+        "muted": false,
+        "operationType": "info-message",
+        "settings": {
+          "infoMessage": {
+            "messageText": "ццв",
+            "transitionDelay": 1,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-ms7972n8-034b-copy-ms798p87-e699",
+        "kind": "finish",
+        "x": 5404,
+        "y": 980,
+        "title": "Закрытие чата",
+        "subtitle": "",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "finish",
+        "muted": false,
+        "operationType": "fallback-placeholder"
+      },
+      {
+        "id": "menuNode-ms79g7x0",
+        "kind": "menuNode",
+        "x": 820,
+        "y": 348,
+        "title": "Меню",
+        "subtitle": "Ожидание нажатия кнопки: 20 сек.",
+        "color": "var(--cmgui-color-special-13)",
+        "icon": "menu",
+        "operationType": "menu-operation",
+        "settings": {
+          "menu": {
+            "messageText": "цвцв",
+            "waitTime": 20,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "buttons": [
+              {
+                "id": "menu-button-ms79g7x0-b402",
+                "text": "Кнопка"
+              },
+              {
+                "id": "menu-button-ms79g8pr-3674",
+                "text": "Кнопка"
+              },
+              {
+                "id": "menu-button-ms79g9zf-2aaf",
+                "text": "Кнопка"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "empty-ms79g8pr-8473",
+        "kind": "segment",
+        "x": 1724,
+        "y": 2440,
+        "title": "Распределение по сегментам",
+        "subtitle": "Группа сегментов: Сегмент 1, Сегмент 2, Сегмент 3, Сегмент 4",
+        "color": "var(--cmgui-color-special-13)",
+        "icon": "distribution",
+        "muted": false,
+        "operationType": "segment-distribution",
+        "settings": {
+          "segment": {
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "groups": [
+              {
+                "id": "segment-group-ms79noac-f102",
+                "name": "Сегмент 1",
+                "dropdownOpen": false
+              },
+              {
+                "id": "segment-group-ms79noyj-6af2",
+                "name": "Сегмент 2",
+                "dropdownOpen": false
+              },
+              {
+                "id": "segment-group-ms79npbk-00dd",
+                "name": "Сегмент 3",
+                "dropdownOpen": false
+              },
+              {
+                "id": "segment-group-ms79nq4i-5e41",
+                "name": "Сегмент 4",
+                "dropdownOpen": false
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "empty-ms79noac-a6fe",
+        "kind": "menuNode",
+        "x": 2340,
+        "y": 2216,
+        "title": "Меню",
+        "subtitle": "Ожидание нажатия кнопки: 20 сек.",
+        "color": "var(--cmgui-color-special-13)",
+        "icon": "menu",
+        "muted": false,
+        "operationType": "menu-operation",
+        "settings": {
+          "menu": {
+            "messageText": "аццв",
+            "waitTime": 20,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "buttons": [
+              {
+                "id": "menu-button-ms79o815-3416",
+                "text": "Кнопка"
+              },
+              {
+                "id": "menu-button-ms79o9ku-0902",
+                "text": "Кнопка"
+              },
+              {
+                "id": "menu-button-ms79oas5-344f",
+                "text": "Кнопка"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "empty-ms79noac-41e2",
+        "kind": "finish",
+        "x": 2776,
+        "y": 3400,
+        "title": "Закрытие чата",
+        "subtitle": "",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "finish",
+        "muted": false,
+        "operationType": "fallback-placeholder"
+      },
+      {
+        "id": "empty-ms79noac-335d",
+        "kind": "finish",
+        "x": 2776,
+        "y": 3524,
+        "title": "Закрытие чата",
+        "subtitle": "",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "finish",
+        "muted": false,
+        "operationType": "fallback-placeholder"
+      },
+      {
+        "id": "empty-ms79noyj-7430",
+        "kind": "finish",
+        "x": 2776,
+        "y": 3028,
+        "title": "Закрытие чата",
+        "subtitle": "",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "finish",
+        "muted": false,
+        "operationType": "fallback-placeholder"
+      },
+      {
+        "id": "empty-ms79npbk-aefa",
+        "kind": "finish",
+        "x": 2776,
+        "y": 3152,
+        "title": "Закрытие чата",
+        "subtitle": "",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "finish",
+        "muted": false,
+        "operationType": "fallback-placeholder"
+      },
+      {
+        "id": "empty-ms79nq4i-203f",
+        "kind": "finish",
+        "x": 2776,
+        "y": 3276,
+        "title": "Закрытие чата",
+        "subtitle": "",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "finish",
+        "muted": false,
+        "operationType": "fallback-placeholder"
+      },
+      {
+        "id": "empty-ms79o815-0e82",
+        "kind": "finish",
+        "x": 2948,
+        "y": 2104,
+        "title": "Закрытие чата",
+        "subtitle": "",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "finish",
+        "muted": false,
+        "operationType": "fallback-placeholder"
+      },
+      {
+        "id": "empty-ms79o9ku-8874",
+        "kind": "transfer",
+        "x": 2948,
+        "y": 1880,
+        "title": "На сотрудника: Лемаева Юлия",
+        "subtitle": "Ожидание ответа: 1 мин.",
+        "color": "var(--cmgui-color-special-2)",
+        "icon": "user-20",
+        "muted": false,
+        "operationType": "employee-transfer",
+        "settings": {
+          "simpleTransfer": {
+            "operationType": "employee-transfer",
+            "employeeName": "Лемаева Юлия",
+            "responseTimeout": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "employeeDropdownOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-ms79oas5-8df0",
+        "kind": "transfer",
+        "x": 2948,
+        "y": 2284,
+        "title": "На последнего менеджера",
+        "subtitle": "Ожидание ответа: 1 мин.",
+        "color": "var(--cmgui-color-special-2)",
+        "icon": "last-manager",
+        "muted": false,
+        "operationType": "last-manager-transfer",
+        "settings": {
+          "simpleTransfer": {
+            "operationType": "last-manager-transfer",
+            "employeeName": "",
+            "responseTimeout": 60,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "employeeDropdownOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-ms79ogvx-b306",
+        "kind": "message",
+        "x": 3504,
+        "y": 1880,
+        "title": "Информационное сообщение",
+        "subtitle": "Следующая операция через: 1 сек.",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "info-message",
+        "muted": false,
+        "operationType": "info-message",
+        "settings": {
+          "infoMessage": {
+            "messageText": "вцвц",
+            "transitionDelay": 1,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-ms79p8f0-4274",
+        "kind": "menuNode",
+        "x": 3544,
+        "y": 2284,
+        "title": "Меню",
+        "subtitle": "Ожидание нажатия кнопки: 20 сек.",
+        "color": "var(--cmgui-color-special-13)",
+        "icon": "menu",
+        "muted": false,
+        "operationType": "menu-operation",
+        "settings": {
+          "menu": {
+            "messageText": "аауу",
+            "waitTime": 20,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "buttons": [
+              {
+                "id": "menu-button-ms79q7ed-f80a",
+                "text": "Кнопка"
+              },
+              {
+                "id": "menu-button-ms79q862-b09a",
+                "text": "Кнопка"
+              },
+              {
+                "id": "menu-button-ms79q8ky-858a",
+                "text": "Кнопка"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "empty-ms79q7ed-3fe0",
+        "kind": "finish",
+        "x": 4144,
+        "y": 2044,
+        "title": "Закрытие чата",
+        "subtitle": "",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "finish",
+        "muted": false,
+        "operationType": "fallback-placeholder"
+      },
+      {
+        "id": "empty-ms79q7ed-cad2",
+        "kind": "message",
+        "x": 4144,
+        "y": 2288,
+        "title": "Информационное сообщение",
+        "subtitle": "Следующая операция через: 1 сек.",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "info-message",
+        "muted": false,
+        "operationType": "info-message",
+        "settings": {
+          "infoMessage": {
+            "messageText": "цыцв",
+            "transitionDelay": 1,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-ms79q7ed-3e29",
+        "kind": "message",
+        "x": 4148,
+        "y": 2552,
+        "title": "Информационное сообщение",
+        "subtitle": "Следующая операция через: 1 сек.",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "info-message",
+        "muted": false,
+        "operationType": "info-message",
+        "settings": {
+          "infoMessage": {
+            "messageText": "ыммв",
+            "transitionDelay": 1,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-ms79q863-0977",
+        "kind": "message",
+        "x": 4144,
+        "y": 2168,
+        "title": "Информационное сообщение",
+        "subtitle": "Следующая операция через: 1 сек.",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "info-message",
+        "muted": false,
+        "operationType": "info-message",
+        "settings": {
+          "infoMessage": {
+            "messageText": "аацац",
+            "transitionDelay": 1,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-ms79q8ky-1f12",
+        "kind": "message",
+        "x": 4144,
+        "y": 2436,
+        "title": "Информационное сообщение",
+        "subtitle": "Следующая операция через: 1 сек.",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "info-message",
+        "muted": false,
+        "operationType": "info-message",
+        "settings": {
+          "infoMessage": {
+            "messageText": "ацыавц",
+            "transitionDelay": 1,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false
+          }
+        }
+      },
+      {
+        "id": "empty-ms79qj5x-dd14",
+        "kind": "menuNode",
+        "x": 4768,
+        "y": 2168,
+        "title": "Меню",
+        "subtitle": "Ожидание нажатия кнопки: 20 сек.",
+        "color": "var(--cmgui-color-special-13)",
+        "icon": "menu",
+        "muted": false,
+        "operationType": "menu-operation",
+        "settings": {
+          "menu": {
+            "messageText": "цвцв",
+            "waitTime": 20,
+            "timeoutUnit": "seconds",
+            "cycleLimit": 1,
+            "technicalOpen": false,
+            "buttons": [
+              {
+                "id": "menu-button-ms79r1po-7002",
+                "text": "Кнопка"
+              },
+              {
+                "id": "menu-button-ms79r2dr-b052",
+                "text": "Кнопка"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "empty-ms79r1po-6746",
+        "kind": "finish",
+        "x": 5376,
+        "y": 1984,
+        "title": "Закрытие чата",
+        "subtitle": "",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "finish",
+        "muted": false,
+        "operationType": "fallback-placeholder"
+      },
+      {
+        "id": "empty-ms79r1po-039a",
+        "kind": "finish",
+        "x": 5376,
+        "y": 2232,
+        "title": "Закрытие чата",
+        "subtitle": "",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "finish",
+        "muted": false,
+        "operationType": "fallback-placeholder"
+      },
+      {
+        "id": "empty-ms79r1po-9581",
+        "kind": "finish",
+        "x": 5380,
+        "y": 2356,
+        "title": "Закрытие чата",
+        "subtitle": "",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "finish",
+        "muted": false,
+        "operationType": "fallback-placeholder"
+      },
+      {
+        "id": "empty-ms79r2ds-6369",
+        "kind": "finish",
+        "x": 5376,
+        "y": 2108,
+        "title": "Закрытие чата",
+        "subtitle": "",
+        "color": "var(--cmgui-color-special-15)",
+        "icon": "finish",
+        "muted": false,
+        "operationType": "fallback-placeholder"
+      }
+    ],
+    "edges": [
+      {
+        "id": "empty-mpcg50x7-0c07-empty-mpcg6mx2-67f8-539bac5dd5f",
+        "source": "empty-mpcg50x7-0c07",
+        "target": "empty-mpcg6mx2-67f8",
+        "label": "Рабочее время",
+        "tone": "plain",
+        "outputKey": "schedule-mpcg6mx2-d5ab",
+        "__labelClipped": false,
+        "routeOffsets": {
+          "1": {
+            "value": -228,
+            "orientation": "vertical"
+          }
+        }
+      },
+      {
+        "id": "empty-mpcg50x7-0c07-empty-mpcg6mx3-7dcd-1b60a3147c937",
+        "source": "empty-mpcg50x7-0c07",
+        "target": "empty-mpcg6mx3-7dcd",
+        "label": "Вне графика",
+        "tone": "plain",
+        "outputKey": "out-of-schedule",
+        "__labelClipped": false,
+        "routeOffsets": {
+          "3": {
+            "value": 32,
+            "orientation": "vertical"
+          }
+        }
+      },
+      {
+        "id": "empty-mpcg50x7-0c07-empty-mpcg6ojk-d162-800f6a50bee308",
+        "source": "empty-mpcg50x7-0c07",
+        "target": "empty-mpcg6ojk-d162",
+        "label": "Праздники",
+        "tone": "plain",
+        "outputKey": "schedule-mpcg6ojj-f999",
+        "__labelClipped": false,
+        "routeOffsets": {
+          "1": {
+            "value": -328,
+            "orientation": "vertical"
+          }
+        }
+      },
+      {
+        "id": "empty-mpcg6ojk-d162-empty-mpchjwze-8ff0-571460bd3cd71",
+        "source": "empty-mpcg6ojk-d162",
+        "target": "empty-mpchjwze-8ff0",
+        "label": "Форма заполнена",
+        "tone": "plain",
+        "outputKey": "completed",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-mpcg6ojk-d162-empty-mpchjwzf-4c8f-f5cfb60d97915",
+        "source": "empty-mpcg6ojk-d162",
+        "target": "empty-mpchjwzf-4c8f",
+        "label": "Форма не заполнена",
+        "tone": "plain",
+        "outputKey": "expired",
+        "__labelClipped": false
+      },
+      {
+        "id": "menuNode-mpchtpjs-empty-mpchtpjt-a9dc-2a96c6c376a3b",
+        "source": "menuNode-mpchtpjs",
+        "target": "empty-mpchtpjt-a9dc",
+        "label": "1. Кнопка",
+        "tone": "plain",
+        "outputKey": "menu-button-mpchtpjs-adbd",
+        "__labelClipped": false
+      },
+      {
+        "id": "menuNode-mpchtpjs-empty-mpchtpjt-960c-4186d0d032d2a8",
+        "source": "menuNode-mpchtpjs",
+        "target": "empty-mpchtpjt-960c",
+        "label": "Кнопка не нажата",
+        "tone": "plain",
+        "outputKey": "button-not-clicked",
+        "__labelClipped": false,
+        "routeOffsets": {
+          "1": {
+            "value": 32,
+            "orientation": "vertical"
+          }
+        }
+      },
+      {
+        "id": "menuNode-mpchtpjs-empty-mpchtpjt-36d0-c01c45317ce458",
+        "source": "menuNode-mpchtpjs",
+        "target": "empty-mpchtpjt-36d0",
+        "label": "Некорректный ввод",
+        "tone": "plain",
+        "outputKey": "invalid-input",
+        "__labelClipped": false,
+        "routeOffsets": {
+          "1": {
+            "value": -40,
+            "orientation": "vertical"
+          }
+        }
+      },
+      {
+        "id": "menuNode-mpchtpjs-empty-mpchtqkt-8c9a-3660f25747e78",
+        "source": "menuNode-mpchtpjs",
+        "target": "empty-mpchtqkt-8c9a",
+        "label": "2. Кнопка",
+        "tone": "plain",
+        "outputKey": "menu-button-mpchtqks-3f1a",
+        "__labelClipped": false,
+        "routeOffsets": {
+          "1": {
+            "value": -4,
+            "orientation": "vertical"
+          }
+        }
+      },
+      {
+        "id": "menuNode-mpchtpjs-empty-mpchtqyc-d4ec-c888d52443ee1",
+        "source": "menuNode-mpchtpjs",
+        "target": "empty-mpchtqyc-d4ec",
+        "label": "3. Кнопка",
+        "tone": "plain",
+        "outputKey": "menu-button-mpchtqyc-a5c0",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-mpcg6mx2-67f8-menuNode-mpchtpjs-77dc5b707270b8",
+        "source": "empty-mpcg6mx2-67f8",
+        "target": "menuNode-mpchtpjs",
+        "label": "Никто не ответил",
+        "tone": "plain",
+        "outputKey": "failed",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-mpcg50x7-0c07-empty-mpchwr98-b73a-b5f6788e0696f",
+        "source": "empty-mpcg50x7-0c07",
+        "target": "empty-mpchwr98-b73a",
+        "label": "Будние дни",
+        "tone": "plain",
+        "outputKey": "schedule-mpchwr96-cd10",
+        "__labelClipped": false,
+        "routeOffsets": {
+          "1": {
+            "value": -64,
+            "orientation": "vertical"
+          }
+        }
+      },
+      {
+        "id": "empty-mpcg50x7-0c07-empty-mpchwrnu-6e3d-7cef15f9c8fc38",
+        "source": "empty-mpcg50x7-0c07",
+        "target": "empty-mpchwrnu-6e3d",
+        "label": "Нерабочее время",
+        "tone": "plain",
+        "outputKey": "schedule-mpchwrnt-6a19",
+        "__labelClipped": false,
+        "routeOffsets": {
+          "1": {
+            "value": 12,
+            "orientation": "vertical"
+          }
+        }
+      },
+      {
+        "id": "empty-mpcg50x7-0c07-empty-mpchws77-3ae6-460ceb8658461",
+        "source": "empty-mpcg50x7-0c07",
+        "target": "empty-mpchws77-3ae6",
+        "label": "Выходные дни",
+        "tone": "plain",
+        "outputKey": "schedule-mpchws77-aedd",
+        "__labelClipped": false,
+        "routeOffsets": {
+          "1": {
+            "value": -11,
+            "orientation": "vertical"
+          }
+        }
+      },
+      {
+        "id": "empty-mpchwrnu-6e3d-empty-mpchxf6r-bcf9-1a975714627cf8",
+        "source": "empty-mpchwrnu-6e3d",
+        "target": "empty-mpchxf6r-bcf9",
+        "label": "Менеджер не закреплен",
+        "tone": "plain",
+        "outputKey": "manager-not-assigned",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-mpchwr98-b73a-transfer-mpchxudv-f17ae8f1b748d8",
+        "source": "empty-mpchwr98-b73a",
+        "target": "transfer-mpchxudv",
+        "label": "Форма не заполнена",
+        "tone": "plain",
+        "outputKey": "expired",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-mpcg6mx3-7dcd-transfer-ms6k7ghb-be5d665608d81",
+        "source": "empty-mpcg6mx3-7dcd",
+        "target": "transfer-ms6k7ghb",
+        "label": "Без сегмента",
+        "tone": "plain",
+        "outputKey": "without-segment",
+        "__labelClipped": false
+      },
+      {
+        "id": "transfer-mpchxudv-transfer-ms6kdw5s-ee87fa81f978a",
+        "source": "transfer-mpchxudv",
+        "target": "transfer-ms6kdw5s",
+        "label": "Менеджер не ответил",
+        "tone": "plain",
+        "outputKey": "failed",
+        "__labelClipped": false
+      },
+      {
+        "id": "transfer-ms6kdw5s-transfer-ms6muldl-7ab92aa53831c",
+        "source": "transfer-ms6kdw5s",
+        "target": "transfer-ms6muldl",
+        "label": "Никто не ответил",
+        "tone": "plain",
+        "outputKey": "failed",
+        "__labelClipped": false
+      },
+      {
+        "id": "transfer-ms6muldl-empty-ms6muldl-061e-3c9180f21337d8",
+        "source": "transfer-ms6muldl",
+        "target": "empty-ms6muldl-061e",
+        "label": "Никто не ответил",
+        "tone": "plain",
+        "outputKey": "failed",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-mpchtqyc-d4ec-condition-ms795s90-bf643bbfbd3c7",
+        "source": "empty-mpchtqyc-d4ec",
+        "target": "condition-ms795s90",
+        "label": "Форма заполнена",
+        "tone": "plain",
+        "outputKey": "completed",
+        "__labelClipped": false
+      },
+      {
+        "id": "condition-ms795s90-empty-ms795s91-3405-65fcc85cdd91a",
+        "source": "condition-ms795s90",
+        "target": "empty-ms795s91-3405",
+        "label": "Группа условий 1",
+        "tone": "plain",
+        "outputKey": "condition-group-ms795s91-9043",
+        "__labelClipped": false
+      },
+      {
+        "id": "condition-ms795s90-empty-ms795s91-fc71-45dbaedeec9aa8",
+        "source": "condition-ms795s90",
+        "target": "empty-ms795s91-fc71",
+        "label": "Условия не выполнены",
+        "tone": "plain",
+        "outputKey": "condition-not-matched",
+        "__labelClipped": false
+      },
+      {
+        "id": "condition-ms795s90-empty-ms795xhz-b6f7-c4722a7abb7d48",
+        "source": "condition-ms795s90",
+        "target": "empty-ms795xhz-b6f7",
+        "label": "Группа условий 2",
+        "tone": "plain",
+        "outputKey": "condition-group-ms795xhz-0b3e",
+        "__labelClipped": false
+      },
+      {
+        "id": "condition-ms795s90-empty-ms79603z-c317-162e0246a19ce",
+        "source": "condition-ms795s90",
+        "target": "empty-ms79603z-c317",
+        "label": "Группа условий 3",
+        "tone": "plain",
+        "outputKey": "condition-group-ms79603z-3396",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms795s91-3405-empty-ms796sxo-9553-fbc1a2388ef188",
+        "source": "empty-ms795s91-3405",
+        "target": "empty-ms796sxo-9553",
+        "label": "Сотрудник не ответил",
+        "tone": "plain",
+        "outputKey": "failed",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms795xhz-b6f7-empty-ms796yqb-eff5-a73af2bc6125b8",
+        "source": "empty-ms795xhz-b6f7",
+        "target": "empty-ms796yqb-eff5",
+        "label": "Никто не ответил",
+        "tone": "plain",
+        "outputKey": "failed",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79603z-c317-empty-ms7972n8-0c26-ac15554d2c166",
+        "source": "empty-ms79603z-c317",
+        "target": "empty-ms7972n8-0c26",
+        "label": "Форма заполнена",
+        "tone": "plain",
+        "outputKey": "completed",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79603z-c317-empty-ms7972n8-034b-79d0244eb54448",
+        "source": "empty-ms79603z-c317",
+        "target": "empty-ms7972n8-034b",
+        "label": "Форма не заполнена",
+        "tone": "plain",
+        "outputKey": "expired",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-mpchtqyc-d4ec-copy-ms798p87-e0c5-condition-ms795s90-copy-ms798p87-c1b0-23405a2f4abf48",
+        "source": "empty-mpchtqyc-d4ec-copy-ms798p87-e0c5",
+        "target": "condition-ms795s90-copy-ms798p87-c1b0",
+        "label": "Форма заполнена",
+        "tone": "plain",
+        "outputKey": "completed",
+        "__labelClipped": false
+      },
+      {
+        "id": "condition-ms795s90-copy-ms798p87-c1b0-empty-ms795s91-3405-copy-ms798p87-bbfe-f6e0641c85e67",
+        "source": "condition-ms795s90-copy-ms798p87-c1b0",
+        "target": "empty-ms795s91-3405-copy-ms798p87-bbfe",
+        "label": "Группа условий 1",
+        "tone": "plain",
+        "outputKey": "condition-group-ms795s91-9043",
+        "__labelClipped": false
+      },
+      {
+        "id": "condition-ms795s90-copy-ms798p87-c1b0-empty-ms795s91-fc71-copy-ms798p87-e6f9-ea397084f022",
+        "source": "condition-ms795s90-copy-ms798p87-c1b0",
+        "target": "empty-ms795s91-fc71-copy-ms798p87-e6f9",
+        "label": "Условия не выполнены",
+        "tone": "plain",
+        "outputKey": "condition-not-matched",
+        "__labelClipped": false
+      },
+      {
+        "id": "condition-ms795s90-copy-ms798p87-c1b0-empty-ms795xhz-b6f7-copy-ms798p87-e92e-f99dfcd69d5168",
+        "source": "condition-ms795s90-copy-ms798p87-c1b0",
+        "target": "empty-ms795xhz-b6f7-copy-ms798p87-e92e",
+        "label": "Группа условий 2",
+        "tone": "plain",
+        "outputKey": "condition-group-ms795xhz-0b3e",
+        "__labelClipped": false
+      },
+      {
+        "id": "condition-ms795s90-copy-ms798p87-c1b0-empty-ms79603z-c317-copy-ms798p87-feef-cbac8a55c8ebc8",
+        "source": "condition-ms795s90-copy-ms798p87-c1b0",
+        "target": "empty-ms79603z-c317-copy-ms798p87-feef",
+        "label": "Группа условий 3",
+        "tone": "plain",
+        "outputKey": "condition-group-ms79603z-3396",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms795s91-3405-copy-ms798p87-bbfe-empty-ms796sxo-9553-copy-ms798p87-1270-4d5743b80e106",
+        "source": "empty-ms795s91-3405-copy-ms798p87-bbfe",
+        "target": "empty-ms796sxo-9553-copy-ms798p87-1270",
+        "label": "Сотрудник не ответил",
+        "tone": "plain",
+        "outputKey": "failed",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms795xhz-b6f7-copy-ms798p87-e92e-empty-ms796yqb-eff5-copy-ms798p87-6c3c-3af7fbbd713398",
+        "source": "empty-ms795xhz-b6f7-copy-ms798p87-e92e",
+        "target": "empty-ms796yqb-eff5-copy-ms798p87-6c3c",
+        "label": "Никто не ответил",
+        "tone": "plain",
+        "outputKey": "failed",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79603z-c317-copy-ms798p87-feef-empty-ms7972n8-0c26-copy-ms798p87-fda4-8989a944cd25c8",
+        "source": "empty-ms79603z-c317-copy-ms798p87-feef",
+        "target": "empty-ms7972n8-0c26-copy-ms798p87-fda4",
+        "label": "Форма заполнена",
+        "tone": "plain",
+        "outputKey": "completed",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79603z-c317-copy-ms798p87-feef-empty-ms7972n8-034b-copy-ms798p87-e699-6cc95837cc641",
+        "source": "empty-ms79603z-c317-copy-ms798p87-feef",
+        "target": "empty-ms7972n8-034b-copy-ms798p87-e699",
+        "label": "Форма не заполнена",
+        "tone": "plain",
+        "outputKey": "expired",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-mpcg50x7-0c07-empty-mpchtqyc-d4ec-copy-ms798p87-e0c5-da3f13d54b8c08",
+        "source": "empty-mpcg50x7-0c07",
+        "target": "empty-mpchtqyc-d4ec-copy-ms798p87-e0c5",
+        "label": "VIP-линия",
+        "tone": "plain",
+        "outputKey": "schedule-ms7941ju-2a47",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-mpcg50x7-0c07-empty-mpchtqkt-8c9a-copy-ms798p87-fc66-de5ec772a136a",
+        "source": "empty-mpcg50x7-0c07",
+        "target": "empty-mpchtqkt-8c9a-copy-ms798p87-fc66",
+        "label": "Регион Санкт-Петербург",
+        "tone": "plain",
+        "outputKey": "schedule-ms7946vz-e992",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-mpcg50x7-0c07-empty-mpchtpjt-36d0-copy-ms798p87-07c4-6873e68f43eb4",
+        "source": "empty-mpcg50x7-0c07",
+        "target": "empty-mpchtpjt-36d0-copy-ms798p87-07c4",
+        "label": "Дежурная группа",
+        "tone": "plain",
+        "outputKey": "schedule-ms7942a8-50b4",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-mpcg50x7-0c07-empty-mpchtpjt-a9dc-copy-ms798p87-0ae5-cd85f312f25648",
+        "source": "empty-mpcg50x7-0c07",
+        "target": "empty-mpchtpjt-a9dc-copy-ms798p87-0ae5",
+        "label": "Регион Москва",
+        "tone": "plain",
+        "outputKey": "schedule-ms7945v0-d8f7",
+        "__labelClipped": false
+      },
+      {
+        "id": "incoming-menuNode-ms79g7x0-1a06b3d0b8ece",
+        "source": "incoming",
+        "target": "menuNode-ms79g7x0",
+        "label": "",
+        "tone": "plain",
+        "outputKey": "main"
+      },
+      {
+        "id": "menuNode-ms79g7x0-empty-ms79g8pr-8473-bb8b3feb9a226",
+        "source": "menuNode-ms79g7x0",
+        "target": "empty-ms79g8pr-8473",
+        "label": "2. Кнопка",
+        "tone": "plain",
+        "outputKey": "menu-button-ms79g8pr-3674",
+        "__labelClipped": false
+      },
+      {
+        "id": "menuNode-ms79g7x0-empty-mpcg50x7-0c07-cd4dddc43b926",
+        "source": "menuNode-ms79g7x0",
+        "target": "empty-mpcg50x7-0c07",
+        "label": "1. Кнопка",
+        "tone": "plain",
+        "outputKey": "menu-button-ms79g7x0-b402",
+        "__labelClipped": false,
+        "routeOffsets": {
+          "1": {
+            "value": 28,
+            "orientation": "vertical"
+          }
+        }
+      },
+      {
+        "id": "empty-ms79g8pr-8473-empty-ms79noac-a6fe-73390c391b4118",
+        "source": "empty-ms79g8pr-8473",
+        "target": "empty-ms79noac-a6fe",
+        "label": "Сегмент 1",
+        "tone": "plain",
+        "outputKey": "segment-group-ms79noac-f102",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79g8pr-8473-empty-ms79noac-41e2-dee8938181c27",
+        "source": "empty-ms79g8pr-8473",
+        "target": "empty-ms79noac-41e2",
+        "label": "Без сегмента",
+        "tone": "plain",
+        "outputKey": "without-segment",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79g8pr-8473-empty-ms79noac-335d-823a0f8e58bb6",
+        "source": "empty-ms79g8pr-8473",
+        "target": "empty-ms79noac-335d",
+        "label": "Остальные сегменты",
+        "tone": "plain",
+        "outputKey": "other-segments",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79g8pr-8473-empty-ms79noyj-7430-08f2569f093c5",
+        "source": "empty-ms79g8pr-8473",
+        "target": "empty-ms79noyj-7430",
+        "label": "Сегмент 2",
+        "tone": "plain",
+        "outputKey": "segment-group-ms79noyj-6af2",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79g8pr-8473-empty-ms79npbk-aefa-147d5410c083a",
+        "source": "empty-ms79g8pr-8473",
+        "target": "empty-ms79npbk-aefa",
+        "label": "Сегмент 3",
+        "tone": "plain",
+        "outputKey": "segment-group-ms79npbk-00dd",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79g8pr-8473-empty-ms79nq4i-203f-02a3e1a29499d",
+        "source": "empty-ms79g8pr-8473",
+        "target": "empty-ms79nq4i-203f",
+        "label": "Сегмент 4",
+        "tone": "plain",
+        "outputKey": "segment-group-ms79nq4i-5e41",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79noac-a6fe-empty-ms79o815-0e82-9d07cb72869b3",
+        "source": "empty-ms79noac-a6fe",
+        "target": "empty-ms79o815-0e82",
+        "label": "1. Кнопка",
+        "tone": "plain",
+        "outputKey": "menu-button-ms79o815-3416",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79noac-a6fe-empty-ms79o9ku-8874-d2df79683faf08",
+        "source": "empty-ms79noac-a6fe",
+        "target": "empty-ms79o9ku-8874",
+        "label": "2. Кнопка",
+        "tone": "plain",
+        "outputKey": "menu-button-ms79o9ku-0902",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79noac-a6fe-empty-ms79oas5-8df0-93dbc25d3416b8",
+        "source": "empty-ms79noac-a6fe",
+        "target": "empty-ms79oas5-8df0",
+        "label": "3. Кнопка",
+        "tone": "plain",
+        "outputKey": "menu-button-ms79oas5-344f",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79o9ku-8874-empty-ms79ogvx-b306-237b1f6f7a2ba",
+        "source": "empty-ms79o9ku-8874",
+        "target": "empty-ms79ogvx-b306",
+        "label": "Сотрудник не ответил",
+        "tone": "plain",
+        "outputKey": "failed",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79ogvx-b306-transfer-ms6muldl-4a2a4fb4d8bb8",
+        "source": "empty-ms79ogvx-b306",
+        "target": "transfer-ms6muldl",
+        "label": "Сообщение доставлено",
+        "tone": "success",
+        "outputKey": "delivered",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79oas5-8df0-empty-ms79p8f0-4274-8a4029b19aec",
+        "source": "empty-ms79oas5-8df0",
+        "target": "empty-ms79p8f0-4274",
+        "label": "Менеджер не найден",
+        "tone": "plain",
+        "outputKey": "manager-not-found",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79oas5-8df0-transfer-mpchxudv-6eb6be38bab488",
+        "source": "empty-ms79oas5-8df0",
+        "target": "transfer-mpchxudv",
+        "label": "Менеджер не ответил",
+        "tone": "plain",
+        "outputKey": "failed",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79p8f0-4274-empty-ms79q7ed-3fe0-5d2c412db7bab8",
+        "source": "empty-ms79p8f0-4274",
+        "target": "empty-ms79q7ed-3fe0",
+        "label": "1. Кнопка",
+        "tone": "plain",
+        "outputKey": "menu-button-ms79q7ed-f80a",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79p8f0-4274-empty-ms79q7ed-cad2-d9c4952259a62",
+        "source": "empty-ms79p8f0-4274",
+        "target": "empty-ms79q7ed-cad2",
+        "label": "Кнопка не нажата",
+        "tone": "plain",
+        "outputKey": "button-not-clicked",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79p8f0-4274-empty-ms79q7ed-3e29-915dcf20eecb68",
+        "source": "empty-ms79p8f0-4274",
+        "target": "empty-ms79q7ed-3e29",
+        "label": "Некорректный ввод",
+        "tone": "plain",
+        "outputKey": "invalid-input",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79p8f0-4274-empty-ms79q863-0977-b26243ff10726",
+        "source": "empty-ms79p8f0-4274",
+        "target": "empty-ms79q863-0977",
+        "label": "2. Кнопка",
+        "tone": "plain",
+        "outputKey": "menu-button-ms79q862-b09a",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79p8f0-4274-empty-ms79q8ky-1f12-4c1ab63d2d2c58",
+        "source": "empty-ms79p8f0-4274",
+        "target": "empty-ms79q8ky-1f12",
+        "label": "3. Кнопка",
+        "tone": "plain",
+        "outputKey": "menu-button-ms79q8ky-858a",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79q863-0977-empty-ms79qj5x-dd14-73d2c4540cae18",
+        "source": "empty-ms79q863-0977",
+        "target": "empty-ms79qj5x-dd14",
+        "label": "Сообщение доставлено",
+        "tone": "success",
+        "outputKey": "delivered",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79qj5x-dd14-empty-ms79r1po-6746-5d483959d9f5a8",
+        "source": "empty-ms79qj5x-dd14",
+        "target": "empty-ms79r1po-6746",
+        "label": "1. Кнопка",
+        "tone": "plain",
+        "outputKey": "menu-button-ms79r1po-7002",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79qj5x-dd14-empty-ms79r1po-039a-5a6e6c8a4c2ca",
+        "source": "empty-ms79qj5x-dd14",
+        "target": "empty-ms79r1po-039a",
+        "label": "Кнопка не нажата",
+        "tone": "plain",
+        "outputKey": "button-not-clicked",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79qj5x-dd14-empty-ms79r1po-9581-b00eb5f103035",
+        "source": "empty-ms79qj5x-dd14",
+        "target": "empty-ms79r1po-9581",
+        "label": "Некорректный ввод",
+        "tone": "plain",
+        "outputKey": "invalid-input",
+        "__labelClipped": false
+      },
+      {
+        "id": "empty-ms79qj5x-dd14-empty-ms79r2ds-6369-5c70233d8a9d28",
+        "source": "empty-ms79qj5x-dd14",
+        "target": "empty-ms79r2ds-6369",
+        "label": "2. Кнопка",
+        "tone": "plain",
+        "outputKey": "menu-button-ms79r2dr-b052",
+        "__labelClipped": false
+      }
+    ],
+    "viewport": {
+      "x": -397.38100903750046,
+      "y": 263.84836031126974,
+      "k": 0.25
+    }
+  },
+  "createdAt": 1778744171518,
+  "updatedAt": 1785412713223
+}
