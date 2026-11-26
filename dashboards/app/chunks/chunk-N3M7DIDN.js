@@ -1,0 +1,1 @@
+import{Qb as r,eb as t,fc as o}from"./chunk-EIRITYSS.js";var a={data:[]},d=e=>{let{data:i=a,isFetching:s,isLoading:n}=t({queryKey:[r.getReportFilters,e],queryFn:()=>o({params:{report_type:e,limit:1e4}}),placeholderData:a,enabled:!!e});return{reportFilters:i.data,isLoading:n||s}};export{d as a};

@@ -1,0 +1,1 @@
+import{a as n,bb as i}from"./chunk-EIRITYSS.js";import{e as a}from"./chunk-GCIE2SXQ.js";var r=a(n());var l=()=>{let e=i();return{invalidateQueries:(0,r.useCallback)(async(...t)=>{await e.invalidateQueries({queryKey:[...t]})},[e])}};export{l as a};

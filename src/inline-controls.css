@@ -1,0 +1,93 @@
+.edge-tooltip {
+  position: fixed;
+  z-index: 110;
+  display: none;
+  max-width: 280px;
+  padding: 8px 12px;
+  border-radius: var(--cmgui-border-radius-medium);
+  background: var(--cmgui-color-text-primary);
+  color: var(--cmgui-color-text-invert);
+  box-shadow: var(--cmgui-shadow-large);
+  font: var(--cmgui-font-caption);
+  pointer-events: none;
+}
+
+.edge-tooltip.is-narrow {
+  max-width: 168px;
+}
+
+.edge-tooltip.is-open {
+  display: block;
+}
+
+.node-settings-title-wrap {
+  max-width: calc(100% - 44px);
+  min-width: 0;
+  display: inline-flex;
+  align-items: flex-start;
+  position: relative;
+  min-height: 28px;
+}
+
+.node-settings-title-text {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-settings-title-wrap.is-editable .node-settings-title-text {
+  cursor: text;
+}
+
+.node-settings-title-edit {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  display: grid;
+  place-items: center;
+  margin: 0 0 0 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--cmgui-color-icon-primary);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 120ms ease, color 120ms ease;
+}
+
+.node-settings-title-wrap.is-editable:hover .node-settings-title-edit {
+  opacity: 1;
+}
+
+.node-settings-title-edit:hover {
+  color: var(--cmgui-color-icon-secondary);
+}
+
+.node-settings-title-input {
+  width: min(100%, 560px);
+  height: 28px;
+  display: none;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: var(--cmgui-color-bg-main-white);
+  color: var(--cmgui-color-text-primary);
+  font: var(--cmgui-font-title-overlay);
+  line-height: 28px;
+  letter-spacing: 0;
+}
+
+.node-settings-title-wrap.is-editing {
+  width: calc(100% - 44px);
+}
+
+.node-settings-title-wrap.is-editing .node-settings-title-text,
+.node-settings-title-wrap.is-editing .node-settings-title-edit {
+  display: none;
+}
+
+.node-settings-title-wrap.is-editing .node-settings-title-input {
+  display: block;
+}

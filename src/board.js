@@ -449,7 +449,14 @@ function renderMenu() {
   const top = ["menu-star-20", "menu-analytic-report-20", "menu-dashboard-20", "menu-message-20", "menu-settings-20", "menu-integrations-20"];
   const bottom = ["menu-notification-20", "menu-info-20", "menu-user-20"];
   document.querySelector("#menuTop").innerHTML = top
-    .map((item, index) => `<button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button is-compact is-subtle ${index === 4 ? "is-active" : ""}" title="Раздел"><span class="cmgui-icon">${iconSvg(item, 20)}</span></button>`)
+    .map((item, index) => {
+      const buttonClasses = "cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button is-compact is-subtle";
+      const icon = `<span class="cmgui-icon">${iconSvg(item, 20)}</span>`;
+      if (item === "menu-dashboard-20") {
+        return `<a class="${buttonClasses}" href="./dashboards/" title="Дашборды" aria-label="Дашборды">${icon}</a>`;
+      }
+      return `<button class="${buttonClasses} ${index === 4 ? "is-active" : ""}" title="Раздел">${icon}</button>`;
+    })
     .join("");
   document.querySelector("#menuBottom").innerHTML = bottom
     .map((item) => `<button class="cmgui-button cmgui-button-size-extrasmall cmgui-button-secondary cmgui-button-ghost cmgui-button-round icon-button is-compact is-subtle" title="Раздел"><span class="cmgui-icon">${iconSvg(item, 20)}</span></button>`)
