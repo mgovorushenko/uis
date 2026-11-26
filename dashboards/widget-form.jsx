@@ -25,8 +25,8 @@ const help = {
   source: "Отчет, из которого виджет берет данные. От источника зависят доступные показатели",
   metric: "Выберите, что будет измерять виджет. Например, количество звонков или долю пропущенных.",
   group: "Разделите данные на группы, например по сайту. Для каждой группы на графике появится своя линия.",
-  limit: "Сколько групп можно показать на графике одновременно.",
-  second: "Включите, чтобы сравнить два показателя на одном графике",
+  limit: "Сколько групп можно показать на графике одновременно",
+  second: "Сравните два показателя на одном графике. У второго показателя будет своя шкала.",
 };
 
 function Help({ field, label }) {
@@ -35,7 +35,7 @@ function Help({ field, label }) {
   return (
     <Tooltip text={<span id={id} role="tooltip">{help[field]}</span>} innerClassname="widget-help-tooltip"
       visible={visible} onVisibleChange={setVisible} placement="right" mouseEnterDelay={0.3}
-      maxWidth="min(360px, calc(100vw - 32px))">
+      maxWidth="min(260px, calc(100vw - 32px))">
       <button className="widget-help" type="button" aria-label={`Подсказка: ${label}`} aria-describedby={visible ? id : undefined}
         onFocus={(event) => { if (event.currentTarget.matches(":focus-visible")) setVisible(true); }}
         onBlur={() => setVisible(false)} onClick={() => setVisible(true)}
@@ -149,7 +149,7 @@ function LineFields({ values, columnData, currentWidget }) {
       <div className="widget-designer-second">
         <Switch name="secondColumnControl" checked={Boolean(values.secondColumnControl)}
           disabled={Boolean(currentWidget?.displayParams?.compareModeEnabled)} onChange={toggleSecond}>
-          Показывать второй показатель
+          Второй показатель
         </Switch>
         <Help field="second" label="Второй показатель" />
       </div>
@@ -179,8 +179,12 @@ export function WidgetModalContent({ currentWidget, isCreateMode }) {
   const isSimple = ["divider", "textArea"].includes(values.chartType);
   const automaticTitle = metricName || (isLine ? "Новый график" : "Новый виджет");
   const title = customTitle || automaticTitle;
-  const secondMetricMissing = isLine && values.secondColumnControl && !values.columns?.[1]?.id;
-  const canPreview = isValid && (isSimple || (Boolean(metricId) && !secondMetricMissing));
+  const needsBothMetrics = isLine && values.secondColumnControl && (!metricId || !values.columns?.[1]?.id);
+  const canPreview = isValid && (isSimple || (Boolean(metricId) && !needsBothMetrics));
+  const previewPrompt = !values.report_type && !isSimple ? "Выберите источник данных"
+    : needsBothMetrics ? "Выберите оба показателя"
+    : !metricId && !isSimple ? "Выберите показатель"
+    : "Заполните обязательные поля";
   const close = () => setWidgetModalParams({ visible: false });
 
   useEffect(() => {
@@ -228,7 +232,7 @@ export function WidgetModalContent({ currentWidget, isCreateMode }) {
                   <div className="widget-designer-visibility">
                     <Checkbox checked={showLegend} label="Легенда" onChange={() => setShowLegend((current) => !current)} />
                   </div>
-                  <div className="widget-designer-detail"><DateTimeDimensions popupMatchSelectWidth={176} selectPlacement="bottomRight" /></div>
+                  <div className="widget-designer-detail"><DateTimeDimensions /></div>
                 </div>
               )}
               <div className="widget-designer-chart">
@@ -238,7 +242,7 @@ export function WidgetModalContent({ currentWidget, isCreateMode }) {
               </div>
             </>
           ) : (
-            <p role="status">{!values.report_type && !isSimple ? "Выберите источник данных" : !metricId && !isSimple ? "Выберите показатель" : secondMetricMissing ? "Выберите второй показатель" : "Заполните обязательные поля"}</p>
+            <p role="status">{previewPrompt}</p>
           )}
         </section>
       </div>

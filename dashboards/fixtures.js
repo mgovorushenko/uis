@@ -170,6 +170,29 @@ function demoFlatReport(params) {
   };
 }
 
+const fixtureDay = 86400000;
+const dayNumber = (date) => Date.parse(date.slice(0, 10) + "T00:00:00Z") / fixtureDay;
+const referenceDay = dayNumber(initialReport.date_from);
+
+function lineMetricValue(metric, rowIndices, from, till) {
+  const lastDay = dayNumber(till);
+  const isPercentage = metrics.find(([id]) => id === metric)?.[2] === "percentage";
+  let total = 0;
+  let observations = 0;
+  for (let day = dayNumber(from); day <= lastDay; day++) {
+    for (const rowIndex of rowIndices) {
+      const series = trafficSeries[rowIndex];
+      const dailyIndex = day - referenceDay;
+      const value = metric === "visits"
+        ? series[((dailyIndex % series.length) + series.length) % series.length]
+        : Number(getMetricValue(metric, (((dailyIndex + rowIndex) % 5) + 5) % 5));
+      total += value;
+      observations++;
+    }
+  }
+  return isPercentage && observations ? (total / observations).toFixed(1) : String(total);
+}
+
 function demoReport(params) {
   const requestedColumns = params.columns || [params.main_column, params.additional_column].filter(Boolean);
   const groups = (params.dimensions || params.data_dimensions || []).filter(Boolean);
@@ -188,9 +211,14 @@ function demoReport(params) {
       })),
     ) };
   }
-  const totals = selectedRows.length ? requestedColumns.map((id) => metrics.find(([key]) => key === id)?.[2] === "percentage"
-    ? "84.4"
-    : String(selectedRows.reduce((total, index) => total + Number(getMetricValue(id, index)), 0))) : [];
+  const totals = selectedRows.length ? requestedColumns.map((id) => {
+    if (params.mode === "total") {
+      return lineMetricValue(id, selectedRows, params.date_from || initialReport.date_from, params.date_till || initialReport.date_till);
+    }
+    return metrics.find(([key]) => key === id)?.[2] === "percentage"
+      ? "84.4"
+      : String(selectedRows.reduce((total, index) => total + Number(getMetricValue(id, index)), 0));
+  }) : [];
   const rowsFor = (names, path = []) => names.map((value) => {
     const rowIndex = collectionFor(groups[path.length]).indexOf(value);
     const valueId = String(rowIndex + 1);
@@ -200,23 +228,22 @@ function demoReport(params) {
       rows: path.length + 1 < groups.length ? rowsFor(axisLabels(groups[path.length + 1]), [...path, valueId]) : [],
     };
   });
-  const lineGroups = groups.length ? labels : selectedRows.length ? [null] : [];
-  const lineValue = (metric, label, index, groupIndex) => {
-    if (metric === "visits") {
-      const series = trafficSeries[trafficChannels.indexOf(label)];
-      if (series) return String(series[index % series.length]);
-      if (!label) return String(selectedRows.reduce((sum, rowIndex) => sum + trafficSeries[rowIndex][index % trafficSeries[rowIndex].length], 0));
-    }
-    return getMetricValue(metric, selectedRows[(index + groupIndex) % selectedRows.length]);
-  };
-  const items = lineGroups.flatMap((label, groupIndex) => dateIntervals(params).map((interval, index) => ({
-    datetime_dimension_interval: interval,
-    data_dimensions: label ? [label] : [],
-    data_dimensions_ids: label ? [String(groupIndex + 1)] : [],
-    color: groups[0] === "traffic" ? trafficColors[trafficChannels.indexOf(label)] : undefined,
-    main_column: lineValue(requestedColumns[0], label, index, groupIndex),
-    additional_column: requestedColumns[1] ? lineValue(requestedColumns[1], label, index, groupIndex) : undefined,
-  })));
+  let items = [];
+  if (params.mode === "linechart" || params.mode === "linechart_total") {
+    const intervals = dateIntervals(params);
+    const lineGroups = groups.length ? labels : selectedRows.length ? [null] : [];
+    items = lineGroups.flatMap((label, groupIndex) => {
+      const groupRows = label ? selectedRows.filter((index) => fixtureValue(groups[0], index) === label) : selectedRows;
+      return intervals.map((interval) => ({
+        datetime_dimension_interval: interval,
+        data_dimensions: label ? [label] : [],
+        data_dimensions_ids: label ? [String(groupIndex + 1)] : [],
+        color: groups[0] === "traffic" ? trafficColors[trafficChannels.indexOf(label)] : undefined,
+        main_column: lineMetricValue(requestedColumns[0], groupRows, interval.from, interval.till),
+        additional_column: requestedColumns[1] ? lineMetricValue(requestedColumns[1], groupRows, interval.from, interval.till) : undefined,
+      }));
+    });
+  }
   const rows = rowsFor(labels);
   const sort = params.sort?.[0];
   const column = requestedColumns.indexOf(sort?.field);

@@ -60,16 +60,6 @@ export function widgetOverrides() {
         return { contents, loader: "js", resolveDir: dirname(path) };
       });
 
-      build.onLoad({ filter: /\/widget-form\/components\/DateTimeDimensions\.js$/ }, async ({ path }) => {
-        if (!path.includes("/@comagic/reports/lib/")) return;
-        let contents = await readFile(path, "utf8");
-        contents = replaceOnce(contents, "const DateTimeDimensions = () => {",
-          "const DateTimeDimensions = ({ popupMatchSelectWidth, selectPlacement } = {}) => {");
-        contents = replaceOnce(contents, 'name: "datetime_dimension",\n\t\tlabel:',
-          'name: "datetime_dimension",\n\t\tpopupMatchSelectWidth,\n\t\tselectPlacement,\n\t\tlabel:');
-        return { contents, loader: "js", resolveDir: dirname(path) };
-      });
-
       build.onLoad({ filter: /\/widget-modal\/utils\/isWidgetsEqual\.js$/ }, async ({ path }) => {
         if (!path.includes("/@comagic/reports/lib/")) return;
         let contents = await readFile(path, "utf8");
@@ -81,9 +71,17 @@ export function widgetOverrides() {
         return { contents, loader: "js", resolveDir: dirname(path) };
       });
 
+      build.onResolve({ filter: /^uis-local-line-widget-totals$/ }, () => ({
+        path: fileURLToPath(new URL("./line-widget-totals.jsx", import.meta.url)),
+      }));
+
       build.onLoad({ filter: /\/widget-factory\/LineWidget\.js$/ }, async ({ path }) => {
         if (!path.includes("/@comagic/reports/lib/")) return;
         let contents = await readFile(path, "utf8");
+        contents = replaceOnce(contents, "import { getSecondaryYAxisSide } from '../../../utils/getSecondaryYAxisSide.js';",
+          'import { LineWidgetTotals } from "uis-local-line-widget-totals";');
+        contents = replaceOnce(contents, "\tconst secondaryYAxisSide = getSecondaryYAxisSide(firstColumnDataType, secondColumnDataType);\n", "");
+        contents = replaceOnce(contents, "ySide: secondaryYAxisSide,", 'ySide: "right",\n\t\t\thideFromLegend: true,');
         contents = replaceOnce(contents, "SeriesRole, joinInterval, DEFAULT_OPACITY", "SeriesRole, joinInterval");
         contents = replaceOnce(contents, "opacity: DEFAULT_OPACITY,", "opacity: 0.5,");
         contents = replaceOnce(contents, "const { colors } = useThemeColors();", "const { colors, colorsObj } = useThemeColors();");
@@ -99,38 +97,24 @@ export function widgetOverrides() {
           "colorByGroupKey: currentSeries.colorByGroupKey,\n\t\t\tcolors,\n\t\t\tungroupedColor,");
         contents = replaceOnce(contents, "\t\tisWidgetCompareMode,\n\t\tqueryData\n",
           "\t\tisWidgetCompareMode,\n\t\tqueryData,\n\t\tungroupedColor\n");
+        contents = replaceOnce(contents, "return /* @__PURE__ */ jsx(GridItem, {\n\t\twidgetName,",
+          `return /* @__PURE__ */ jsx(GridItem, {
+            widgetName,
+            caption: isDataExist ? jsx(LineWidgetTotals, {
+              params: { date_from: dateFrom, date_till: dateTill, report_type, columns, filter, goal_ids, perspective_window: 60 },
+              columnNames,
+              columnDataTypes,
+              currency
+            }) : null,`);
         contents = replaceOnce(contents, "data: newLineChartData,\n\t\t\trenderTooltip,", "data: newLineChartData,\n\t\t\thideLegend: widget.displayParams.showLegend === false,\n\t\t\trenderTooltip,");
         return { contents, loader: "js", resolveDir: dirname(path) };
       });
 
       build.onLoad({ filter: /\/charts\/line\/useLineChartSeries\.js$/ }, async ({ path }) => {
         if (!path.includes("/@comagic/charts/lib/")) return;
-        let contents = await readFile(path, "utf8");
-        contents = replaceOnce(contents, "import { FAKE_LINE_POINT_PREFIX",
-          'import { SeriesRole } from "../../constants/index.js";\nimport { FAKE_LINE_POINT_PREFIX');
-        contents = replaceOnce(contents, "const normalizeSeries =",
-          "const isSecondary = (item) => [SeriesRole.secondary, SeriesRole.secondaryCompared].includes(item.meta?.metric);\nconst normalizeSeries =");
-        contents = replaceOnce(contents, 'id: `${item.name}-${item.color}`,',
-          'id: `${item.name}-${item.color}${isSecondary(item) ? "-secondary" : ""}`,');
-        contents = replaceOnce(contents, "uniqBy(series, (item) => item.id), [series]",
-          `uniqBy(series, (item) => item.id).map((item) => {
-            const column = item.meta?.column;
-            return isSecondary(item) && column && item.name !== column
-              ? { ...item, name: \`\${item.name} · \${column}\` } : item;
-          }), [series]`);
-        return { contents, loader: "js", resolveDir: dirname(path) };
-      });
-
-      build.onLoad({ filter: /\/LegendItem-[^/]+\.js$/ }, async ({ path }) => {
-        if (!path.includes("/@comagic/charts/lib/")) return;
-        let contents = await readFile(path, "utf8");
-        contents = replaceOnce(contents, "name, onClick, testId }) =>", "name, onClick, opacity = 1, testId }) =>");
-        contents = replaceOnce(contents, 'backgroundColor: isDisabled ? "#fff" : color || "#92968d",\n\t\tborderColor: color || "#92968d"',
-          'backgroundColor: isDisabled ? "#fff" : markerColor,\n\t\tborderColor: markerColor,\n\t\tbackgroundClip: opacity < 1 ? "padding-box" : undefined');
-        contents = replaceOnce(contents, "\tconst style = {",
-          `\tconst baseColor = color || "#92968d";
-          const markerColor = opacity === 1 ? baseColor : \`color-mix(in srgb, \${baseColor} \${opacity * 100}%, transparent)\`;
-          const style = {`);
+        const source = await readFile(path, "utf8");
+        const contents = replaceOnce(source, "uniqBy(series, (item) => item.id)",
+          "uniqBy(series.filter((item) => !item.hideFromLegend), (item) => item.id)");
         return { contents, loader: "js", resolveDir: dirname(path) };
       });
     },

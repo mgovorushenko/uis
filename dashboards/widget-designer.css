@@ -182,6 +182,14 @@
   height: 176px;
 }
 
+.widget-line-totals {
+  margin-top: var(--cmgui-spacing-1);
+  color: var(--cmgui-color-text-primary);
+  font: var(--cmgui-font-caption);
+}
+
+.widget-line-total-separator { margin-inline: 4px; }
+
 .widget-designer-footer {
   display: flex;
   gap: var(--cmgui-spacing-2);
