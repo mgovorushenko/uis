@@ -183,13 +183,21 @@ function lineMetricValue(metric, rowIndices, from, till) {
     for (const rowIndex of rowIndices) {
       const series = trafficSeries[rowIndex];
       const dailyIndex = day - referenceDay;
+      const sample = (((dailyIndex + rowIndex) % 5) + 5) % 5;
+      if (metric === "handled" || metric === "handled_rate") {
+        const incoming = Number(getMetricValue("incoming", sample));
+        total += Math.round(incoming * Number(getMetricValue("handled_rate", sample)) / 100);
+        observations += incoming;
+        continue;
+      }
       const value = metric === "visits"
         ? series[((dailyIndex % series.length) + series.length) % series.length]
-        : Number(getMetricValue(metric, (((dailyIndex + rowIndex) % 5) + 5) % 5));
+        : Number(getMetricValue(metric, sample));
       total += value;
       observations++;
     }
   }
+  if (metric === "handled_rate" && observations) return (100 * total / observations).toFixed(1);
   return isPercentage && observations ? (total / observations).toFixed(1) : String(total);
 }
 
@@ -198,6 +206,9 @@ function demoReport(params) {
   const groups = (params.dimensions || params.data_dimensions || []).filter(Boolean);
   const selectedRows = matchingRows(params.filter);
   const isFiltered = Boolean(params.filter?.field || params.filter?.filters?.length);
+  const from = params.date_from || initialReport.date_from;
+  const till = params.date_till || initialReport.date_till;
+  const valuesFor = (rows) => requestedColumns.map((id) => lineMetricValue(id, rows, from, till));
   const axisLabels = (dimension) => isFiltered
     ? [...new Set(selectedRows.map((index) => fixtureValue(dimension || "employee", index)))]
     : collectionFor(dimension);
@@ -207,25 +218,20 @@ function demoReport(params) {
       axisLabels(groups[1]).map((y, row) => ({
         dimensions: [x, y],
         dimension_ids: [String(column + 1), String(row + 1)],
-        columns: requestedColumns.map((id) => getMetricValue(id, column + row)),
+        columns: valuesFor(selectedRows.filter((index) => fixtureValue(groups[0], index) === x && fixtureValue(groups[1], index) === y)),
       })),
     ) };
   }
-  const totals = selectedRows.length ? requestedColumns.map((id) => {
-    if (params.mode === "total") {
-      return lineMetricValue(id, selectedRows, params.date_from || initialReport.date_from, params.date_till || initialReport.date_till);
-    }
-    return metrics.find(([key]) => key === id)?.[2] === "percentage"
-      ? "84.4"
-      : String(selectedRows.reduce((total, index) => total + Number(getMetricValue(id, index)), 0));
-  }) : [];
-  const rowsFor = (names, path = []) => names.map((value) => {
-    const rowIndex = collectionFor(groups[path.length]).indexOf(value);
+  const totals = selectedRows.length ? valuesFor(selectedRows) : [];
+  const rowsFor = (names, rows = selectedRows, depth = 0) => names.map((value) => {
+    const dimension = groups[depth] || "employee";
+    const groupRows = rows.filter((index) => fixtureValue(dimension, index) === value);
+    const rowIndex = collectionFor(dimension).indexOf(value);
     const valueId = String(rowIndex + 1);
     return {
-      dimension: { value, value_id: valueId, id: groups[path.length] || "employee" },
-      columns: requestedColumns.map((id) => getMetricValue(id, rowIndex + path.length)),
-      rows: path.length + 1 < groups.length ? rowsFor(axisLabels(groups[path.length + 1]), [...path, valueId]) : [],
+      dimension: { value, value_id: valueId, id: dimension },
+      columns: valuesFor(groupRows),
+      rows: depth + 1 < groups.length ? rowsFor(axisLabels(groups[depth + 1]), groupRows, depth + 1) : [],
     };
   });
   let items = [];

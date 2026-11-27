@@ -182,6 +182,16 @@
   height: 176px;
 }
 
+.widget-designer-chart[data-chart-type="textArea"] {
+  height: auto;
+  min-height: 120px;
+  max-height: 368px;
+  overflow-wrap: anywhere;
+}
+
+.widget-designer-chart[data-chart-type="divider"] { height: 64px; }
+.widget-designer-chart[data-chart-type="divider"][data-mode="divider"] { height: 40px; }
+
 .widget-line-totals {
   margin-top: var(--cmgui-spacing-1);
   color: var(--cmgui-color-text-primary);

@@ -1,6 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
 import { formatter } from "@comagic/reports/lib/i18n/formatter.js";
 import { getReportTotals } from "@comagic/reports/lib/requests/getAggregatedReportByType.js";
+import { useWidgetColumns } from "@comagic/reports/lib/components/dashboard/useWidgetColumns.js";
+import { useReportsConfigContext } from "@comagic/reports/lib/providers/reports-config-priovider/ReportsConfigProvider.js";
+
+export function GroupedWidgetTotals({ widget, dateFrom, dateTill, goal_ids }) {
+  const { columns, filter, report_type } = widget.params;
+  const metadata = useWidgetColumns(columns, report_type);
+  const { currency } = useReportsConfigContext();
+  return (
+    <LineWidgetTotals
+      params={{ date_from: dateFrom, date_till: dateTill, columns, filter, report_type, goal_ids, perspective_window: 60 }}
+      columnNames={metadata.map((column) => column?.name)}
+      columnDataTypes={metadata.map((column) => column?.data_type)}
+      currency={currency} />
+  );
+}
 
 export function LineWidgetTotals({ params, columnNames, columnDataTypes, currency }) {
   const { data } = useQuery({

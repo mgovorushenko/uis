@@ -1,5 +1,5 @@
-import { useEffect, useId, useRef, useState } from "react";
-import { Button, Checkbox, Icon, List, Modal, Select, Switch, Tooltip } from "@comagic/ui";
+import { useEffect, useRef, useState } from "react";
+import { Button, Checkbox, Icon, List, Modal, Select, Switch } from "@comagic/ui";
 import { useFormContext, useWatch } from "react-hook-form";
 import { TypeControl } from "@comagic/reports/lib/components/dashboard/widget-modal/widget-form/components/TypeControl.js";
 import { DateTimeDimensions } from "@comagic/reports/lib/components/dashboard/widget-modal/widget-form/components/DateTimeDimensions.js";
@@ -17,38 +17,10 @@ import { useGetReportState } from "@comagic/reports/lib/hooks/useGetReportState/
 import { useReportContext } from "@comagic/reports/lib/providers/report-core-provider/ReportContext.js";
 import { useSystemContext } from "@comagic/reports/lib/providers/system-provider/SystemProvider.js";
 import { getIsWidgetColumnAvailable } from "@comagic/reports/lib/utils/widgetPanelState.js";
+import { getIsSecondColumnModeWidgetType } from "@comagic/reports/lib/components/dashboard/compare-mode.js";
 import { arrayToTree } from "@comagic/reports/lib/utils/arrayToTree.js";
+import { Help, HelpRow, selectTree } from "./widget-fields.jsx";
 import { WidgetFilters } from "./widget-filters.jsx";
-
-const help = {
-  type: "Выберите, как показать данные на дашборде, например, линейный график или столбчатая диаграмма",
-  source: "Отчет, из которого виджет берет данные. От источника зависят доступные показатели",
-  metric: "Выберите, что будет измерять виджет. Например, количество звонков или долю пропущенных.",
-  group: "Разделите данные на группы, например по сайту. Для каждой группы на графике появится своя линия.",
-  limit: "Сколько групп можно показать на графике одновременно",
-  second: "Сравните два показателя на одном графике. У второго показателя будет своя шкала.",
-};
-
-function Help({ field, label }) {
-  const id = useId();
-  const [visible, setVisible] = useState(false);
-  return (
-    <Tooltip text={<span id={id} role="tooltip">{help[field]}</span>} innerClassname="widget-help-tooltip"
-      visible={visible} onVisibleChange={setVisible} placement="right" mouseEnterDelay={0.3}
-      maxWidth="min(260px, calc(100vw - 32px))">
-      <button className="widget-help" type="button" aria-label={`Подсказка: ${label}`} aria-describedby={visible ? id : undefined}
-        onFocus={(event) => { if (event.currentTarget.matches(":focus-visible")) setVisible(true); }}
-        onBlur={() => setVisible(false)} onClick={() => setVisible(true)}
-        onKeyDown={(event) => { if (event.key === "Escape" && visible) { event.stopPropagation(); setVisible(false); } }}>
-        <img src="../assets/icons/info_20.svg" alt="" />
-      </button>
-    </Tooltip>
-  );
-}
-
-function HelpRow({ field, label, children }) {
-  return <div className="widget-help-row">{children}<Help field={field} label={label} /></div>;
-}
 
 function EditableTitle({ title, onChange }) {
   const [draft, setDraft] = useState(null);
@@ -80,13 +52,37 @@ function EditableTitle({ title, onChange }) {
 
 const blankMetric = () => ({ id: "", name: "" });
 const fieldChange = { shouldDirty: true, shouldValidate: true };
+const legendTypes = new Set(["line", "bar", "stackedBar", "horizontalBar", "horizontalStackedBar", "pie"]);
+const titles = {
+  line: "Новый график",
+  label: "Новая карточка",
+  bar: "Новая столбчатая диаграмма",
+  stackedBar: "Новая столбчатая диаграмма",
+  horizontalBar: "Новая линейчатая диаграмма",
+  horizontalStackedBar: "Новая линейчатая диаграмма",
+  pie: "Новая круговая диаграмма",
+  funnel: "Новая воронка",
+  heatmap: "Новая тепловая карта",
+  table: "Новая таблица",
+  divider: "Разделитель",
+  textArea: "Текстовый блок",
+  treemap: "Новая древовидная карта",
+};
 
-function selectTree(nodes, excluded) {
-  return nodes.flatMap(({ id, name, children, isLeaf }) => {
-    if (isLeaf) return id === excluded ? [] : [{ key: String(id), value: name, title: name }];
-    const nested = selectTree(children ?? [], excluded);
-    return nested.length ? [{ key: `group-${id}`, title: name, children: nested }] : [];
-  });
+function getPreviewPrompt(values, isSimple, needsBothMetrics) {
+  const { chartType, report_type, reportConfig, description, dimension, secondDimension, columns } = values;
+  if (isSimple) return chartType === "textArea" && !description?.trim() ? "Введите текст" : "Заполните обязательные поля";
+  if (!report_type) return "Выберите источник данных";
+  if (needsBothMetrics) return "Выберите оба показателя";
+  if (!columns?.length || columns.some(({ id }) => !id)) {
+    return chartType === "funnel" ? "Выберите показатели для этапов"
+      : columns?.length > 1 ? "Выберите показатели" : "Выберите показатель";
+  }
+  if (!dimension && !["line", "label", "funnel"].includes(chartType) && !(chartType === "table" && reportConfig === "flat")) {
+    return chartType === "table" ? "Выберите вложенность" : chartType === "heatmap" ? "Выберите группировку по столбцам" : "Выберите группировку";
+  }
+  if (chartType === "heatmap" && !secondDimension) return "Выберите группировку по строкам";
+  return "Заполните обязательные поля";
 }
 
 function MetricSelect({ label, index, columns, tree, loading, onChange }) {
@@ -175,16 +171,15 @@ export function WidgetModalContent({ currentWidget, isCreateMode }) {
   const [showLegend, setShowLegend] = useState(() => currentWidget?.displayParams?.showLegend !== false);
   const metricId = values.columns?.[0]?.id;
   const metricName = columnData.columnsTreeDataHash[metricId]?.name;
-  const isLine = values.chartType === "line";
-  const isSimple = ["divider", "textArea"].includes(values.chartType);
-  const automaticTitle = metricName || (isLine ? "Новый график" : "Новый виджет");
+  const chartType = values.chartType;
+  const isLine = chartType === "line";
+  const isSimple = ["divider", "textArea"].includes(chartType);
+  const hasLegend = legendTypes.has(chartType) || (chartType === "funnel" && values.mode === "vertical");
+  const automaticTitle = (!isSimple && metricName) || titles[chartType] || "Новый виджет";
   const title = customTitle || automaticTitle;
-  const needsBothMetrics = isLine && values.secondColumnControl && (!metricId || !values.columns?.[1]?.id);
+  const hasTwoMetricFields = chartType === "treemap" || (getIsSecondColumnModeWidgetType(chartType) && values.secondColumnControl);
+  const needsBothMetrics = hasTwoMetricFields && (!metricId || !values.columns?.[1]?.id);
   const canPreview = isValid && (isSimple || (Boolean(metricId) && !needsBothMetrics));
-  const previewPrompt = !values.report_type && !isSimple ? "Выберите источник данных"
-    : needsBothMetrics ? "Выберите оба показателя"
-    : !metricId && !isSimple ? "Выберите показатель"
-    : "Заполните обязательные поля";
   const close = () => setWidgetModalParams({ visible: false });
 
   useEffect(() => {
@@ -198,7 +193,7 @@ export function WidgetModalContent({ currentWidget, isCreateMode }) {
       dataType: columnData.columnsTreeDataHash[formValues.columns?.[0]?.id]?.data_type,
     });
     Object.assign(widget.displayParams, { customTitle, autoTitle: !customTitle });
-    if (isLine) widget.displayParams.showLegend = showLegend;
+    if (hasLegend) widget.displayParams.showLegend = showLegend;
     return widget;
   }
 
@@ -227,22 +222,22 @@ export function WidgetModalContent({ currentWidget, isCreateMode }) {
         <section className={`widget-designer-preview${canPreview ? " has-widget" : ""}`} aria-label="Предпросмотр">
           {canPreview ? (
             <>
-              {isLine && (
+              {hasLegend && (
                 <div className="widget-designer-preview-toolbar">
                   <div className="widget-designer-visibility">
                     <Checkbox checked={showLegend} label="Легенда" onChange={() => setShowLegend((current) => !current)} />
                   </div>
-                  <div className="widget-designer-detail"><DateTimeDimensions /></div>
+                  {isLine && <div className="widget-designer-detail"><DateTimeDimensions /></div>}
                 </div>
               )}
-              <div className="widget-designer-chart">
+              <div className="widget-designer-chart" data-chart-type={chartType} data-mode={values.mode}>
                 <WidgetFactory key={values.chartType} id={`widget-show-panel-${values.id}`} widget={process(values)}
                   dateFrom={shadowReportState.date_from} dateTill={shadowReportState.date_till} goal_ids={shadowReportState.goal_ids}
                   draggable={false} isForm />
               </div>
             </>
           ) : (
-            <p role="status">{previewPrompt}</p>
+            <p role="status">{getPreviewPrompt(values, isSimple, needsBothMetrics)}</p>
           )}
         </section>
       </div>
